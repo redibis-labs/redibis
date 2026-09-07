@@ -1,0 +1,105 @@
+# Sanitized CAFC base contract (ODCS v3.0.2) for Contract Synthesis golden tests.
+# Does not contain production PII; field names are illustrative only.
+apiVersion: v3.0.2
+kind: DataContract
+id: cafc-customer-feature-composite-daily
+name: Customer Analytical Feature Composite (CAFC)
+version: 1.0.0
+status: active
+domain: Customer Analytics
+dataProduct: cafc
+description:
+  purpose: Daily customer-level analytical feature composite consolidating behaviour, value, and billing signals.
+  limitations: Batch T+1 only; no real-time stream.
+  usage: Downstream ML feature stores and CRM scoring.
+tags:
+  - cafc
+  - analytics
+servers:
+  - server: hive-analytics
+    type: hive
+    description: Analytics warehouse
+    environment: production
+    host: hive.example.local
+    database: analytics
+schema:
+  - name: customer_feature_composite_daily
+    physicalName: analytics.customer_feature_composite_daily
+    logicalType: object
+    description: One row per customer per business day.
+    dataGranularityDescription: customer_id + business_date
+    properties:
+      - name: customer_id
+        physicalName: customer_id
+        logicalType: string
+        physicalType: string
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 1
+        description: Surrogate customer key
+        quality:
+          - type: library
+            rule: nullValues
+            mustBe: 0
+            description: customer_id must not be null
+      - name: business_date
+        physicalName: business_date
+        logicalType: date
+        physicalType: date
+        required: true
+        primaryKey: true
+        primaryKeyPosition: 2
+        description: Business day partition key
+        partitioned: true
+        partitionKeyPosition: 1
+      - name: msisdn_hash
+        physicalName: msisdn_hash
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Hashed network identifier (not raw MSISDN)
+      - name: arpu_30d
+        physicalName: arpu_30d
+        logicalType: number
+        physicalType: double
+        required: false
+        description: 30-day average revenue
+      - name: region_code
+        physicalName: region_code
+        logicalType: string
+        physicalType: string
+        required: false
+        description: Lookup region code from reference.dim_region
+    quality:
+      - type: library
+        rule: rowCount
+        description: Non-empty daily load
+        mustBeGreaterThan: 0
+    relationships: []
+slaProperties:
+  - property: freshness
+    value: 24
+    unit: hours
+    element: $.schema[0]
+  - property: frequency
+    value: 1
+    unit: days
+team:
+  - username: cafc-owner
+    role: owner
+    dateIn: "2024-01-01"
+support:
+  - channel: email
+    url: mailto:cafc-ops@example.com
+    description: CAFC on-call
+roles:
+  - role: analytics_reader
+    description: Read access for feature consumers
+    access: read
+customProperties:
+  - property: upstreamSources
+    value:
+      - crm.customers
+      - billing.usage_daily
+  - property: requirementDocument
+    value: REQ-CAFC-001

@@ -1,0 +1,10 @@
+name: merchant-curated-demo
+description: Tutorial curated rules — example null checks for merchant contact columns.
+rules:
+  - rule: expect_column_values_to_not_be_null
+    column: merchant_email
+    kwargs: {}
+  - rule: expect_column_values_to_not_be_null
+    column: merchant_mobile
+    kwargs: {}
+ge_code: qa.add_gx_expectation(expectation_name='expect_column_values_to_not_be_null', column='merchant_email')

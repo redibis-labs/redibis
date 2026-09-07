@@ -1,0 +1,38 @@
+apiVersion: v3.0.1
+kind: DataContract
+name: merchant_registry_gold
+version: 1.0.0
+status: active
+schema:
+  - name: merchants
+    physicalName: telecom.merchants
+    description: >
+      Merchant master registry: one row per enrolled merchant, covering contact,
+      location, and onboarding identity used by telecom acquisition processes.
+    purpose: Merchant onboarding registry
+    tags: [telecom, merchant]
+    properties:
+      - name: merchant_mobile
+        logicalType: string
+        physicalType: string
+        businessName: Merchant mobile number
+        classification: pii_personal
+        tags: [pii, gdpr_personal_data, contact, MSISDN, PII]
+        entity_type: PHONE_NUMBER
+        business:
+          definition: >-
+            The merchant's primary mobile number used for verification, SMS alerts,
+            and contact during onboarding.
+          synonyms: [mobile, msisdn, contact_number]
+          example_values: ["+20 1# ### ####", "01##########"]
+          tags: [contact, identifier]
+      - name: city
+        logicalType: string
+        physicalType: string
+        businessName: City
+        tags: [location]
+        business:
+          definition: City or governorate where the merchant operates or is registered.
+          synonyms: [town, governorate]
+          example_values: ["Cairo", "Alexandria"]
+          tags: [location, geography]

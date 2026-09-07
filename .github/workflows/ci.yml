@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install package and test dependencies
+        run: pip install -e ".[dev]" -c requirements/constraints.txt
+      - name: Run test suite
+        run: pytest tests/ -q --tb=short
+
+  wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build wheel
+        run: |
+          pip install build
+          python -m build --wheel
+      - name: Check wheel contents
+        run: |
+          set -euo pipefail
+          WHL=$(ls dist/redibis-*.whl)
+          if unzip -l "$WHL" | awk '{print $NF}' | grep -E \
+            '^(enterprise/|redibis_reports|redibis_codegen_service|redibis_training)'; then
+            echo "Commercial material found in OSS wheel" >&2
+            exit 1
+          fi

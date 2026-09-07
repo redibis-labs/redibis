@@ -1,0 +1,80 @@
+{
+  "status": "passed",
+  "validated_table_count": 14,
+  "validated_column_count": 147,
+  "validated_pii_column_count": 123,
+  "validated_non_pii_column_count": 24,
+  "validated_schema": "tabular_column column_classification golden_truth",
+  "table_results": [
+    {
+      "table_name": "telco_customer_profile",
+      "column_count": 11,
+      "pii_column_count": 9
+    },
+    {
+      "table_name": "telco_kyc_identity_document",
+      "column_count": 10,
+      "pii_column_count": 8
+    },
+    {
+      "table_name": "telco_subscriber_sim_registry",
+      "column_count": 10,
+      "pii_column_count": 7
+    },
+    {
+      "table_name": "telco_device_and_cpe_inventory",
+      "column_count": 10,
+      "pii_column_count": 9
+    },
+    {
+      "table_name": "telco_cdr_event",
+      "column_count": 13,
+      "pii_column_count": 12
+    },
+    {
+      "table_name": "telco_billing_invoice",
+      "column_count": 11,
+      "pii_column_count": 10
+    },
+    {
+      "table_name": "eshop_customer_account",
+      "column_count": 9,
+      "pii_column_count": 8
+    },
+    {
+      "table_name": "eshop_shipping_address",
+      "column_count": 12,
+      "pii_column_count": 11
+    },
+    {
+      "table_name": "eshop_order_header",
+      "column_count": 9,
+      "pii_column_count": 5
+    },
+    {
+      "table_name": "fintech_payment_transaction",
+      "column_count": 14,
+      "pii_column_count": 13
+    },
+    {
+      "table_name": "fintech_mobile_wallet_account",
+      "column_count": 10,
+      "pii_column_count": 8
+    },
+    {
+      "table_name": "merchant_seller_registry",
+      "column_count": 11,
+      "pii_column_count": 11
+    },
+    {
+      "table_name": "support_ticket_free_text",
+      "column_count": 8,
+      "pii_column_count": 4
+    },
+    {
+      "table_name": "sensitive_customer_risk_profile",
+      "column_count": 9,
+      "pii_column_count": 8
+    }
+  ]
+}

@@ -1,0 +1,411 @@
+# Telecom industry classification policy pack (Apache Atlas aligned).
+# Open, versioned, governed — see docs/agents/AGENTIC_GOVERNANCE_DESIGN.md
+version: "1.0.0"
+name: telecom
+description: Multi-domain telecom data classification per Apache Atlas guide
+
+domains:
+  DataSensitivity:
+    tags:
+      PII:
+        attributes: {}
+      SubscriberPII:
+        attributes:
+          subscriber_type: {required: false}
+      pii_indirect:
+        attributes: {}
+      security_sensitive:
+        attributes: {}
+      BiometricData:
+        attributes:
+          biometric_type: {required: true}
+      CPNI:
+        attributes:
+          cpni_category: {required: false}
+      BusinessConfidential:
+        attributes: {}
+      PublicData:
+        attributes: {}
+
+  DataSecurity:
+    tags:
+      Public: {order: 0}
+      Internal: {order: 1}
+      Confidential: {order: 2}
+      Restricted: {order: 3}
+      TopSecret: {order: 4}
+
+  RegulatoryCompliance:
+    tags:
+      GDPR:
+        attributes:
+          lawful_basis: {required: false}
+      TRAI:
+        attributes: {}
+      CPNI_Regulated:
+        attributes: {}
+      PCI_DSS:
+        attributes: {}
+      LawfulIntercept:
+        attributes:
+          warrant_ref: {required: false}
+        apply_forbidden: true
+
+  TelcoDataType:
+    tags:
+      MSISDN:
+        attributes: {}
+      IMEI:
+        attributes: {}
+      IMSI:
+        attributes: {}
+      CDR_Data:
+        attributes:
+          cdr_type: {required: false}
+      BillingData:
+        attributes: {}
+      NetworkTelemetry:
+        attributes: {}
+      KYC_Document:
+        attributes:
+          document_type: {required: false}
+
+  DataQuality:
+    tags:
+      HighIntegrity:
+        attributes: {}
+      MediumIntegrity:
+        attributes: {}
+      LowIntegrity:
+        attributes: {}
+
+  Lifecycle:
+    tags:
+      Active:
+        attributes: {}
+      Suspended:
+        attributes: {}
+      Churned:
+        attributes: {}
+      Archived:
+        attributes: {}
+
+  RetentionPolicy:
+    tags:
+      ShortTerm90d:
+        retention_days: 90
+      MediumTerm1y:
+        retention_days: 365
+      LongTerm7y:
+        retention_days: 2555
+      Indefinite:
+        retention_days: null
+
+  PrivacyState:
+    tags:
+      RawPersonalData:
+        attributes: {}
+      Pseudonymized:
+        attributes: {}
+      Anonymized:
+        attributes: {}
+      AggregatedOnly:
+        attributes: {}
+
+golden_rules:
+  - id: single_data_security
+    description: Exactly one DataSecurity tag per entity
+    rule: exactly_one
+    domain: DataSecurity
+
+  - id: sensitivity_requires_confidential
+    description: Any DataSensitivity tag requires DataSecurity >= Confidential
+    rule: min_security_for_domain
+    trigger_domain: DataSensitivity
+    min_security: Confidential
+
+  - id: lawful_intercept_escalate
+    description: LawfulIntercept is detect-and-escalate only; never apply
+    rule: escalate_only
+    tag: RegulatoryCompliance:LawfulIntercept
+
+  - id: pseudonymized_not_anonymized
+    description: Pseudonymized and Anonymized are mutually exclusive
+    rule: mutually_exclusive
+    tags:
+      - PrivacyState:Pseudonymized
+      - PrivacyState:Anonymized
+
+  - id: archived_requires_retention
+    description: Archived or Churned lifecycle requires a RetentionPolicy tag
+    rule: requires_when
+    when_tag: Lifecycle:Archived
+    requires_domain: RetentionPolicy
+  - id: churned_requires_retention
+    description: Churned lifecycle requires a RetentionPolicy tag
+    rule: requires_when
+    when_tag: Lifecycle:Churned
+    requires_domain: RetentionPolicy
+
+cotag_matrix:
+  SubscriberPII:
+    mandatory:
+      - domain: DataSecurity
+        tag: Confidential
+      - domain: TelcoDataType
+        tag: MSISDN
+  BiometricData:
+    mandatory:
+      - domain: DataSecurity
+        tag: Restricted
+  CDR_Data:
+    mandatory:
+      - domain: RetentionPolicy
+        tag: ShortTerm90d
+      - domain: DataSecurity
+        tag: Confidential
+  MSISDN:
+    mandatory:
+      - domain: DataSensitivity
+        tag: PII
+  IMEI:
+    mandatory:
+      - domain: DataSensitivity
+        tag: PII
+  IMSI:
+    mandatory:
+      - domain: DataSensitivity
+        tag: PII
+  NETWORK_ID:
+    mandatory:
+      - domain: TelcoDataType
+        tag: NetworkTelemetry
+      - domain: DataSecurity
+        tag: Internal
+  KYC_Document:
+    mandatory:
+      - domain: DataSecurity
+        tag: Restricted
+
+security_derivation:
+  PII: Confidential
+  SubscriberPII: Confidential
+  pii_indirect: Confidential
+  security_sensitive: Restricted
+  BiometricData: Restricted
+  CPNI: Restricted
+  BusinessConfidential: Internal
+  PublicData: Public
+
+retention_table:
+  CDR_Data:
+    days: 90
+    tag: ShortTerm90d
+  BillingData:
+    days: 2555
+    tag: LongTerm7y
+  NetworkTelemetry:
+    days: 90
+    tag: ShortTerm90d
+  KYC_Document:
+    days: 2555
+    tag: LongTerm7y
+
+jurisdiction_cotags:
+  EU:
+    - domain: RegulatoryCompliance
+      tag: GDPR
+  IN:
+    - domain: RegulatoryCompliance
+      tag: TRAI
+  US:
+    - domain: RegulatoryCompliance
+      tag: CPNI_Regulated
+
+jurisdiction_inference:
+  US:
+    - when_column_tags_any:
+        - regulated
+      candidate:
+        domain: DataSensitivity
+        tag: CPNI
+        confidence: 0.7
+        source: jurisdiction_inference:US
+
+role_routing:
+  Steward:
+    - DataSensitivity.*
+    - TelcoDataType.*
+    - DataQuality.*
+    - Lifecycle.*
+    - PrivacyState.*
+  Architecture:
+    - DataSecurity.*
+    - RetentionPolicy.*
+  SecOps:
+    - RegulatoryCompliance.LawfulIntercept
+  DPO:
+    - RegulatoryCompliance.GDPR
+    - DataSensitivity.BiometricData
+    - DataSensitivity.CPNI
+  Legal:
+    - RegulatoryCompliance.*
+
+entity_type_mapping:
+  PHONE_NUMBER:
+    domain: TelcoDataType
+    tag: MSISDN
+  NATIONAL_ID:
+    domain: DataSensitivity
+    tag: SubscriberPII
+  CREDIT_CARD:
+    domain: DataSensitivity
+    tag: PII
+  PASSPORT:
+    domain: DataSensitivity
+    tag: SubscriberPII
+  BIOMETRIC:
+    domain: DataSensitivity
+    tag: BiometricData
+  EMAIL:
+    domain: DataSensitivity
+    tag: PII
+  EMAIL_ADDRESS:
+    domain: DataSensitivity
+    tag: PII
+  PERSON:
+    domain: DataSensitivity
+    tag: SubscriberPII
+  SOCIAL_PROFILE_URL:
+    domain: DataSensitivity
+    tag: SubscriberPII
+  SESSION_ID:
+    domain: DataSensitivity
+    tag: pii_indirect
+  PSEUDO_ID:
+    domain: DataSensitivity
+    tag: pii_indirect
+  DEVICE_ID:
+    domain: DataSensitivity
+    tag: pii_indirect
+  COOKIE_ID:
+    domain: DataSensitivity
+    tag: pii_indirect
+  TRACKING_ID:
+    domain: DataSensitivity
+    tag: pii_indirect
+  IP_ADDRESS:
+    domain: DataSensitivity
+    tag: pii_indirect
+  PASSWORD_HASH:
+    domain: DataSensitivity
+    tag: security_sensitive
+  CSRF_TOKEN:
+    domain: DataSensitivity
+    tag: security_sensitive
+  API_KEY:
+    domain: DataSensitivity
+    tag: security_sensitive
+  SECRET:
+    domain: DataSensitivity
+    tag: security_sensitive
+  JWT:
+    domain: DataSensitivity
+    tag: security_sensitive
+  SESSION_TOKEN:
+    domain: DataSensitivity
+    tag: security_sensitive
+  NETWORK_ID:
+    domain: TelcoDataType
+    tag: NetworkTelemetry
+  CELL_ID:
+    domain: TelcoDataType
+    tag: NetworkTelemetry
+  EMPLOYER:
+    domain: DataSensitivity
+    tag: pii_indirect
+
+edge_rules:
+  - id: network_id_not_phone
+    when:
+      name_matches: "(?i)cell_global|(^|_)lac$|tac_lte"
+      entity: PHONE_NUMBER
+    then:
+      set_entity: NETWORK_ID
+      note: "network cell/LAC/TAC identifier, not a phone number"
+  - id: network_id_by_name
+    when:
+      name_matches: "(?i)cell_global|(^|_)lac$|tac_lte"
+    then:
+      set_entity: NETWORK_ID
+      note: "network identifier column by name"
+  - id: imei_named_column
+    when:
+      name_matches: "(?i)\\bimei\\b"
+    then:
+      set_entity: IMEI
+      require_review: true
+      note: "IMEI column — name signal when sample values are synthetic/non-Luhn"
+  - id: custid_not_nid
+    when:
+      name_matches: "(?i)cust(omer)?_id|acct_id|account_id"
+      entity: NATIONAL_ID
+      nid_checksum: fail
+    then:
+      set_entity: NOT_PII
+      note: "surrogate key, not a national id"
+  - id: latlon_is_location
+    when:
+      entity: ADDRESS
+      is_numeric: true
+      name_matches: "(?i)\\b(lat|latitude|lon|lng|longitude)\\b"
+      in_range: [-180, 180]
+    then:
+      set_entity: LOCATION
+      note: "numeric coordinate column, not a postal address"
+  - id: ambiguous_ref_review
+    when:
+      entity: PHONE_NUMBER
+      name_matches: "(?i)\\bref\\b"
+      context_hit: false
+    then:
+      require_review: true
+      note: "phone-shaped but no context"
+  - id: session_token_is_security
+    when: { name_matches: "(?i)(access|auth|refresh|session)[_-]?token" }
+    then: { set_entity: SESSION_TOKEN }
+  - id: api_key_is_security
+    when: { name_matches: "(?i)api[_-]?key" }
+    then: { set_entity: API_KEY }
+  - id: secret_is_security
+    when: { name_matches: "(?i)secret" }
+    then: { set_entity: SECRET }
+  - id: jwt_is_security
+    when: { name_matches: "(?i)jwt|bearer" }
+    then: { set_entity: JWT }
+  - id: session_is_indirect_pii
+    when: { name_matches: "(?i)session|(^|_)sid($|_)" }
+    then: { set_entity: SESSION_ID }
+  - id: surrogate_id_is_indirect
+    when: { name_matches: "(?i)(^|_)(customer|user|client|account)_id$", nid_checksum: fail }
+    then: { set_entity: PSEUDO_ID }
+  - id: csrf_is_security
+    when: { name_matches: "(?i)csrf|xsrf" }
+    then: { set_entity: CSRF_TOKEN }
+  - id: pwdhash_is_security
+    when: { name_matches: "(?i)password|passwd|pwd|_hash$" }
+    then: { set_entity: PASSWORD_HASH }
+  - id: social_url_is_direct
+    when: { entity: URL, name_matches: "(?i)social|profile|oauth" }
+    then: { set_entity: SOCIAL_PROFILE_URL }
+  - id: employer_is_indirect_pii
+    when: { name_matches: "(?i)employer|workplace" }
+    then:
+      set_entity: EMPLOYER
+      note: "employer/workplace name indirectly identifies the associated subscriber"
+  - id: organization_reference_not_pii
+    when:
+      name_matches: "(?i)manufacturer|(^|_)brand($|_)|(^|_)make($|_)|(^|_)oem($|_)|(^|_)(company|organi[sz]ation|merchant|vendor|supplier)(_name)?($|_)"
+    then:
+      set_entity: ORGANIZATION
+      note: "handset manufacturer/brand or company/merchant reference is an organization, not personal data -- overrides NER mislabeling (e.g. a manufacturer name tagged as a person)"

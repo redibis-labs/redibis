@@ -1,0 +1,26 @@
+{
+  "status": "generated",
+  "output_dir": "/home/ubuntu/pii_pandas_generators/table_column_golden_truth_json",
+  "table_count": 14,
+  "column_count": 147,
+  "pii_column_count": 123,
+  "non_pii_column_count": 24,
+  "per_table_files": [
+    "/home/ubuntu/pii_pandas_generators/table_column_golden_truth_json/telco_customer_profile_golden_truth.json",
+    "/home/ubuntu/pii_pandas_generators/table_column_golden_truth_json/telco_kyc_identity_document_golden_truth.json",
+    "/home/ubuntu/pii_pandas_generators/table_column_golden_truth_json/telco_subscriber_sim_registry_golden_truth.json",
+    "/home/ubuntu/pii_pandas_generators/table_column_golden_truth_json/telco_device_and_cpe_inventory_golden_truth.json",
+    "/home/ubuntu/pii_pandas_generators/table_column_golden_truth_json/telco_cdr_event_golden_truth.json",
+    "/home/ubuntu/pii_pandas_generators/table_column_golden_truth_json/telco_billing_invoice_golden_truth.json",
+    "/home/ubuntu/pii_pandas_generators/table_column_golden_truth_json/eshop_customer_account_golden_truth.json",
+    "/home/ubuntu/pii_pandas_generators/table_column_golden_truth_json/eshop_shipping_address_golden_truth.json",
+    "/home/ubuntu/pii_pandas_generators/table_column_golden_truth_json/eshop_order_header_golden_truth.json",
+    "/home/ubuntu/pii_pandas_generators/table_column_golden_truth_json/fintech_payment_transaction_golden_truth.json",
+    "/home/ubuntu/pii_pandas_generators/table_column_golden_truth_json/fintech_mobile_wallet_account_golden_truth.json",
+    "/home/ubuntu/pii_pandas_generators/table_column_golden_truth_json/merchant_seller_registry_golden_truth.json",
+    "/home/ubuntu/pii_pandas_generators/table_column_golden_truth_json/support_ticket_free_text_golden_truth.json",
+    "/home/ubuntu/pii_pandas_generators/table_column_golden_truth_json/sensitive_customer_risk_profile_golden_truth.json"
+  ],
+  "combined_file": "/home/ubuntu/pii_pandas_generators/table_column_golden_truth_json/all_tables_golden_truth.json",
+  "index_csv": "/home/ubuntu/pii_pandas_generators/table_column_golden_truth_json/all_columns_golden_truth_index.csv"
+}

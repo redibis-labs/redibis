@@ -1,0 +1,251 @@
+{
+  "backend": "openmetadata",
+  "steps": [
+    {
+      "body": {
+        "description": "Redibis-managed ODCS contracts (agent catalog)",
+        "name": "redibis",
+        "serviceType": "CustomDatabase"
+      },
+      "method": "PUT",
+      "path": "/v1/services/databaseServices",
+      "target": "databaseService"
+    },
+    {
+      "body": {
+        "description": "Database telecom (from redibis physicalName)",
+        "name": "telecom",
+        "service": "redibis"
+      },
+      "method": "PUT",
+      "path": "/v1/databases",
+      "target": "database"
+    },
+    {
+      "body": {
+        "database": "redibis.telecom",
+        "description": "Default schema for telecom",
+        "name": "default"
+      },
+      "method": "PUT",
+      "path": "/v1/databaseSchemas",
+      "target": "databaseSchema"
+    },
+    {
+      "body": {
+        "columns": [
+          {
+            "dataLength": 20,
+            "dataType": "VARCHAR",
+            "description": "Customer primary mobile number, E.164 Egyptian numbering plan; set at activation, never null. PII (PHONE_NUMBER): cite column existence only; do not quote values.",
+            "name": "msisdn",
+            "tags": [
+              {
+                "labelType": "Automated",
+                "source": "Classification",
+                "state": "Confirmed",
+                "tagFQN": "PII.NonSensitive"
+              },
+              {
+                "labelType": "Automated",
+                "source": "Classification",
+                "state": "Confirmed",
+                "tagFQN": "Redibis.PHONE_NUMBER"
+              },
+              {
+                "labelType": "Automated",
+                "source": "Classification",
+                "state": "Confirmed",
+                "tagFQN": "Redibis.regulated"
+              }
+            ]
+          },
+          {
+            "dataLength": 14,
+            "dataType": "VARCHAR",
+            "description": "Egyptian national ID; 14 digits, checksum validated. PII (NATIONAL_ID): cite column existence only; do not quote values.",
+            "name": "national_id",
+            "tags": [
+              {
+                "labelType": "Automated",
+                "source": "Classification",
+                "state": "Confirmed",
+                "tagFQN": "PII.Sensitive"
+              },
+              {
+                "labelType": "Automated",
+                "source": "Classification",
+                "state": "Confirmed",
+                "tagFQN": "Redibis.NATIONAL_ID"
+              }
+            ]
+          },
+          {
+            "dataLength": 1,
+            "dataType": "VARCHAR",
+            "description": "A=active, S=suspended (non-payment), C=churned.",
+            "name": "status",
+            "tags": [
+              {
+                "labelType": "Automated",
+                "source": "Classification",
+                "state": "Confirmed",
+                "tagFQN": "Redibis.lifecycle"
+              }
+            ]
+          }
+        ],
+        "databaseSchema": "redibis.telecom.default",
+        "description": "Customer master; one row per subscriber at activation.",
+        "displayName": "telecom_customers",
+        "name": "customers",
+        "tableType": "Regular"
+      },
+      "method": "PUT",
+      "path": "/v1/tables",
+      "target": "table"
+    },
+    {
+      "body": [
+        {
+          "description": "Customer primary mobile number, E.164 Egyptian numbering plan; set at activation, never null. PII (PHONE_NUMBER): cite column existence only; do not quote values.",
+          "displayName": "Mobile Phone (MSISDN)",
+          "fullyQualifiedName": "Redibis_telecom.telecom_customers.msisdn",
+          "glossary": "Redibis_telecom",
+          "name": "msisdn",
+          "references": [
+            {
+              "columns": [
+                "msisdn"
+              ],
+              "name": "redibis.telecom.default.customers",
+              "type": "table"
+            }
+          ],
+          "relatedTerms": [],
+          "synonyms": [
+            "Mobile Phone (MSISDN)"
+          ]
+        },
+        {
+          "description": "Egyptian national ID; 14 digits, checksum validated. PII (NATIONAL_ID): cite column existence only; do not quote values.",
+          "displayName": "National ID",
+          "fullyQualifiedName": "Redibis_telecom.telecom_customers.national_id",
+          "glossary": "Redibis_telecom",
+          "name": "national_id",
+          "references": [
+            {
+              "columns": [
+                "national_id"
+              ],
+              "name": "redibis.telecom.default.customers",
+              "type": "table"
+            }
+          ],
+          "relatedTerms": [],
+          "synonyms": [
+            "National ID"
+          ]
+        },
+        {
+          "description": "A=active, S=suspended (non-payment), C=churned.",
+          "displayName": "telecom.customers.status",
+          "fullyQualifiedName": "Redibis_telecom.telecom_customers.status",
+          "glossary": "Redibis_telecom",
+          "name": "status",
+          "references": [
+            {
+              "columns": [
+                "status"
+              ],
+              "name": "redibis.telecom.default.customers",
+              "type": "table"
+            }
+          ],
+          "relatedTerms": [],
+          "synonyms": [
+            "telecom.customers.status"
+          ]
+        }
+      ],
+      "method": "PUT",
+      "path": "/v1/glossaryTerms",
+      "target": "glossaryTerms"
+    },
+    {
+      "body": {
+        "contract_uuid": "11111111-1111-4111-8111-111111111111",
+        "database_name": "telecom",
+        "description": "Customer master; one row per subscriber at activation.",
+        "physicalName": "telecom.customers",
+        "schema": [
+          {
+            "name": "telecom_customers",
+            "physicalName": "telecom.customers",
+            "properties": [
+              {
+                "businessName": "Mobile Phone (MSISDN)",
+                "description": "Customer primary mobile number, E.164 Egyptian numbering plan; set at activation, never null.",
+                "logicalType": "string",
+                "name": "msisdn",
+                "physicalType": "VARCHAR(20)",
+                "privacy": {
+                  "classification_engine": {
+                    "confidence": 0.92,
+                    "detected": true,
+                    "entity_type": "PHONE_NUMBER"
+                  },
+                  "masking_policy": {
+                    "default_strategy": "fpe",
+                    "reversible": true
+                  }
+                },
+                "tags": [
+                  "regulated"
+                ]
+              },
+              {
+                "businessName": "National ID",
+                "description": "Egyptian national ID; 14 digits, checksum validated.",
+                "logicalType": "string",
+                "name": "national_id",
+                "physicalType": "VARCHAR(14)",
+                "privacy": {
+                  "classification_engine": {
+                    "confidence": 0.95,
+                    "detected": true,
+                    "entity_type": "NATIONAL_ID"
+                  },
+                  "masking_policy": {
+                    "default_strategy": "hash",
+                    "reversible": false
+                  }
+                }
+              },
+              {
+                "description": "A=active, S=suspended (non-payment), C=churned.",
+                "logicalType": "string",
+                "name": "status",
+                "physicalType": "CHAR(1)",
+                "tags": [
+                  "lifecycle"
+                ]
+              }
+            ]
+          }
+        ],
+        "table_name": "customers",
+        "version": "1.0.0"
+      },
+      "body_format": "odcs_json",
+      "method": "PUT",
+      "path": "/v1/dataContracts/odcs",
+      "query": {
+        "entityType": "table",
+        "mode": "replace"
+      },
+      "target": "dataContract"
+    }
+  ],
+  "table_fqn": "redibis.telecom.default.customers"
+}

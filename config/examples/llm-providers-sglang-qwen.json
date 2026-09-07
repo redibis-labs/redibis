@@ -1,0 +1,30 @@
+{
+  "_comment": "Local SGLang + Qwen for enrichment. Never put real API keys here — use SGLANG_API_KEY. Pair with config/examples/scan-enrich-catalog-sglang.yaml.",
+  "providers": {
+    "demo": {
+      "kind": "demo",
+      "description": "Offline demo (no network)",
+      "residency": "local"
+    },
+    "sglang-qwen": {
+      "kind": "custom",
+      "description": "SGLang-hosted Qwen (local)",
+      "profile_type": "openai_compatible",
+      "litellm_model": "openai/Qwen/Qwen2.5-14B-Instruct",
+      "model_prefix": "openai",
+      "api_base": "http://localhost:30000/v1",
+      "api_key_env": "SGLANG_API_KEY",
+      "supports_json": true,
+      "residency": "local",
+      "known_models": [
+        "Qwen/Qwen2.5-14B-Instruct",
+        "Qwen/Qwen2.5-7B-Instruct"
+      ],
+      "params": {
+        "temperature": 0.2,
+        "max_tokens": 4096,
+        "timeout": 120
+      }
+    }
+  }
+}

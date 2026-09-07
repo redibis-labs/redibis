@@ -1,0 +1,14 @@
+# Expected plaintext findings for we_call_center_ar.txt
+# Engines: regex + phone (language=ar). PERSON names need NER.
+
+PHONE_NUMBER	01559876543
+PHONE_NUMBER	01550123499
+EG_NATIONAL_ID	29511202105432
+EG_NATIONAL_ID	29807080104321
+LOCATION	عمارة
+LOCATION	الجيزة
+
+# Names in the source (NER / PERSON when a model is attached)
+PERSON	طارق عبد العزيز محمد
+PERSON	سارة علي عبد الرحمن
+PERSON	فاطمة حسن خليل

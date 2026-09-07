@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "redibis-pii-guard"
+version = "0.1.0"
+description = "Standalone PII Guard service — scan + de-identify over redibis library."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "redibis>=0.5.6",
+    "fastapi>=0.100,<0.120",
+    "uvicorn>=0.23,<0.40",
+    "httpx>=0.27,<0.28",
+    "pydantic>=2.0,<3",
+    "pyyaml>=6.0",
+    "pandas>=2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==8.2.0"]
+
+[project.scripts]
+redibis-pii-guard = "redibis_pii_guard.app:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["redibis_pii_guard*"]

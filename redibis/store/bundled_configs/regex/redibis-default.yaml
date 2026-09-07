@@ -1,0 +1,6 @@
+name: redibis-default
+description: Built-in regex catalog — merge with default telecom patterns (no custom overrides).
+config:
+  replace_all: false
+  add: {}
+  remove: []

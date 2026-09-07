@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="referrer" content="same-origin"/>
+  <title>Redibis — Text Gateway</title>
+  <link rel="stylesheet" href="/static/app.css?v={{ css_v }}"/>
+  <link rel="stylesheet" href="/static/gateway.css?v={{ css_v }}"/>
+  <link rel="icon" type="image/png" href="/static/logo.png"/>
+</head>
+<body class="gateway-page">
+  <nav class="nav">
+    <a class="nav-left" href="/" aria-label="Open scan console">
+      <img src="/static/logo.png" alt="R" class="nav-logo-img" onerror="this.style.display='none'"/>
+      <div class="nav-brand">Redibis</div>
+      <div class="nav-tagline">text gateway</div>
+    </a>
+    <div id="navTabs" class="nav-tabs"></div>
+    <div class="nav-right">
+      <a class="nav-link" href="/">◈ Scan</a>
+      <a class="nav-link" href="/v2">◈ Contracts</a>
+      <a class="nav-link" href="/reports">◈ Reports</a>
+      <a class="nav-link" href="/gateway">◈ Gateway</a>
+      <a class="nav-link" href="/docs" target="_blank">◉ API Docs</a>
+      {% if user and user.role == 'admin' %}
+      <a class="nav-link" href="/users">👤 Users</a>
+      {% endif %}
+      {% include "_user_menu.html" %}
+    </div>
+  </nav>
+
+  <div class="page gw">
+    <header class="gw-head">
+      <h1>Text Gateway</h1>
+      <p class="gw-sub">
+        Paste text to see exactly what personal data it contains.
+        Scanned in memory — never stored.
+      </p>
+    </header>
+
+    <div class="gw-grid">
+      <section class="gw-main">
+        <div id="gwBanner" class="gw-banners" hidden role="status"></div>
+        <div id="gwHealthBanner" class="gw-banners" hidden role="status"></div>
+
+        <div id="gwProgress" class="gw-progress" hidden>
+          <div class="gw-progress-track">
+            <div id="gwProgressFill" class="gw-progress-fill"
+                 role="progressbar" aria-valuemin="0" aria-valuemax="100"
+                 aria-valuenow="0" aria-label="Scan progress"></div>
+          </div>
+          <div class="gw-progress-row">
+            <div id="gwProgressStage" class="gw-progress-stage" aria-live="polite">Starting…</div>
+            <button id="gwCancelScan" type="button" class="btn btn-ghost btn-sm">Cancel</button>
+          </div>
+        </div>
+
+        <textarea id="gwInput" class="gw-input"
+                  placeholder="Paste text here…"
+                  spellcheck="false" autocomplete="off"
+                  autocapitalize="off" autocorrect="off"
+                  maxlength="{{ ui_max_chars }}"></textarea>
+
+        <div id="gwResult" class="gw-result" hidden
+             role="region" aria-live="polite" tabindex="-1"
+             aria-label="Scan result with highlighted findings"></div>
+
+        <div class="gw-bar">
+          <label>Language
+            <select id="gwLang">
+              <option value="en">English</option>
+              <option value="ar">Arabic</option>
+            </select>
+          </label>
+          <label>Engines
+            <select id="gwEngines">
+              <option value="both">Both</option>
+              <option value="regex">Regex only</option>
+              <option value="ner">NER only</option>
+              <option value="phone">Phone</option>
+            </select>
+          </label>
+          <label>Min score
+            <input id="gwMinScore" type="number" min="0" max="1" step="0.05" value="0.35"/>
+          </label>
+          <label class="gw-check" title="Sends this text to the selected LLM provider.">
+            <input id="gwUseLlm" type="checkbox"/> Use LLM refiner
+          </label>
+          <label id="gwLlmProviderWrap" class="gw-inline" hidden>Provider
+            <select id="gwLlmProvider"><option value="">(default)</option></select>
+          </label>
+          <label id="gwLlmModelWrap" class="gw-inline" hidden>Model
+            <input id="gwLlmModel" type="text" placeholder="(default)" size="14"/>
+          </label>
+          <span class="gw-spacer"></span>
+          <span id="gwCount" class="gw-count">0 / {{ ui_max_chars }}</span>
+          <button id="gwEdit" type="button" class="btn btn-ghost" hidden>Edit</button>
+          <button id="gwMaskToggle" type="button" class="btn btn-ghost" hidden
+                  aria-pressed="false"
+                  title="Apply the reviewed de-identification policy to the result pane. Toggle off to restore the original text with highlights.">
+            Show masked
+          </button>
+          <button id="gwScan" type="button" class="btn">Scan</button>
+        </div>
+
+        <div class="gw-bar gw-bar-guards">
+          <label class="gw-check" title="Local heuristic check is always free; an LLM judge runs only when configured.">
+            <input id="gwCheckToxicity" type="checkbox"/> Check toxicity
+          </label>
+          <label class="gw-check" title="Local heuristic check is always free; an LLM judge runs only when configured.">
+            <input id="gwCheckInjection" type="checkbox"/> Check prompt injection
+          </label>
+          <span id="gwGuardHint" class="gw-hint"></span>
+        </div>
+      </section>
+
+      <aside class="gw-side">
+        <div class="gw-card">
+          <h2>Summary</h2>
+          <div id="gwSummary" class="gw-empty">Nothing scanned yet.</div>
+        </div>
+        <div class="gw-card" id="gwSafetyCard" hidden>
+          <h2>Safety checks</h2>
+          <div id="gwSafety" class="gw-kv-list"></div>
+        </div>
+        <div class="gw-card" id="gwMetaCard" hidden>
+          <h2>Provenance</h2>
+          <dl id="gwMeta" class="gw-kv"></dl>
+        </div>
+        <div class="gw-card" id="gwPolicyCard" hidden>
+          <h2>De-identification policy</h2>
+          <p class="gw-hint">Review the suggestion before copying. Nothing is applied until you confirm.</p>
+          <div class="gw-pol-actions">
+            <button id="gwPolicyAllRedact" type="button" class="btn btn-ghost btn-sm"
+                    title="Set default and every entity override to redact">
+              Set all to redact
+            </button>
+          </div>
+          <div id="gwPolicy"></div>
+        </div>
+        <div class="gw-card" id="gwActions" hidden>
+          <h2>Actions</h2>
+          <button id="gwDeid" type="button" class="btn btn-ghost" disabled>Copy de-identified text</button>
+          <button id="gwDownload" type="button" class="btn btn-ghost">Download JSON</button>
+          <button id="gwClear" type="button" class="btn btn-red">Clear</button>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div id="gwTip" class="gw-tip" hidden role="tooltip"></div>
+  <div class="footer-strip">redibis · easily govern · Apache-2.0 license</div>
+
+  <script>
+    window.REDIBIS_USER = {% if user %}{"username":"{{ user.username }}","role":"{{ user.role }}"}{% else %}null{% endif %};
+    window.GW_MAX_CHARS = {{ ui_max_chars }};
+  </script>
+  <script src="/static/auth.js"></script>
+  <script type="module" src="/static/gateway.js?v={{ js_v }}"></script>
+</body>
+</html>

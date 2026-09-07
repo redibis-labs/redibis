@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Redibis — Reports (addon required)</title>
+<link rel="stylesheet" href="/static/app.css?v={{ asset_v }}"/>
+<link rel="icon" type="image/png" href="/static/logo.png"/>
+</head>
+<body>
+<nav class="nav">
+  <a class="nav-left" href="/" aria-label="Open scan console">
+    <img src="/static/logo.png" alt="R" class="nav-logo-img" onerror="this.style.display='none'"/>
+    <div class="nav-brand">Redibis</div>
+    <div class="nav-tagline">reports</div>
+  </a>
+  <div class="nav-right">
+    <a class="nav-link" href="/">◈ Scan</a>
+    <a class="nav-link" href="/gateway">◈ Gateway</a>
+    <a class="nav-link" href="/docs" target="_blank">◉ API Docs</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="crumb">reports · addon</div>
+  <h1 class="page-title">PII Reports add-on required</h1>
+  <p class="page-sub">
+    The open-source redibis core produces scan artifacts (<code>pii_report.json</code>).
+    The filtered KPI console, CSV downloads, and compute debug stream ship as the
+    commercial package <strong>redibis-reports</strong>.
+  </p>
+  <div class="card" style="padding:24px;max-width:720px">
+    <div class="stitle" style="margin-top:0">Install into this environment</div>
+    <pre style="font-family:'IBM Plex Mono',monospace;font-size:13px;white-space:pre-wrap;background:#faf6f0;border:1px dashed var(--border);border-radius:8px;padding:14px">pip install redibis-reports
+# or editable (monorepo):
+#   pip install -e ./enterprise/addons/reports
+
+# then restart the webapp and reopen /reports</pre>
+    <p style="margin:16px 0 0;color:var(--muted);font-size:14px">
+      See <code>README.md#commercial-reporting</code> for the public package boundary
+      and installation summary.
+    </p>
+  </div>
+</div>
+<div class="footer-strip">redibis · open core · Apache-2.0 · reporting is a commercial add-on</div>
+</body>
+</html>

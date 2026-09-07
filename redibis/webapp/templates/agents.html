@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Redibis — Ask</title>
+<link rel="stylesheet" href="/static/agents.css?v={{ asset_v }}"/>
+<link rel="stylesheet" href="/static/agents_ask.css?v={{ asset_v }}"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css"/>
+<link rel="stylesheet" href="/static/agents_composer.css?v={{ asset_v }}"/>
+<script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reactflow@11/dist/umd/index.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reactflow@11/dist/style.css"/>
+</head>
+<body>
+<nav class="ag-nav">
+  <div class="ag-brand">Redibis <span>Ask</span></div>
+  <div class="ag-nav-links">
+    <button type="button" class="ag-nav-link on" data-view="ask">Ask</button>
+    <button type="button" class="ag-nav-link" data-view="composer">Composer</button>
+    <button type="button" class="ag-nav-link" data-view="dashboard">Dashboard</button>
+    <button type="button" class="ag-nav-link" data-view="results">Results</button>
+    <a class="ag-nav-external" href="/">Scan</a>
+    <a class="ag-nav-external" href="/v2">Contracts</a>
+    <a class="ag-nav-external" href="/reports">Reports</a>
+    <a class="ag-nav-external" href="/gateway">Gateway</a>
+    <a class="ag-nav-external" href="/settings">Settings</a>
+    {% include "_user_menu.html" %}
+  </div>
+</nav>
+{% if not agents_enabled %}
+<div class="ag-banner">Agent execution is disabled (<code>agents.enabled: false</code>). Review the effective configuration in <a href="/settings">Settings</a>; enable agents in deployment config to run.</div>
+{% endif %}
+<main class="ag-main">
+  <section id="view-ask" class="ag-view on">
+    <div class="ask-shell">
+      <h1 class="ask-title">What should we do with your data?</h1>
+      <p class="ask-sub">Describe the goal — profile, PII, contract, enrich. Attach optional sample files.</p>
+      <div id="askRuntime" class="ask-panel">
+        <h3>AI runtime</h3>
+        <div id="askRuntimeBody" class="ask-runtime-grid">Loading effective model configuration…</div>
+      </div>
+      <div class="ask-compose">
+        <div class="ask-input-row">
+          <textarea id="askPrompt" class="ask-textarea" rows="2" aria-label="Describe the data governance task" placeholder="e.g. Profile telecom.customers, detect PII, and enrich the contract…"></textarea>
+          <div class="ask-actions">
+            <button type="button" class="ask-icon-btn" id="askAddFiles" title="Add sources" aria-label="Add source files">+</button>
+            <button type="button" class="ask-send" id="askSend">Send</button>
+          </div>
+        </div>
+        <input type="file" id="askFileInput" class="ask-file-input" multiple accept=".csv,.parquet"/>
+        <div id="askChips" class="ask-chips"></div>
+      </div>
+      <div id="askClarify"></div>
+      <div id="askDebug" class="ask-panel ask-hidden">
+        <h3>Debug state</h3>
+        <ul id="askSteps" class="ask-steps"></ul>
+        <div id="askLogMeta" class="ask-log-meta"></div>
+        <div id="askLog" class="ask-log" style="margin-top:6px"></div>
+      </div>
+      <div id="askArtifacts" class="ask-panel ask-hidden"></div>
+    </div>
+  </section>
+  <section id="view-composer" class="ag-view"></section>
+  <section id="view-results" class="ag-view"></section>
+  <section id="view-dashboard" class="ag-view"></section>
+  <section id="view-plan" class="ag-view" hidden></section>
+  <section id="view-codegen" class="ag-view" hidden></section>
+</main>
+<div class="ag-modal" id="previewModal">
+  <div class="ag-modal-box">
+    <h3 style="font-weight:500;margin-bottom:8px">Run preview</h3>
+    <div id="previewContent"></div>
+    <div style="margin-top:14px;display:flex;gap:8px">
+      <button type="button" class="ag-btn primary" id="btnPreviewRun">Confirm run</button>
+      <button type="button" class="ag-btn" id="btnPreviewClose">Close</button>
+    </div>
+  </div>
+</div>
+<script>window.REDIBIS_AGENTS_ENABLED = {{ 'true' if agents_enabled else 'false' }};</script>
+<script>window.REDIBIS_USER = {% if user %}{"username":"{{ user.username }}","role":"{{ user.role }}"}{% else %}null{% endif %};</script>
+<script src="/static/auth.js"></script>
+{% if copilotkit_enabled %}
+<script>window.REDIBIS_COPILOTKIT_ENABLED = true;</script>
+<script src="/static/agents_copilot.js?v={{ asset_v }}"></script>
+{% endif %}
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="/static/agents_ask.js?v={{ asset_v }}"></script>
+<script src="/static/agents.js?v={{ asset_v }}"></script>
+<script src="/static/agents_composer.js?v={{ asset_v }}"></script>
+</body>
+</html>

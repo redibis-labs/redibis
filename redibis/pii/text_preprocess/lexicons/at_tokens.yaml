@@ -1,0 +1,19 @@
+# Verbal email separators (EN + AR).
+
+at_tokens:
+  - at
+  - "(at)"
+  - "[at]"
+  - "{at}"
+  - آت
+  - ات
+  - فاصل
+
+dot_tokens:
+  - dot
+  - period
+  - "(dot)"
+  - "[dot]"
+  - نقطة
+  - نقطه
+  - دوت

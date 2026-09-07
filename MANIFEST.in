@@ -1,0 +1,3 @@
+# Keep the vendor-internal enterprise tree out of OSS sdists.
+recursive-exclude enterprise *
+global-exclude *.py[cod] __pycache__ .DS_Store

@@ -1,0 +1,33 @@
+table_tags:
+  - domain:subscriber
+columns:
+  msisdn:
+    businessName: Mobile Station ISDN Number
+    business:
+      definition: Unique telephone number assigned to a mobile subscriber.
+      synonyms:
+        - mobile_number
+      tags:
+        - TelcoDataType:MSISDN
+    pii:
+      classification: pii_personal
+      entity_type: PHONE_NUMBER
+      reason: Column name and telco semantics indicate subscriber phone number.
+    tags:
+      - TelcoDataType:MSISDN
+  customer_id:
+    businessName: Customer Identifier
+    business:
+      definition: Internal opaque key that identifies a customer account record.
+    pii:
+      classification: confidential
+      entity_type: OTHER
+      reason: Internal account key; not national ID by default.
+  email:
+    businessName: Email Address
+    business:
+      definition: Electronic mail address used to contact the subscriber.
+    pii:
+      classification: pii_personal
+      entity_type: EMAIL_ADDRESS
+      reason: Direct contact email.

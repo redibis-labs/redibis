@@ -1,0 +1,93 @@
+version: "1.0"
+producers:
+  - id: rule.regex_catalog
+    engine: regex
+    label: "Regex catalogue (Presidio recognizers)"
+    description: "Rule-based pattern matching via the packaged regex catalogue"
+    params: {}
+    output: pii_evidence
+    cost: low
+  - id: ner.presidio
+    engine: presidio
+    label: "Presidio regex engine"
+    description: "Presidio analyzer scores per column (regex path)"
+    params:
+      engines: { type: string, default: regex }
+    output: pii_evidence
+    cost: medium
+  - id: ner.gliner
+    engine: gliner
+    label: "NER model (GLiNER)"
+    description: "Neural entity recognition when model is configured"
+    params: {}
+    output: pii_evidence
+    cost: high
+  - id: equation.decide
+    engine: equation
+    label: "PII equation verdict"
+    description: "Fuse regex + NER scores via decide_pii"
+    params:
+      equation_mode: { type: string, default: independent, choices: [strict, balanced, lenient, independent] }
+    output: pii_verdict
+    cost: low
+  - id: profile.ge
+    engine: great_expectations
+    label: "GE profiler"
+    description: "Great Expectations OnboardingDataAssistant profile"
+    params: {}
+    output: profiling_report
+    cost: medium
+  - id: profile.om
+    engine: open_metadata
+    label: "OpenMetadata metrics profiler"
+    description: "Lean pandas-native OM-style metrics"
+    params: {}
+    output: profiling_report
+    cost: low
+  - id: profile.duckdb
+    engine: duckdb
+    label: "DuckDB SUMMARIZE profiler"
+    description: "Fast DuckDB column statistics"
+    params: {}
+    output: profiling_report
+    cost: low
+  - id: profile.relationships
+    engine: native
+    label: "Cross-column relationships"
+    description: "Correlations, constant columns, redundant pairs"
+    params: {}
+    output: profiling_report
+    cost: low
+  - id: profile.ydata
+    engine: ydata
+    label: "YData profile (optional)"
+    description: "Rich YData report when redibis[ydata] is installed"
+    params:
+      minimal: { type: boolean, default: true }
+    output: profiling_report
+    cost: high
+  - id: telecom.evidence
+    engine: telecom
+    label: "Telecom column evidence"
+    description: "MSISDN/SIM/geo format breakdown and raw sample for LLM reconciliation"
+    params:
+      sample_policy: { type: string, default: raw, choices: [raw, masked] }
+      sample_n: { type: int, default: 10, min: 1, max: 50 }
+    output: telecom_evidence
+    cost: low
+  - id: quality.candidates
+    engine: great_expectations
+    label: "Value-set quality candidates"
+    description: "Low-cardinality columns suitable for value-set expectations"
+    params:
+      max_unique: { type: int, default: 50, min: 2, max: 500 }
+    output: quality_evidence
+    cost: low
+deny:
+  - "*.write_*"
+default_producers:
+  - rule.regex_catalog
+  - equation.decide
+  - profile.ge
+  - profile.relationships
+  - quality.candidates

@@ -1,0 +1,384 @@
+{
+  "table_name": "telco_device_and_cpe_inventory",
+  "table_business_name": "Customer device and CPE inventory",
+  "description": "Tracks handset, router, ONT, and eSIM/device identifiers associated with subscribers and fixed broadband customers.",
+  "domain": "telecom_oss",
+  "granularity": "One row per customer-associated device or CPE asset.",
+  "modality": "tabular_column",
+  "test_type": "column_classification",
+  "column_count": 10,
+  "pii_column_count": 9,
+  "non_pii_column_count": 1,
+  "column_evaluations": [
+    {
+      "test_id": "TABULAR_EVAL_04_001",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_oss",
+        "test_type": "column_classification",
+        "table_name": "telco_device_and_cpe_inventory",
+        "table_business_name": "Customer device and CPE inventory",
+        "table_description": "Tracks handset, router, ONT, and eSIM/device identifiers associated with subscribers and fixed broadband customers.",
+        "column_business_name": "Device asset identifier",
+        "column_description": "Internal asset key.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": true,
+        "primary_key": true,
+        "unique": true
+      },
+      "input_data": {
+        "column_name": "device_asset_id",
+        "sample_values": [
+          "ID-00000001",
+          "ID-00000002",
+          "ID-00000003",
+          "ID-00000004",
+          "ID-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "NUMERIC_ID",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_04_002",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_oss",
+        "test_type": "column_classification",
+        "table_name": "telco_device_and_cpe_inventory",
+        "table_business_name": "Customer device and CPE inventory",
+        "table_description": "Tracks handset, router, ONT, and eSIM/device identifiers associated with subscribers and fixed broadband customers.",
+        "column_business_name": "Customer identifier",
+        "column_description": "Customer linked to the device.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "customer_id",
+        "sample_values": [
+          "ID-00000001",
+          "ID-00000002",
+          "ID-00000003",
+          "ID-00000004",
+          "ID-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CUSTOMER_ID",
+          "is_pii": true,
+          "pii_category": "Linkable Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_04_003",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_oss",
+        "test_type": "column_classification",
+        "table_name": "telco_device_and_cpe_inventory",
+        "table_business_name": "Customer device and CPE inventory",
+        "table_description": "Tracks handset, router, ONT, and eSIM/device identifiers associated with subscribers and fixed broadband customers.",
+        "column_business_name": "Subscription identifier",
+        "column_description": "Subscription linked to the device.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "subscription_id",
+        "sample_values": [
+          "ID-00000001",
+          "ID-00000002",
+          "ID-00000003",
+          "ID-00000004",
+          "ID-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "SUBSCRIBER_ID",
+          "is_pii": true,
+          "pii_category": "Linkable Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_04_004",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_oss",
+        "test_type": "column_classification",
+        "table_name": "telco_device_and_cpe_inventory",
+        "table_business_name": "Customer device and CPE inventory",
+        "table_description": "Tracks handset, router, ONT, and eSIM/device identifiers associated with subscribers and fixed broadband customers.",
+        "column_business_name": "IMEI",
+        "column_description": "Mobile equipment identifier; validate with Luhn where possible.",
+        "logical_type": "string",
+        "physical_type": "CHAR(15)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "imei",
+        "sample_values": [
+          "490154203237000",
+          "490154203237001",
+          "490154203237002",
+          "490154203237003",
+          "490154203237004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "IMEI",
+          "is_pii": true,
+          "pii_category": "Device Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_04_005",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_oss",
+        "test_type": "column_classification",
+        "table_name": "telco_device_and_cpe_inventory",
+        "table_business_name": "Customer device and CPE inventory",
+        "table_description": "Tracks handset, router, ONT, and eSIM/device identifiers associated with subscribers and fixed broadband customers.",
+        "column_business_name": "IMEI software version",
+        "column_description": "IMEI plus software version.",
+        "logical_type": "string",
+        "physical_type": "CHAR(16)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "imeisv",
+        "sample_values": [
+          "490154203237000",
+          "490154203237001",
+          "490154203237002",
+          "490154203237003",
+          "490154203237004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "IMEISV",
+          "is_pii": true,
+          "pii_category": "Device Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_04_006",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_oss",
+        "test_type": "column_classification",
+        "table_name": "telco_device_and_cpe_inventory",
+        "table_business_name": "Customer device and CPE inventory",
+        "table_description": "Tracks handset, router, ONT, and eSIM/device identifiers associated with subscribers and fixed broadband customers.",
+        "column_business_name": "eSIM EID",
+        "column_description": "Embedded SIM identifier.",
+        "logical_type": "string",
+        "physical_type": "CHAR(32)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "embedded_sim_eid",
+        "sample_values": [
+          "embedded_sim_eid_00000001",
+          "embedded_sim_eid_00000002",
+          "embedded_sim_eid_00000003",
+          "embedded_sim_eid_00000004",
+          "embedded_sim_eid_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EMBEDDED_SIM_EID",
+          "is_pii": true,
+          "pii_category": "Telecom Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_04_007",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_oss",
+        "test_type": "column_classification",
+        "table_name": "telco_device_and_cpe_inventory",
+        "table_business_name": "Customer device and CPE inventory",
+        "table_description": "Tracks handset, router, ONT, and eSIM/device identifiers associated with subscribers and fixed broadband customers.",
+        "column_business_name": "Router serial number",
+        "column_description": "Customer premises router serial number.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(30)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "router_serial",
+        "sample_values": [
+          "router_serial_00000001",
+          "router_serial_00000002",
+          "router_serial_00000003",
+          "router_serial_00000004",
+          "router_serial_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "ROUTER_SERIAL_ALPHANUM",
+          "is_pii": true,
+          "pii_category": "Device Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_04_008",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_oss",
+        "test_type": "column_classification",
+        "table_name": "telco_device_and_cpe_inventory",
+        "table_business_name": "Customer device and CPE inventory",
+        "table_description": "Tracks handset, router, ONT, and eSIM/device identifiers associated with subscribers and fixed broadband customers.",
+        "column_business_name": "ONT serial number",
+        "column_description": "GPON ONT serial number.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(20)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "ont_serial",
+        "sample_values": [
+          "ont_serial_00000001",
+          "ont_serial_00000002",
+          "ont_serial_00000003",
+          "ont_serial_00000004",
+          "ont_serial_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "ONT_SERIAL",
+          "is_pii": true,
+          "pii_category": "Device Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_04_009",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_oss",
+        "test_type": "column_classification",
+        "table_name": "telco_device_and_cpe_inventory",
+        "table_business_name": "Customer device and CPE inventory",
+        "table_description": "Tracks handset, router, ONT, and eSIM/device identifiers associated with subscribers and fixed broadband customers.",
+        "column_business_name": "MAC address",
+        "column_description": "Device MAC address.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(17)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "mac_address",
+        "sample_values": [
+          "01:02:03:04:05:06",
+          "02:04:06:08:0a:0c",
+          "03:06:09:0c:0f:12",
+          "04:08:0c:10:14:18",
+          "05:0a:0f:14:19:1e"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "MAC_ADDRESS",
+          "is_pii": true,
+          "pii_category": "Network Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_04_010",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_oss",
+        "test_type": "column_classification",
+        "table_name": "telco_device_and_cpe_inventory",
+        "table_business_name": "Customer device and CPE inventory",
+        "table_description": "Tracks handset, router, ONT, and eSIM/device identifiers associated with subscribers and fixed broadband customers.",
+        "column_business_name": "Installation address identifier",
+        "column_description": "Reference to fixed-service installation address.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "installation_address_id",
+        "sample_values": [
+          "ID-00000001",
+          "ID-00000002",
+          "ID-00000003",
+          "ID-00000004",
+          "ID-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "LOCATION_ADDRESS",
+          "is_pii": true,
+          "pii_category": "Location",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    }
+  ]
+}

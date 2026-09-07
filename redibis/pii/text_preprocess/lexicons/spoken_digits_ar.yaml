@@ -1,0 +1,152 @@
+# Egyptian Arabic spoken digit / connector lexicons (pack-overridable seed).
+# Keys are folded with normalize_arabic_fold before lookup.
+
+digits:
+  "0": [زيرو, صفر, zero]
+  "1": [واحد, وحد, one]
+  "2": [اتنين, اثنين, اثنان, two]
+  "3": [تلاتة, ثلاثة, تلاته, ثلاثه, تلات, ثلاث, three]
+  "4": [أربعة, اربعة, أربعه, اربعه, four]
+  "5": [خمسة, خمسه, five]
+  "6": [ستة, سته, six]
+  "7": [سبعة, سبعه, seven]
+  "8": [تمانية, ثمانية, تمانيه, ثمانيه, تمنيه, تمينة, تمنيه, eight]
+  "9": [تسعة, تسعه, nine]
+
+# Teen compounds encode TWO digit positions (call-center MSISDN style).
+teens:
+  "10": [عشرة, عشره, ten]
+  "11": [حداشر, احداشر, eleven]
+  "12": [اتناشر, اثناشر, twelve]
+  "13": [تلاتاشر, ثلاثاشر, thirteen]
+  "14": [اربعتاشر, أربعتاشر, fourteen]
+  "15": [خمسطاشر, خمستاشر, fifteen]
+  "16": [ستاشر, sixteen]
+  "17": [سبعتاشر, seventeen]
+  "18": [تمنتاشر, ثمنتاشر, eighteen]
+  "19": [تسعتاشر, nineteen]
+
+# Round tens (20, 30, …) — two digit characters.
+tens:
+  "20": [عشرين, عشرين]
+  "30": [تلاتين, ثلاثين]
+  "40": [اربعين, أربعين]
+  "50": [خمسين]
+  "60": [ستين]
+  "70": [سبعين]
+  "80": [تمانين, ثمانين, تمنين, ثمنين]
+  "90": [تسعين]
+
+# Hundreds — three digit characters for telephony / card grouping.
+hundreds:
+  "100": [مية, ميه, مائة, مئه, hundred]
+  "200": [ميتين, مئتين, مائتين]
+  "300": [تلاتمية, ثلاثمية, ثلاثمائة]
+  "400": [اربعمية, أربعميه, اربعمائة, ربعمية, ربعميه]
+  "500": [خمسمية, خمسمائة]
+  "600": [ستمية, ستمائة]
+  "700": [سبعمية, سبعمائة]
+  "800": [تمنمية, ثمنمية, ثمانمائة]
+  "900": [تسعمية, تسعمائة]
+
+# Plural digit nouns for "N copies of digit D" (أربعة خمسات → 5555).
+digit_plurals:
+  "1": [وحدات, واحدات]
+  "2": [اتنينات, اثنينات]
+  "3": [تلاتات, ثلاثات]
+  "4": [أربعات, اربعات]
+  "5": [خمسات]
+  "6": [ستات]
+  "7": [سبعات]
+  "8": [تمانيات, ثمانيات]
+  "9": [تسعات]
+  "0": [زيروات, اصفار, أصفار]
+
+# Thousand markers (تلات ألاف = 3000).
+thousands:
+  - ألف
+  - الاف
+  - آلاف
+  - الاف
+
+# Connector inside compounds like "سبعة وستين" (= 67). Standalone skip
+# between unrelated atoms is handled in the parser.
+connectors:
+  - و
+  - ثم
+
+phone_labels:
+  - موبايل
+  - هاتف
+  - تليفون
+  - رقم
+  - تواصل
+  - محفظة
+  - شريحة
+  - أرضي
+  - ارضي
+  - msisdn
+  - phone
+  - mobile
+  - wallet
+  - landline
+  - فودافون كاش
+  - تحويل
+
+nid_labels:
+  - قومي
+  - هوية
+  - الرقم القومي
+  - رقم قومي
+  - national id
+  - nid
+
+card_labels:
+  - فيزا
+  - كارت
+  - كارد
+  - بطاقة
+  - ائتمان
+  - ميزة
+  - ميزه
+  - visa
+  - mastercard
+  - card
+  - pan
+  - مشتريات
+  - البنك
+
+cvv_labels:
+  - cvv
+  - cvc
+  - سي في في
+  - سي في
+  - ضهر الكارت
+  - ظهر الكارت
+
+otp_labels:
+  - otp
+  - كود تأكيد
+  - كود التأكيد
+  - كود العملية
+  - رمز التحقق
+  - كود
+
+expiry_labels:
+  - صلاحية
+  - انتهاء
+  - شهر وسنة
+  - تاريخ الصلاحية
+  - expiry
+  - expiration
+
+partial_card_labels:
+  - آخر أربع
+  - اخر اربع
+  - أول أربع
+  - اول اربع
+  - آخره
+  - اخره
+  - آخر
+  - اخر
+  - bin

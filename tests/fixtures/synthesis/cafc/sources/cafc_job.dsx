@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Sanitized DataStage-like DSX/XML export for CAFC (text-only; binaries rejected). -->
+<DSExport>
+  <Job Identifier="CAFC_DAILY" DateModified="2024-01-01">
+    <Record Identifier="V0S0" Type="CustomStage" StageType="PxSequentialFile">
+      <Collection Name="Properties">
+        <Property Name="Name">ReadCustomers</Property>
+        <Property Name="Table">crm.customers</Property>
+      </Collection>
+    </Record>
+    <Record Identifier="V0S1" Type="CustomStage" StageType="PxSequentialFile">
+      <Collection Name="Properties">
+        <Property Name="Name">ReadUsage</Property>
+        <Property Name="Table">billing.usage_daily</Property>
+      </Collection>
+    </Record>
+    <Record Identifier="V0S2" Type="TransformerStage">
+      <Collection Name="Properties">
+        <Property Name="Name">BuildFeatures</Property>
+        <Property Name="Derivation">msisdn_hash = SHA2(msisdn); arpu_30d = AVG(revenue)</Property>
+      </Collection>
+    </Record>
+    <Record Identifier="V0S3" Type="CustomStage" StageType="PxSequentialFile">
+      <Collection Name="Properties">
+        <Property Name="Name">WriteCAFC</Property>
+        <Property Name="Table">analytics.customer_feature_composite_daily</Property>
+      </Collection>
+    </Record>
+    <Record Identifier="V0L0" Type="Link">
+      <Collection Name="Properties">
+        <Property Name="Name">CustomersToXform</Property>
+        <Property Name="Partner">V0S0|V0S2</Property>
+      </Collection>
+    </Record>
+    <Record Identifier="V0L1" Type="Link">
+      <Collection Name="Properties">
+        <Property Name="Name">UsageToXform</Property>
+        <Property Name="Partner">V0S1|V0S2</Property>
+      </Collection>
+    </Record>
+    <Record Identifier="V0L2" Type="Link">
+      <Collection Name="Properties">
+        <Property Name="Name">XformToTarget</Property>
+        <Property Name="Partner">V0S2|V0S3</Property>
+      </Collection>
+    </Record>
+  </Job>
+</DSExport>

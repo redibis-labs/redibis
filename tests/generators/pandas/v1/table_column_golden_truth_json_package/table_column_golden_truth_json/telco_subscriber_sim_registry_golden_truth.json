@@ -1,0 +1,384 @@
+{
+  "table_name": "telco_subscriber_sim_registry",
+  "table_business_name": "Subscriber and SIM registry",
+  "description": "Represents active and historical SIM subscriptions, including Egyptian MSISDN, IMSI, ICCID, and operator-specific identifiers.",
+  "domain": "telecom_bss",
+  "granularity": "One row per SIM subscription lifecycle instance.",
+  "modality": "tabular_column",
+  "test_type": "column_classification",
+  "column_count": 10,
+  "pii_column_count": 7,
+  "non_pii_column_count": 3,
+  "column_evaluations": [
+    {
+      "test_id": "TABULAR_EVAL_03_001",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_bss",
+        "test_type": "column_classification",
+        "table_name": "telco_subscriber_sim_registry",
+        "table_business_name": "Subscriber and SIM registry",
+        "table_description": "Represents active and historical SIM subscriptions, including Egyptian MSISDN, IMSI, ICCID, and operator-specific identifiers.",
+        "column_business_name": "Subscription identifier",
+        "column_description": "Internal subscription key.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": true,
+        "primary_key": true,
+        "unique": true
+      },
+      "input_data": {
+        "column_name": "subscription_id",
+        "sample_values": [
+          "ID-00000001",
+          "ID-00000002",
+          "ID-00000003",
+          "ID-00000004",
+          "ID-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "SUBSCRIBER_ID",
+          "is_pii": true,
+          "pii_category": "Linkable Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_03_002",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_bss",
+        "test_type": "column_classification",
+        "table_name": "telco_subscriber_sim_registry",
+        "table_business_name": "Subscriber and SIM registry",
+        "table_description": "Represents active and historical SIM subscriptions, including Egyptian MSISDN, IMSI, ICCID, and operator-specific identifiers.",
+        "column_business_name": "Customer identifier",
+        "column_description": "Customer owning or using the subscription.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": true,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "customer_id",
+        "sample_values": [
+          "ID-00000001",
+          "ID-00000002",
+          "ID-00000003",
+          "ID-00000004",
+          "ID-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CUSTOMER_ID",
+          "is_pii": true,
+          "pii_category": "Linkable Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_03_003",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_bss",
+        "test_type": "column_classification",
+        "table_name": "telco_subscriber_sim_registry",
+        "table_business_name": "Subscriber and SIM registry",
+        "table_description": "Represents active and historical SIM subscriptions, including Egyptian MSISDN, IMSI, ICCID, and operator-specific identifiers.",
+        "column_business_name": "Mobile station ISDN number",
+        "column_description": "Customer-facing mobile number in Egyptian or E.164 format.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(16)",
+        "required": true,
+        "primary_key": false,
+        "unique": true
+      },
+      "input_data": {
+        "column_name": "msisdn",
+        "sample_values": [
+          "+201010000000",
+          "+201110007919",
+          "+201210015838",
+          "+201510023757",
+          "+201010031676"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "MSISDN",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_03_004",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_bss",
+        "test_type": "column_classification",
+        "table_name": "telco_subscriber_sim_registry",
+        "table_business_name": "Subscriber and SIM registry",
+        "table_description": "Represents active and historical SIM subscriptions, including Egyptian MSISDN, IMSI, ICCID, and operator-specific identifiers.",
+        "column_business_name": "Original allocation operator",
+        "column_description": "Operator inferred from original Egyptian prefix; MNP may change actual operator.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(30)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "operator_original_prefix",
+        "sample_values": [
+          "operator_original_prefix_00000001",
+          "operator_original_prefix_00000002",
+          "operator_original_prefix_00000003",
+          "operator_original_prefix_00000004",
+          "operator_original_prefix_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CATEGORY",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_03_005",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_bss",
+        "test_type": "column_classification",
+        "table_name": "telco_subscriber_sim_registry",
+        "table_business_name": "Subscriber and SIM registry",
+        "table_description": "Represents active and historical SIM subscriptions, including Egyptian MSISDN, IMSI, ICCID, and operator-specific identifiers.",
+        "column_business_name": "International Mobile Subscriber Identity",
+        "column_description": "SIM subscriber identity used in mobile networks.",
+        "logical_type": "string",
+        "physical_type": "CHAR(15)",
+        "required": true,
+        "primary_key": false,
+        "unique": true
+      },
+      "input_data": {
+        "column_name": "imsi",
+        "sample_values": [
+          "602011000000000",
+          "602021000000001",
+          "602031000000002",
+          "602041000000003",
+          "602011000000004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "IMSI",
+          "is_pii": true,
+          "pii_category": "Telecom Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_03_006",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_bss",
+        "test_type": "column_classification",
+        "table_name": "telco_subscriber_sim_registry",
+        "table_business_name": "Subscriber and SIM registry",
+        "table_description": "Represents active and historical SIM subscriptions, including Egyptian MSISDN, IMSI, ICCID, and operator-specific identifiers.",
+        "column_business_name": "Integrated Circuit Card Identifier",
+        "column_description": "SIM card serial number.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(22)",
+        "required": true,
+        "primary_key": false,
+        "unique": true
+      },
+      "input_data": {
+        "column_name": "iccid",
+        "sample_values": [
+          "89201000000000000000",
+          "89201000000000000001",
+          "89201000000000000002",
+          "89201000000000000003",
+          "89201000000000000004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "ICCID",
+          "is_pii": true,
+          "pii_category": "Telecom Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_03_007",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_bss",
+        "test_type": "column_classification",
+        "table_name": "telco_subscriber_sim_registry",
+        "table_business_name": "Subscriber and SIM registry",
+        "table_description": "Represents active and historical SIM subscriptions, including Egyptian MSISDN, IMSI, ICCID, and operator-specific identifiers.",
+        "column_business_name": "SIM PIN",
+        "column_description": "SIM PIN if captured in operational support context; should normally not be stored.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(8)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "sim_pin",
+        "sample_values": [
+          "sim_pin_00000001",
+          "sim_pin_00000002",
+          "sim_pin_00000003",
+          "sim_pin_00000004",
+          "sim_pin_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "PIN_CODE_SIM",
+          "is_pii": true,
+          "pii_category": "Credential",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_03_008",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_bss",
+        "test_type": "column_classification",
+        "table_name": "telco_subscriber_sim_registry",
+        "table_business_name": "Subscriber and SIM registry",
+        "table_description": "Represents active and historical SIM subscriptions, including Egyptian MSISDN, IMSI, ICCID, and operator-specific identifiers.",
+        "column_business_name": "PUK code",
+        "column_description": "PIN Unlock Key.",
+        "logical_type": "string",
+        "physical_type": "CHAR(8)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "puk_code",
+        "sample_values": [
+          "puk_code_00000001",
+          "puk_code_00000002",
+          "puk_code_00000003",
+          "puk_code_00000004",
+          "puk_code_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "PUK_CODE",
+          "is_pii": true,
+          "pii_category": "Credential",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_03_009",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_bss",
+        "test_type": "column_classification",
+        "table_name": "telco_subscriber_sim_registry",
+        "table_business_name": "Subscriber and SIM registry",
+        "table_description": "Represents active and historical SIM subscriptions, including Egyptian MSISDN, IMSI, ICCID, and operator-specific identifiers.",
+        "column_business_name": "Activation date",
+        "column_description": "SIM activation date.",
+        "logical_type": "date",
+        "physical_type": "DATE",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "activation_date",
+        "sample_values": [
+          "2025-01-01",
+          "2026-02-02",
+          "2025-03-03",
+          "2026-04-04",
+          "2025-05-05"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "TIMESTAMP",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_03_010",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_bss",
+        "test_type": "column_classification",
+        "table_name": "telco_subscriber_sim_registry",
+        "table_business_name": "Subscriber and SIM registry",
+        "table_description": "Represents active and historical SIM subscriptions, including Egyptian MSISDN, IMSI, ICCID, and operator-specific identifiers.",
+        "column_business_name": "Subscription status",
+        "column_description": "Active, suspended, terminated, or ported.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(20)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "status",
+        "sample_values": [
+          "active",
+          "pending",
+          "suspended",
+          "closed",
+          "active"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CATEGORY",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    }
+  ]
+}

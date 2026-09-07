@@ -1,0 +1,28 @@
+# Agent composer run defaults — used when intent/config omits a value.
+# Edit via Composer → Edit packs → Run defaults, or PUT /api/agents/defaults.
+version: "1.0.0"
+name: defaults
+description: Default PII, quality sampling, and planner settings for agent runs
+
+planner:
+  provider: ""
+  model: ""
+
+pii:
+  engines: both          # regex | ner | both
+  equation_mode: balanced
+  sample_rows: 5000
+
+quality:
+  sample_rows: 10000
+  strategy: fixed_rows   # fixed_rows | statistical | column_first | partition_picker
+  fixed_row_count: 10000
+  sample_fraction: 0.1
+
+profile:
+  engine: great_expectations
+
+provider_keys: {}
+# Example (env var names only — never raw secrets):
+#   openai: OPENAI_API_KEY
+#   claude: ANTHROPIC_API_KEY

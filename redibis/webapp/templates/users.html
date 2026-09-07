@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Redibis — Users</title>
+<link rel="stylesheet" href="/static/app.css?v={{ asset_v }}"/>
+<link rel="icon" type="image/png" href="/static/logo.png"/>
+<style>
+.users-page{max-width:960px;margin:32px auto;padding:0 24px 80px}
+.users-page h1{font-size:28px;font-weight:800;color:var(--ink)}
+.users-page table{width:100%;border-collapse:collapse;margin-top:16px}
+.users-page th,.users-page td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--border)}
+.users-page form.inline{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:20px}
+.users-page input,.users-page select{font:inherit;border:2px solid var(--border);border-radius:8px;padding:7px 10px}
+.users-page button{font:inherit;font-weight:700;border:2px solid var(--ink);background:#fff;border-radius:8px;padding:7px 12px;cursor:pointer}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <a class="nav-left" href="/">
+    <img src="/static/logo.png" alt="R" class="nav-logo-img" onerror="this.style.display='none'"/>
+    <div class="nav-brand">Redibis</div>
+    <div class="nav-tagline">users</div>
+  </a>
+  <div class="nav-right">
+    <a class="nav-link" href="/">◈ Scan</a>
+    <a class="nav-link" href="/gateway">◈ Gateway</a>
+    {% if user and user.role == 'admin' %}
+    <a class="nav-link" href="/settings">⚙ Settings</a>
+    {% endif %}
+    {% include "_user_menu.html" %}
+  </div>
+</nav>
+<div class="users-page">
+  <h1>Users</h1>
+  <p class="page-sub">Roles: <b>admin</b> (full) and <b>explorer</b> (read-only).</p>
+  <table>
+    <thead><tr><th>Username</th><th>Role</th><th></th></tr></thead>
+    <tbody id="userRows"></tbody>
+  </table>
+  <form class="inline" id="createForm">
+    <div><label>Username<br/><input name="username" required minlength="1"/></label></div>
+    <div><label>Password (12+)<br/><input name="password" type="password" required minlength="12"/></label></div>
+    <div><label>Role<br/><select name="role"><option value="explorer">explorer</option><option value="admin">admin</option></select></label></div>
+    <button type="submit">Create</button>
+  </form>
+</div>
+<script src="/static/auth.js"></script>
+<script>
+async function load() {
+  const r = await fetch("/api/users");
+  const users = await r.json();
+  const tb = document.getElementById("userRows");
+  tb.innerHTML = users.map(u => `<tr>
+    <td>${u.username}</td>
+    <td>
+      <select data-user="${u.username}" class="roleSel">
+        <option value="explorer" ${u.role==="explorer"?"selected":""}>explorer</option>
+        <option value="admin" ${u.role==="admin"?"selected":""}>admin</option>
+      </select>
+    </td>
+    <td>
+      <button data-pw="${u.username}" type="button">Reset password</button>
+      <button data-del="${u.username}" type="button">Delete</button>
+    </td>
+  </tr>`).join("");
+}
+document.getElementById("createForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const r = await fetch("/api/users", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      username: fd.get("username"),
+      password: fd.get("password"),
+      role: fd.get("role"),
+    }),
+  });
+  const d = await r.json();
+  if (!r.ok) { alert(d.detail || "create failed"); return; }
+  e.target.reset();
+  load();
+});
+document.getElementById("userRows").addEventListener("change", async (e) => {
+  if (!e.target.classList.contains("roleSel")) return;
+  const r = await fetch("/api/users/" + encodeURIComponent(e.target.dataset.user), {
+    method: "PATCH",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({role: e.target.value}),
+  });
+  if (!r.ok) alert((await r.json()).detail || "update failed");
+});
+document.getElementById("userRows").addEventListener("click", async (e) => {
+  const del = e.target.dataset.del;
+  const pw = e.target.dataset.pw;
+  if (del && confirm("Delete " + del + "?")) {
+    const r = await fetch("/api/users/" + encodeURIComponent(del), {method: "DELETE"});
+    if (!r.ok) alert((await r.json()).detail || "delete failed");
+    load();
+  }
+  if (pw) {
+    const next = prompt("New password (12+ characters) for " + pw);
+    if (!next) return;
+    const r = await fetch("/api/users/" + encodeURIComponent(pw), {
+      method: "PATCH",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({password: next}),
+    });
+    if (!r.ok) alert((await r.json()).detail || "reset failed");
+  }
+});
+load();
+</script>
+</body>
+</html>

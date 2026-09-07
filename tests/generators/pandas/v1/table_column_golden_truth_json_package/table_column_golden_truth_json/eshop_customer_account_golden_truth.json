@@ -1,0 +1,347 @@
+{
+  "table_name": "eshop_customer_account",
+  "table_business_name": "E-commerce customer account",
+  "description": "Customer account table for Egyptian e-commerce, marketplace, and digital retail use cases.",
+  "domain": "ecommerce_crm",
+  "granularity": "One row per registered customer account.",
+  "modality": "tabular_column",
+  "test_type": "column_classification",
+  "column_count": 9,
+  "pii_column_count": 8,
+  "non_pii_column_count": 1,
+  "column_evaluations": [
+    {
+      "test_id": "TABULAR_EVAL_07_001",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_crm",
+        "test_type": "column_classification",
+        "table_name": "eshop_customer_account",
+        "table_business_name": "E-commerce customer account",
+        "table_description": "Customer account table for Egyptian e-commerce, marketplace, and digital retail use cases.",
+        "column_business_name": "E-shop customer ID",
+        "column_description": "Internal customer account key.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": true,
+        "primary_key": true,
+        "unique": true
+      },
+      "input_data": {
+        "column_name": "eshop_customer_id",
+        "sample_values": [
+          "ESH-CUST-00000001",
+          "ESH-CUST-00000002",
+          "ESH-CUST-00000003",
+          "ESH-CUST-00000004",
+          "ESH-CUST-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CUSTOMER_ID",
+          "is_pii": true,
+          "pii_category": "Linkable Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_07_002",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_crm",
+        "test_type": "column_classification",
+        "table_name": "eshop_customer_account",
+        "table_business_name": "E-commerce customer account",
+        "table_description": "Customer account table for Egyptian e-commerce, marketplace, and digital retail use cases.",
+        "column_business_name": "Full customer name",
+        "column_description": "Displayed or legal customer name.",
+        "logical_type": "string",
+        "physical_type": "NVARCHAR(160)",
+        "required": true,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "full_name",
+        "sample_values": [
+          "Ahmed Hassan ElSayed",
+          "Mohamed Mostafa Kamel",
+          "Mahmoud Tarek Fathy",
+          "Omar Fouad Abdelrahman",
+          "Youssef Ibrahim Nassar"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "PERSON",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_07_003",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_crm",
+        "test_type": "column_classification",
+        "table_name": "eshop_customer_account",
+        "table_business_name": "E-commerce customer account",
+        "table_description": "Customer account table for Egyptian e-commerce, marketplace, and digital retail use cases.",
+        "column_business_name": "Email address",
+        "column_description": "Login and notification email.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(254)",
+        "required": true,
+        "primary_key": false,
+        "unique": true
+      },
+      "input_data": {
+        "column_name": "email_address",
+        "sample_values": [
+          "ahmed.elsayed0000@example.eg",
+          "mohamed.kamel0001@mail.test",
+          "mahmoud.fathy0002@customer.invalid",
+          "omar.abdelrahman0003@synthetic.local",
+          "youssef.nassar0004@example.eg"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EMAIL_ADDRESS",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_07_004",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_crm",
+        "test_type": "column_classification",
+        "table_name": "eshop_customer_account",
+        "table_business_name": "E-commerce customer account",
+        "table_description": "Customer account table for Egyptian e-commerce, marketplace, and digital retail use cases.",
+        "column_business_name": "Mobile number",
+        "column_description": "Egyptian mobile used for OTP, delivery, and support.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(16)",
+        "required": true,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "mobile_number",
+        "sample_values": [
+          "01010000000",
+          "01110007919",
+          "01210015838",
+          "01510023757",
+          "01010031676"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EGYPTIAN_MOBILE",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_07_005",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_crm",
+        "test_type": "column_classification",
+        "table_name": "eshop_customer_account",
+        "table_business_name": "E-commerce customer account",
+        "table_description": "Customer account table for Egyptian e-commerce, marketplace, and digital retail use cases.",
+        "column_business_name": "Password hash",
+        "column_description": "Password hash; classify as secret even when not reversible.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(255)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "password_hash",
+        "sample_values": [
+          "password_hash_00000001",
+          "password_hash_00000002",
+          "password_hash_00000003",
+          "password_hash_00000004",
+          "password_hash_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "HASH_BCRYPT",
+          "is_pii": true,
+          "pii_category": "Credential",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_07_006",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_crm",
+        "test_type": "column_classification",
+        "table_name": "eshop_customer_account",
+        "table_business_name": "E-commerce customer account",
+        "table_description": "Customer account table for Egyptian e-commerce, marketplace, and digital retail use cases.",
+        "column_business_name": "Session identifier",
+        "column_description": "Active or historical session identifier.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(128)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "session_id",
+        "sample_values": [
+          "ESH-CUST-00000001",
+          "ESH-CUST-00000002",
+          "ESH-CUST-00000003",
+          "ESH-CUST-00000004",
+          "ESH-CUST-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "SESSION_ID_ALPHANUM",
+          "is_pii": true,
+          "pii_category": "Credential",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_07_007",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_crm",
+        "test_type": "column_classification",
+        "table_name": "eshop_customer_account",
+        "table_business_name": "E-commerce customer account",
+        "table_description": "Customer account table for Egyptian e-commerce, marketplace, and digital retail use cases.",
+        "column_business_name": "CSRF token",
+        "column_description": "Web anti-forgery token.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(128)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "csrf_token",
+        "sample_values": [
+          "csrf_token_00000001",
+          "csrf_token_00000002",
+          "csrf_token_00000003",
+          "csrf_token_00000004",
+          "csrf_token_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CSRF_TOKEN",
+          "is_pii": true,
+          "pii_category": "Credential",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_07_008",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_crm",
+        "test_type": "column_classification",
+        "table_name": "eshop_customer_account",
+        "table_business_name": "E-commerce customer account",
+        "table_description": "Customer account table for Egyptian e-commerce, marketplace, and digital retail use cases.",
+        "column_business_name": "Social login profile URL",
+        "column_description": "Linked social profile URL where collected.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(255)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "social_profile_url",
+        "sample_values": [
+          "https://facebook.com/ahmed.elsayed",
+          "https://facebook.com/mohamed.kamel",
+          "https://facebook.com/mahmoud.fathy",
+          "https://facebook.com/omar.abdelrahman",
+          "https://facebook.com/youssef.nassar"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "FACEBOOK_PROFILE_URL",
+          "is_pii": true,
+          "pii_category": "Online Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_07_009",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_crm",
+        "test_type": "column_classification",
+        "table_name": "eshop_customer_account",
+        "table_business_name": "E-commerce customer account",
+        "table_description": "Customer account table for Egyptian e-commerce, marketplace, and digital retail use cases.",
+        "column_business_name": "Account creation timestamp",
+        "column_description": "Account creation timestamp.",
+        "logical_type": "timestamp",
+        "physical_type": "TIMESTAMP",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "account_created_at",
+        "sample_values": [
+          "2026-01-01 08:00:00",
+          "2026-01-01 08:07:00",
+          "2026-01-01 08:14:00",
+          "2026-01-01 08:21:00",
+          "2026-01-01 08:28:00"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "TIMESTAMP",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{% if user %}
+<div class="nav-sep"></div>
+<span class="chip chip-ink" title="signed in">{{ user.username }}</span>
+<span class="chip {% if user.role == 'admin' %}chip-red{% else %}chip-muted{% endif %}">{{ user.role }}</span>
+<form method="post" action="/logout" style="display:inline">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}"/>
+  <button class="nav-link" type="submit" style="background:transparent;cursor:pointer">Sign out</button>
+</form>
+{% endif %}

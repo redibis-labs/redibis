@@ -1,0 +1,36 @@
+# Example: agentic pipeline + batch execution (docker/local stack)
+table: telecom.customers
+
+scan_types:
+  - profile
+  - quality
+  - pii
+
+agents:
+  enabled: true
+  runs_dir: /tmp/redibis_agent_runs
+  sample_dir: /workspace/tests/data
+  single_table_executor: langgraph
+  batch_executor: langgraph
+  dynamic_sandbox_enabled: false
+  copilotkit_enabled: false
+
+# RAI — global config (advisory by default; set enforce: true to block)
+rai:
+  enabled: true
+  mode: report
+  enforce: false
+  hard_block_external_pii: true
+
+memory:
+  enabled: false
+
+classification:
+  enabled: true
+  policy_pack: telecom
+
+catalog:
+  backend: openmetadata
+
+contract:
+  automerge: none

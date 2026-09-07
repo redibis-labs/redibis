@@ -1,0 +1,22 @@
+version: 1
+cases:
+  - id: customer-msisdn
+    description: Enrich a subscriber telephone-number column.
+    input: examples/customer-input.yaml
+    assertions:
+      required:
+        columns.msisdn.business.definition:
+          type: string
+          minLength: 20
+        columns.msisdn.pii.entity_type:
+          equals: PHONE_NUMBER
+      contains:
+        columns.msisdn.tags:
+          - TelcoDataType:MSISDN
+      forbidden:
+        - path: columns.msisdn.business.example_values
+          reason: Golden evaluation must not require production-like PII values.
+    scoring:
+      requiredWeight: 0.8
+      optionalWeight: 0.2
+      minimumScore: 0.9

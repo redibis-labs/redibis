@@ -1,0 +1,1508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Redibis — Contracts v2</title>
+<style>
+:root{--ink:#0f172a;--red:#e03131;--amber:#f59e0b;--green:#16a34a;--bg:#f8fafc;
+  --surface:#fff;--border:#e2e8f0;--muted:#64748b;--accent:#2563eb}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+header{background:var(--ink);color:#fff;padding:14px 24px;display:flex;align-items:center;gap:16px}
+header h1{font-size:16px;font-weight:800;letter-spacing:.02em}
+header .sub{color:#94a3b8;font-size:12px}
+header a{color:#93c5fd;text-decoration:none;font-size:12px}
+header #backScan{margin-left:auto}
+.wrap{display:grid;grid-template-columns:280px 1fr;gap:0;min-height:calc(100vh - 50px)}
+.side{border-right:1px solid var(--border);background:var(--surface);padding:16px;overflow:auto}
+.side h2{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:8px 0}
+.tbl-item{padding:8px 10px;border-radius:8px;cursor:pointer;font-family:ui-monospace,monospace;font-size:13px}
+.tbl-item:hover{background:#f1f5f9}
+.tbl-item.active{background:#dbeafe;color:#1e40af;font-weight:700}
+main{padding:24px;overflow:auto}
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--border);margin-bottom:18px}
+.tab{padding:8px 14px;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);font-weight:600}
+.tab.active{color:var(--accent);border-color:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px}
+.card h3{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:12px}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);padding:8px;border-bottom:2px solid var(--border)}
+td{padding:8px;border-bottom:1px solid var(--border);font-size:13px}
+.mono{font-family:ui-monospace,monospace}
+.chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
+.chip-red{background:#fee2e2;color:#991b1b}.chip-green{background:#dcfce7;color:#166534}
+.chip-amber{background:#fef3c7;color:#92400e}.chip-muted{background:#f1f5f9;color:#475569}
+.chip-blue{background:#dbeafe;color:#1e40af}
+.doclist{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.doclist .chip a{margin-left:4px;font-weight:700;opacity:.7}.doclist .chip a:hover{opacity:1}
+button,.btn{font:inherit;border:1px solid var(--border);background:#fff;border-radius:8px;padding:7px 13px;cursor:pointer;font-weight:600}
+button:hover{background:#f8fafc}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:#1d4ed8}
+.btn-danger{background:var(--red);color:#fff;border-color:var(--red)}
+.btn-danger:hover{filter:brightness(.95)}
+.btn-sm{padding:4px 9px;font-size:12px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+input,select,textarea{font:inherit;border:1px solid var(--border);border-radius:8px;padding:7px 10px;width:100%}
+textarea{font-family:ui-monospace,monospace;font-size:12px;min-height:90px}
+label{display:block;font-size:12px;color:var(--muted);margin:8px 0 4px}
+.banner{padding:12px 16px;border-radius:10px;font-weight:700;margin-bottom:14px}
+.banner.valid{background:#dcfce7;color:#166534;border:1px solid #86efac}
+.banner.invalid{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+pre{background:#0f172a;color:#e2e8f0;padding:14px;border-radius:10px;overflow:auto;font-size:12px;max-height:420px}
+.empty{color:var(--muted);font-style:italic;padding:24px;text-align:center}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--ink);color:#fff;padding:12px 18px;border-radius:10px;opacity:0;transition:.3s;z-index:50}
+.toast.show{opacity:1}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+small.hint{color:var(--muted);font-size:11px}
+.diff-summary{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.diff-val{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.diff-val.full{max-width:none;white-space:normal}
+.diff-before{color:#991b1b;text-decoration:line-through;opacity:.85}
+.diff-after{color:#166534;font-weight:600}
+.diff-add{color:#166534}.diff-remove{color:#991b1b}
+tr.diff-row td{vertical-align:top}
+</style>
+</head>
+<body>
+<header>
+  <h1>REDIBIS</h1><span class="sub">Contracts v2 · select-and-merge · enrich · share</span>
+  <a id="backScan" href="/">← scan console</a>
+  <a href="/reports">Reports</a>
+  <a href="/gateway">Gateway</a>
+  <a href="/settings">Settings</a>
+  {% include "_user_menu.html" %}
+</header>
+<div class="wrap">
+  <aside class="side">
+    <h2>Active contracts</h2>
+    <div id="tableList"></div>
+    <h2 style="margin-top:18px">Run buckets</h2>
+    <div id="runTableList"></div>
+  </aside>
+  <main id="main"><div class="empty">Select a table from the left.</div></main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let STATE = { table: null, tab: "contract", memoryEnabled: false };
+
+function toast(msg, ok=true){
+  const t = $("toast"); t.textContent = msg; t.style.background = ok ? "#0f172a" : "#991b1b";
+  t.classList.add("show"); setTimeout(()=>t.classList.remove("show"), 2600);
+}
+async function api(method, path, body, isForm){
+  const opt = { method, headers:{} };
+  if(body && !isForm){ opt.headers["Content-Type"]="application/json"; opt.body=JSON.stringify(body); }
+  else if(isForm){ opt.body = body; }
+  let r;
+  try{
+    r = await fetch(path, opt);
+  }catch(netErr){
+    // fetch() rejects with a TypeError ("Failed to fetch") when no HTTP response
+    // came back at all: server down/restarted, request timed out, connection reset
+    // (common on long LLM calls), or the endpoint is unreachable. The backend's
+    // detailed error never reaches us here — point the user at the real source.
+    throw new Error(`Could not reach the server for ${method} ${path} `
+      + `(${netErr && netErr.message ? netErr.message : netErr}). `
+      + `The request never completed — the backend may be down, restarting, or the `
+      + `call timed out mid-request. Check the server logs for the real error.`);
+  }
+  const ct = r.headers.get("content-type")||"";
+  const data = ct.includes("json") ? await r.json() : await r.text();
+  if(!r.ok){
+    const detail = (data && data.detail) || (typeof data === "string" && data) || r.statusText;
+    if(detail && typeof detail === "object"){
+      if(Array.isArray(detail)){
+        const msgs = detail.map(d=>`${(d.loc||[]).slice(1).join(".")||"request"}: ${d.msg||d}`).join("; ");
+        throw new Error(msgs || `HTTP ${r.status}`);
+      }
+      const err = new Error(detail.message || detail.hint || `HTTP ${r.status}`);
+      err.status = r.status;
+      err.rai = detail.rai || null;
+      err.hint = detail.hint || null;
+      throw err;
+    }
+    throw new Error(`HTTP ${r.status}: ${detail}`);
+  }
+  return data;
+}
+const esc = (s)=> String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const jsArg = (s)=> esc(JSON.stringify(String(s==null?"":s)));
+function contractPath(table, suffix=""){
+  return `/api/contracts/${encodeURIComponent(table)}${suffix}`;
+}
+function formatApiError(e){
+  const msg = (e && e.message) ? e.message : String(e);
+  const hint = e && e.hint ? `<div class="hint" style="margin-top:8px">${esc(e.hint)}</div>` : "";
+  return `<div class="banner invalid"><strong>Request failed</strong><br><small>${esc(msg)}</small>${hint}</div>`;
+}
+
+async function loadMemoryStatus(){
+  try{
+    const s = await api("GET","/api/memory/status");
+    STATE.memoryEnabled = !!s.enabled;
+  }catch(e){ STATE.memoryEnabled = false; }
+}
+
+// ── Sidebar ──────────────────────────────────────────────────────────────
+async function loadTables(){
+  const contracts = await api("GET","/api/contracts");
+  $("tableList").innerHTML = contracts.length ? contracts.map(c =>
+    `<div class="tbl-item ${c.table===STATE.table?'active':''}" onclick="selectTable(${jsArg(c.table)})">
+       ${esc(c.table)} <span class="chip chip-muted">v${esc(c.version||'∅')}</span></div>`).join("")
+    : `<div class="empty" style="padding:8px">No active contracts yet.</div>`;
+  // tables that only have runs (not yet merged)
+  const seen = new Set(contracts.map(c=>c.table));
+  let runTables = new Set();
+  for(const k of ["pii","quality"]){
+    try{
+      // there's no list-all-run-tables endpoint; derive from contracts + show known
+    }catch(e){}
+  }
+}
+async function selectTable(t){ STATE.table = t; await loadTables(); render(); }
+
+// ── Main render ────────────────────────────────────────────────────────────
+function render(){
+  if(!STATE.table){ $("main").innerHTML = `<div class="empty">Select a table.</div>`; return; }
+  const tabs = [["contract","Contract"],["review","Evidence Review"],["runs","Runs"],["enrich","Enrich"],["synthesize","Synthesis"],["share","Share"]];
+  $("main").innerHTML =
+    `<div class="tabs">${tabs.map(([k,l])=>
+        `<div class="tab ${STATE.tab===k?'active':''}" onclick="setTab(${jsArg(k)})">${l}</div>`).join("")}</div>
+     <div id="tabBody"></div>`;
+  ({contract:renderContract, review:renderEvidenceReview, runs:renderRuns, enrich:renderEnrich, synthesize:renderSynthesis, share:renderShare}[STATE.tab])();
+}
+function setTab(k){ STATE.tab=k; render(); }
+
+async function renderEvidenceReview(){
+  const body = $("tabBody"); body.innerHTML = "Loading evidence review…";
+  if(typeof EvidenceReviewer === "undefined"){
+    body.innerHTML = `<div class="empty">Evidence reviewer script not loaded.</div>`; return;
+  }
+  body.innerHTML = `<div id="v2EvidenceReview"></div><p class="hint" style="margin-top:12px">
+    <a href="/review?table=${encodeURIComponent(STATE.table)}" target="_blank">Open full-page explorer</a></p>`;
+  try{
+    await EvidenceReviewer.mountRunExplorer($("v2EvidenceReview"), {table: STATE.table, readOnly: false});
+  }catch(e){
+    body.innerHTML = `<div class="empty">No run-scoped evidence for this table yet.</div>`;
+  }
+}
+
+// ── Contract view (PII report + rules + export + purge) ─────────────────────
+async function renderContract(){
+  const body = $("tabBody"); body.innerHTML = "Loading…";
+  let active;
+  try { active = await api("GET","/api/contracts/"+STATE.table); }
+  catch(e){ body.innerHTML = `<div class="empty">No active contract. Merge a run first.</div>`; return; }
+  const props = (active.schema||[]).flatMap(s=>s.properties||[]);
+  const colEngine = (p)=> (p.privacy||{}).classification_engine || p.pii || {};
+  const colMask = (p)=> (p.privacy||{}).masking_policy || p.maskingPolicy || {};
+  const piiRows = props.filter(p=>colEngine(p).detected!==undefined||p.privacy||p.pii).map(p=>{
+    const ce = colEngine(p); const ev = ce.evidence||{};
+    const verdict = ce.detected
+      ? `<span class="chip chip-red">${esc(ce.entity_type||'PII')} ${(ce.confidence||0).toFixed?.(2)??ce.confidence}</span>`
+      : `<span class="chip chip-muted">clean</span>`;
+    const engines = (ev.engines||[]).join(", ") || '—';
+    const mask = colMask(p).default_strategy || colMask(p).default || '—';
+    const rule = ce.decision_rule || ev.decision_rule || '—';
+    return `<tr><td class="mono">${esc(p.name)}</td><td>${verdict}</td><td class="mono">${esc(engines)}</td>
+      <td class="mono">${esc(mask)}</td><td class="mono" style="font-size:11px">${esc(rule)}</td></tr>`;
+  }).join("");
+  // PII column management — strip (demote) or mark a column as PII.
+  const isPiiCol = (p)=> !!(colEngine(p).detected) || !!(colMask(p).default_strategy||colMask(p).default)
+    || (p.tags||[]).some(t=>t==='pii'||t==='gdpr_personal_data')
+    || (typeof p.classification==='string'&&p.classification.toLowerCase().startsWith('pii'));
+  const mgmtRows = props.map(p=>{
+    const pii = isPiiCol(p);
+    const ce = colEngine(p);
+    const state = pii ? `<span class="chip chip-red">pii${ce.entity_type?' · '+esc(ce.entity_type):''}</span>`
+                      : `<span class="chip chip-muted">normal</span>`;
+    const action = pii
+      ? `<button class="btn-sm btn-danger" onclick="stripPii(${jsArg(p.name)})">strip PII</button>`
+      : `<button class="btn-sm" onclick="addPiiCol(${jsArg(p.name)})">mark PII</button>`;
+    return `<tr><td class="mono">${esc(p.name)}</td><td>${state}</td><td>${action}</td></tr>`;
+  }).join("");
+
+  let rules = {rules:[]};
+  let qview = {rules:[], suppressed:[], counts:{}};
+  try { rules = await api("GET","/api/contracts/"+STATE.table+"/rules"); }catch(e){}
+  try { qview = await api("GET","/api/contracts/"+STATE.table+"/quality-view"); }catch(e){}
+  const activeRules = qview.rules||rules.rules||[];
+  const ruleRows = activeRules.map(r=>
+    `<tr><td><span class="chip chip-blue">${esc(r.severity||'P1')}</span></td><td class="mono">${esc(r.type)}</td>
+     <td class="mono">${esc(r.column||'(table)')}</td><td class="mono" style="font-size:11px">${esc(JSON.stringify(r.params||{}))}</td>
+     <td><button class="btn-sm btn-danger" onclick="suppressQualityRule(${jsArg(r.rule_id)},${jsArg(r.column||"")})">remove</button></td></tr>`).join("");
+  const suppressedRows = (qview.suppressed||[]).map(s=>
+    `<tr style="opacity:.75"><td colspan="4" class="mono" style="font-size:11px">${esc(s.rule_id)} · suppressed</td>
+     <td><button class="btn-sm" onclick="restoreQualityRule(${jsArg(s.rule_id)})">restore</button></td></tr>`).join("");
+  const qCounts = qview.counts||{};
+
+  let consentSection = "";
+  if(STATE.memoryEnabled){
+    let consent = {columns:{}};
+    try{ consent = await api("GET","/api/contracts/"+STATE.table+"/sampling-consent"); }catch(e){}
+    const consentRows = props.map(p=>{
+      const c = (consent.columns||{})[p.name] || {};
+      const approved = !!c.approved;
+      const action = approved
+        ? `<button class="btn-sm btn-danger" onclick="revokeSampling(${jsArg(p.name)})">revoke</button>`
+        : `<button class="btn-sm btn-primary" onclick="approveSampling(${jsArg(p.name)})">approve for sampling</button>`;
+      const st = approved ? `<span class="chip chip-green">approved</span>` : `<span class="chip chip-muted">off</span>`;
+      return `<tr><td class="mono">${esc(p.name)}</td><td>${st}</td><td>${action}</td></tr>`;
+    }).join("");
+    consentSection = `
+    <div class="card"><h3>Column memory — sampling consent</h3>
+      <small class="hint">When approved, masked/hashed sample shapes may be stored in the on-prem memory store for future enrichment hints. Raw PII is never persisted.</small>
+      ${consentRows ? `<table><thead><tr><th>Column</th><th>Consent</th><th>Action</th></tr></thead><tbody>${consentRows}</tbody></table>`
+                     : `<div class="empty">No columns.</div>`}</div>`;
+  }
+
+  let reviewBadge = "";
+  try {
+    const rs = await api("GET", "/api/contracts/"+STATE.table+"/review/status");
+    if(rs.fully_approved){
+      reviewBadge = `<span class="chip chip-green">review complete</span>`;
+    } else if(rs.total_columns){
+      reviewBadge = `<span class="chip chip-muted">${rs.approved_count||0}/${rs.total_columns} reviewed</span>`;
+    }
+  } catch(e){ /* no review state yet */ }
+
+  body.innerHTML = `
+    <div class="card"><div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div><h3 style="margin:0">${esc(STATE.table)} · v${esc(active.version)}</h3>
+      <small class="hint mono">uuid ${esc(active.contract_uuid||'')}</small></div>
+      <div class="row" style="gap:8px;align-items:center">
+        ${reviewBadge}
+        <button class="btn-sm" onclick="openEnrichReview()">Enrich / review context</button>
+        <button class="btn-danger btn-sm" onclick="purge()">Purge (fresh start)</button>
+      </div></div></div>
+
+    <div class="card"><h3>PII — verdict, evidence &amp; masking</h3>
+      <small class="hint">Full per-engine scores live in the run bucket (pii_report.json), not in the contract.</small>
+      ${piiRows ? `<table><thead><tr><th>Column</th><th>Conclusion</th><th>Engines</th><th>Masking</th><th>Rule fired</th></tr></thead><tbody>${piiRows}</tbody></table>`
+                : `<div class="empty">No PII data merged.</div>`}</div>
+
+    <div class="card"><h3>PII column management — strip or mark</h3>
+      <small class="hint">Strip removes every PII signal (pii block, masking policy, classification, pii tags) — the column becomes a normal column and stays demoted across future merges. Mark flags a column the scan missed.</small>
+      ${mgmtRows ? `<table><thead><tr><th>Column</th><th>State</th><th>Action</th></tr></thead><tbody>${mgmtRows}</tbody></table>`
+                 : `<div class="empty">No columns.</div>`}</div>
+
+    <div class="card"><div class="row" style="justify-content:space-between">
+      <h3 style="margin:0">Quality rules</h3>
+      <div class="row"><span class="hint">${qCounts.active||0} active${qCounts.suppressed?` · ${qCounts.suppressed} removed`:''}</span>
+        <button class="btn-sm btn-danger" onclick="suppressAllQualityRules()" ${activeRules.length?'':'disabled'}>remove all</button>
+        <span class="hint">Regenerate:</span>
+        <button class="btn-sm" onclick="exportRules('ge')">GE</button>
+        <button class="btn-sm" onclick="exportRules('sodacl')">SodaCL</button>
+        <button class="btn-sm" onclick="exportRules('dbt')">dbt</button></div></div>
+      <small class="hint">Remove drops a rule from the active contract via the quality decision overlay — it stays removed on future merges without rescanning. Scan runs in the bucket are kept; merge again when ready.</small>
+      ${ruleRows||suppressedRows ? `<table><thead><tr><th>Sev</th><th>Type</th><th>Column</th><th>Params</th><th></th></tr></thead><tbody>${ruleRows}${suppressedRows}</tbody></table>`
+                 : `<div class="empty">No quality rules.</div>`}</div>
+
+    <div class="card"><div class="row" style="justify-content:space-between">
+      <h3 style="margin:0">Integration export</h3>
+      <div class="row">
+        <button class="btn-sm" onclick="exportMetadata()">metadata JSON</button>
+        <button class="btn-sm" onclick="exportPackage()">full package JSON</button>
+      </div></div>
+      <small class="hint">Spec (contract) + telemetry (provenance, pii_summary, decisions) for OpenMetadata / catalog tools.</small></div>
+
+    ${consentSection}
+
+    <div class="card"><h3>Raw contract spec (YAML/JSON)</h3>
+      <small class="hint">Declarative spec only — provenance and pii_summary live in the metadata export.</small>
+      <pre id="rawBox">${esc(JSON.stringify(active,null,2))}</pre></div>`;
+}
+async function exportMetadata(){
+  try{ const out = await api("GET","/api/contracts/"+STATE.table+"/metadata");
+       openModal(JSON.stringify(out,null,2)); }
+  catch(e){ toast(e.message,false); }
+}
+async function exportPackage(){
+  try{ const out = await api("GET","/api/contracts/"+STATE.table+"/export-package");
+       openModal(JSON.stringify(out,null,2)); }
+  catch(e){ toast(e.message,false); }
+}
+async function purge(){
+  if(!confirm(`Purge ${STATE.table}? Deletes the active contract + all audits. Run buckets are kept.`)) return;
+  try{ const r = await api("DELETE","/api/contracts/"+STATE.table+"?keep_runs=true");
+       toast(`Purged (${r.deleted_count} keys)`); STATE.table=null; await loadTables(); render(); }
+  catch(e){ toast(e.message,false); }
+}
+async function exportRules(target){
+  try{ const out = await api("GET","/api/contracts/"+STATE.table+"/rules/export?target="+target);
+       openModal(typeof out==="string"?out:JSON.stringify(out,null,2)); }
+  catch(e){ toast(e.message,false); }
+}
+async function suppressQualityRule(ruleId, col){
+  if(!confirm(`Remove quality rule ${ruleId}? It stays suppressed on future merges — no rescan needed.`)) return;
+  try{
+    const r = await api("POST",`/api/contracts/${STATE.table}/quality-decisions/${encodeURIComponent(ruleId)}/suppress`,
+      {column: col||null, decided_by:"v2"});
+    toast(`Rule removed → v${r.version_after}`); renderContract();
+  }catch(e){ toast(e.message,false); }
+}
+async function restoreQualityRule(ruleId){
+  try{
+    const r = await api("POST",`/api/contracts/${STATE.table}/quality-decisions/${encodeURIComponent(ruleId)}/restore`,{});
+    toast(`Rule restored → v${r.version_after}`); renderContract();
+  }catch(e){ toast(e.message,false); }
+}
+async function suppressAllQualityRules(){
+  if(!confirm(`Remove ALL quality rules from ${STATE.table}? Scan runs are kept — merge again later without rescanning.`)) return;
+  try{
+    const r = await api("POST",`/api/contracts/${STATE.table}/quality-decisions/suppress-all`,{decided_by:"v2"});
+    toast(`All rules removed → v${r.version_after}`); renderContract();
+  }catch(e){ toast(e.message,false); }
+}
+async function stripPii(col){
+  if(!confirm(`Strip all PII metadata from "${col}"? It becomes a normal column and stays demoted on future merges.`)) return;
+  try{ const r = await api("POST","/api/contracts/"+STATE.table+"/columns/"+encodeURIComponent(col)+"/strip-pii",{decided_by:"v2"});
+       toast(`Stripped ${col} → v${r.version_after}`); renderContract(); }
+  catch(e){ toast(e.message,false); }
+}
+async function addPiiCol(col){
+  const et = prompt(`PII entity type for "${col}" (e.g. PHONE_NUMBER, EMAIL_ADDRESS, PERSON):`);
+  if(!et) return;
+  try{ const r = await api("POST","/api/contracts/"+STATE.table+"/columns/"+encodeURIComponent(col)+"/add-pii",{entity_type:et,decided_by:"v2"});
+       toast(`Marked ${col} as PII → v${r.version_after}`); renderContract(); }
+  catch(e){ toast(e.message,false); }
+}
+async function approveSampling(col){
+  try{
+    await api("POST","/api/contracts/"+STATE.table+"/columns/"+encodeURIComponent(col)+"/sampling-consent",
+      {approved:true, approved_by:"v2"});
+    toast(`Sampling approved for ${col}`); renderContract();
+  }catch(e){ toast(e.message,false); }
+}
+async function revokeSampling(col){
+  try{
+    await api("POST","/api/contracts/"+STATE.table+"/columns/"+encodeURIComponent(col)+"/sampling-consent",
+      {approved:false, approved_by:"v2"});
+    toast(`Sampling consent revoked for ${col}`); renderContract();
+  }catch(e){ toast(e.message,false); }
+}
+
+// ── Runs (select-and-merge) ────────────────────────────────────────────────
+async function renderRuns(){
+  const body = $("tabBody"); body.innerHTML = "Loading…";
+  let html = "";
+  for(const kind of ["pii","quality"]){
+    let runs = {runs:[]};
+    try{ runs = await api("GET","/api/contracts/"+STATE.table+"/runs?kind="+kind); }catch(e){}
+    const rows = (runs.runs||[]).map(r=>{
+      const st = {merged:"chip-green",discarded:"chip-muted",reviewed:"chip-amber",draft:"chip-blue"}[r.status]||"chip-muted";
+      const stats = JSON.stringify(r.summary_stats||{});
+      const evidenceLink = kind==="pii"
+        ? `<a class="btn-sm" target="_blank" href="/review?table=${encodeURIComponent(STATE.table)}&run_id=${encodeURIComponent(r.run_id)}">evidence</a>`
+        : "";
+      const actions = r.status==="merged"||r.status==="discarded" ? (evidenceLink||"—") :
+        `${evidenceLink}
+         <button class="btn-sm" onclick="reviewRun(${jsArg(kind)},${jsArg(r.run_id)})">review</button>
+         <button class="btn-sm btn-primary" onclick="mergeRun(${jsArg(kind)},${jsArg(r.run_id)})">merge</button>
+         <button class="btn-sm" onclick="discardRun(${jsArg(kind)},${jsArg(r.run_id)})">discard</button>`;
+      return `<tr><td class="mono">${esc(r.run_id)}</td><td><span class="chip ${st}">${esc(r.status)}</span></td>
+        <td class="mono" style="font-size:11px">${esc(stats)}</td><td>${actions}</td></tr>`;
+    }).join("");
+    html += `<div class="card"><h3>${kind}-contracts bucket</h3>
+      ${rows?`<table><thead><tr><th>Run</th><th>Status</th><th>Stats</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`
+            :`<div class="empty">No ${kind} runs.</div>`}</div>`;
+  }
+  body.innerHTML = html;
+}
+async function mergeRun(kind, run){
+  try{ const r = await api("POST",`/api/runs/${kind}/${STATE.table}/${run}/merge`,{validate_contract:false});
+       toast(`Merged → v${r.version_after}`); await loadTables(); renderRuns(); }
+  catch(e){ toast(e.message,false); }
+}
+async function discardRun(kind, run){
+  try{ await api("POST",`/api/runs/${kind}/${STATE.table}/${run}/discard`,{}); toast("Discarded"); renderRuns(); }
+  catch(e){ toast(e.message,false); }
+}
+async function reviewRun(kind, run){
+  const sub = await api("GET",`/api/runs/${kind}/${STATE.table}/${run}`);
+  openModal(JSON.stringify(sub.payload,null,2), async (edited)=>{
+    try{ await api("PATCH",`/api/runs/${kind}/${STATE.table}/${run}`,{payload:JSON.parse(edited),note:"edited in UI"});
+         toast("Saved edits"); renderRuns(); }
+    catch(e){ toast(e.message,false); }
+  });
+}
+
+// ── Enrich (auto-write lifecycle) ────────────────────────────────────────────
+let enrichMode = "auto";
+let enrichContext = null;
+let enrichContextCol = null;
+
+function openEnrichReview(){
+  enrichMode = "review";
+  setTab("enrich");
+}
+async function setEnrichMode(mode){
+  enrichMode = mode;
+  await renderEnrich();
+}
+async function loadEnrichContext(){
+  if(!STATE.table) return;
+  try{
+    enrichContext = await api("GET", "/api/enrich/"+encodeURIComponent(STATE.table)+"/context");
+    enrichContextCol = (enrichContext.columns||[])[0]?.name || null;
+    renderContextInspector();
+  }catch(e){
+    const el = $("enCtxInspector"); if(el) el.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+  }
+}
+function renderContextInspector(){
+  const el = $("enCtxInspector"); if(!el||!enrichContext) return;
+  const cols = enrichContext.columns||[];
+  const items = [
+    {id:"__instructions__", label:"Instructions (system prompt + policy)"},
+    ...cols.map(c=>({id:c.name, label:c.name})),
+  ];
+  const sel = enrichContextCol || items[0]?.id;
+  enrichContextCol = sel;
+  const list = items.map(it=>
+    `<button class="btn-sm ${it.id===sel?'btn-primary':''}" style="display:block;width:100%;text-align:left;margin:2px 0"
+      onclick="selectContextItem(${jsArg(it.id)})">${esc(it.label)}</button>`).join("");
+  el.innerHTML = `<div class="grid2" style="gap:16px;align-items:start">
+    <div style="max-width:220px">${list}</div>
+    <div id="enCtxDetail">${renderContextDetail(sel)}</div>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <button class="btn-sm" onclick="previewEnrichContext()">Preview prompt</button>
+    <button class="btn-sm" onclick="saveEnrichContext()">Save edits</button>
+  </div>
+  <div id="enCtxPreview" style="margin-top:12px"></div>`;
+}
+function selectContextItem(id){
+  enrichContextCol = id;
+  const d = $("enCtxDetail"); if(d) d.innerHTML = renderContextDetail(id);
+}
+function renderContextDetail(id){
+  if(!enrichContext) return "";
+  if(id==="__instructions__"){
+    const ins = enrichContext.instructions||{};
+    return `<label>System prompt</label><textarea id="ctxSystemPrompt" rows="10">${esc(ins.system_prompt||"")}</textarea>
+      <label>Additional instructions</label><textarea id="ctxExtraInstr" rows="4">${esc(ins.extra_instructions||"")}</textarea>
+      <small class="hint">Edge rules pack: ${esc(ins.policy_pack||"telecom")} (${(ins.edge_rules||[]).length} rules)</small>`;
+  }
+  const col = (enrichContext.columns||[]).find(c=>c.name===id);
+  if(!col) return `<div class="hint">Select a column</div>`;
+  const biz = col.business?.definition || "";
+  const tags = (col.tags||[]).join(", ");
+  const ev = col.evidence ? `<pre style="font-size:11px;max-height:160px;overflow:auto">${esc(JSON.stringify(col.evidence,null,2))}</pre>` : `<span class="hint">no telemetry</span>`;
+  return `<div class="mono" style="font-weight:600;margin-bottom:8px">${esc(col.name)}</div>
+    <label>Classification</label><input id="ctxClass" value="${esc(col.classification||"")}"/>
+    <label>Entity type</label><input id="ctxEntity" value="${esc(col.entity_type||"")}"/>
+    <label>Tags (comma-separated)</label><input id="ctxTags" value="${esc(tags)}"/>
+    <label>Business definition</label><textarea id="ctxBizDef" rows="3">${esc(biz)}</textarea>
+    <label>Evidence (read-only)</label>${ev}
+    <button class="btn-sm" style="margin-top:8px" onclick="promoteContextRule(${jsArg(col.name)})">Save as edge rule</button>`;
+}
+function collectContextEditsFromForm(){
+  if(!enrichContext) return;
+  const id = enrichContextCol;
+  if(id==="__instructions__"){
+    enrichContext.instructions = enrichContext.instructions||{};
+    const sp = $("ctxSystemPrompt"), ex = $("ctxExtraInstr");
+    if(sp) enrichContext.instructions.system_prompt = sp.value;
+    if(ex) enrichContext.instructions.extra_instructions = ex.value;
+    return;
+  }
+  const col = (enrichContext.columns||[]).find(c=>c.name===id);
+  if(!col) return;
+  const cl = $("ctxClass"), et = $("ctxEntity"), tg = $("ctxTags"), bd = $("ctxBizDef");
+  if(cl) col.classification = cl.value.trim() || null;
+  if(et) col.entity_type = et.value.trim() || null;
+  if(tg) col.tags = tg.value.split(",").map(s=>s.trim()).filter(Boolean);
+  if(bd){
+    col.business = col.business || {};
+    col.business.definition = bd.value;
+  }
+}
+async function saveEnrichContext(){
+  if(!STATE.table||!enrichContext) return;
+  collectContextEditsFromForm();
+  try{
+    const r = await api("PUT", "/api/enrich/"+encodeURIComponent(STATE.table)+"/context", enrichContext);
+    enrichContext = r.context;
+    toast("Context saved");
+  }catch(e){ toast(e.message,false); }
+}
+async function previewEnrichContext(){
+  if(!STATE.table) return;
+  collectContextEditsFromForm();
+  await saveEnrichContext();
+  try{
+    const p = await api("POST", "/api/enrich/"+encodeURIComponent(STATE.table)+"/context/preview", {});
+    const el = $("enCtxPreview");
+    if(el) el.innerHTML = `<details open><summary style="cursor:pointer;font-weight:600">Assembled prompt (${p.prompt_chars||0} chars)</summary>
+      <h4>System</h4><pre>${esc(p.system_prompt||"")}</pre>
+      <h4>User</h4><pre>${esc(p.user_prompt||"")}</pre></details>`;
+  }catch(e){ toast(e.message,false); }
+}
+async function promoteContextRule(col){
+  const fromE = ($("ctxEntity")?.value||"UNKNOWN").trim()||"UNKNOWN";
+  try{
+    const r = await api("POST", "/api/enrich/"+encodeURIComponent(STATE.table)+"/context/promote",
+      {column:col, from_entity:fromE, to_entity:fromE, note:"From enrichment context review"});
+    toast("Rule suggested — apply it to the active policy pack in Agentic Composer");
+    console.log(r.suggested_rule);
+  }catch(e){ toast(e.message,false); }
+}
+async function renderEnrich(){
+  memoryHintsLoaded = false;
+  const body = $("tabBody");
+  const modeAuto = enrichMode !== "review";
+  body.innerHTML = `
+    <div class="card"><h3>Enrichment mode</h3>
+      <div class="row">
+        <button class="btn-sm ${modeAuto?'btn-primary':''}" onclick="setEnrichMode('auto')">Enrich automatically</button>
+        <button class="btn-sm ${!modeAuto?'btn-primary':''}" onclick="setEnrichMode('review')">Review context first</button>
+      </div>
+      <small class="hint">Both modes auto-write the LLM contract to active and produce run-folder diff artifacts for OpenMetadata verification. Review mode lets you edit what the LLM sees before the call.</small>
+    </div>
+
+    ${!modeAuto ? `<div class="card" id="enCtxInspector"><div class="hint">Loading context…</div></div>` : ""}
+    <div class="card" style="border-color:#86efac;background:#f0fdf4">
+      <h3 style="color:#166534">Open-source / local</h3>
+      <small class="hint" style="color:#166534">
+        <strong>demo</strong> — offline templates (no network).<br>
+        <strong>claude / gemini</strong> — cloud APIs; set <code>ANTHROPIC_API_KEY</code> or <code>GEMINI_API_KEY</code> (or paste key below).<br>
+        <strong>ollama / vllm / sglang</strong> — local LLM. Use <strong>+ Add custom provider</strong> for any OpenAI-compatible server (SGLang Qwen, LM Studio, …) with free params.
+      </small>
+    </div>
+
+    <div class="card"><h3>LLM enrichment — full contract</h3>
+      <small class="hint">Prefer a <strong>custom</strong> profile for SGLang/Qwen so you control model id, <code>/v1</code> base URL, <code>supports_json</code>, and params. Failures show raw LiteLLM diagnostics below.</small>
+      <div class="grid2" style="margin-top:12px">
+        <div><label>Provider</label>
+          <div class="row" style="gap:8px;align-items:center">
+            <select id="enProvider" style="flex:1"><option>demo</option></select>
+            <button type="button" class="btn-sm" onclick="openCustomProviderForm()">+ Add custom</button>
+            <button type="button" class="btn-sm" id="enEditCustomBtn" style="display:none" onclick="openCustomProviderForm(true)">Edit</button>
+          </div></div>
+        <div id="enCloudKey" style="display:none">
+          <label>API key <span id="enKeyEnvHint" class="hint"></span></label>
+          <input id="enKey" type="password" placeholder="paste key or set env var on server"/>
+          <div id="enGeminiKeyHint" class="hint" style="display:none;margin-top:6px;padding:8px;background:#fef3c7;border-radius:6px;color:#92400e"></div>
+        </div>
+        <div id="enSessionKeyWrap" style="display:none">
+          <label>Session API key <span id="enSessionKeyHint" class="hint">(not saved)</span></label>
+          <input id="enSessionKey" type="password" placeholder="e.g. sk-local (local servers still need a non-empty key)"/>
+        </div>
+        <div id="enLocalFields" class="grid2" style="grid-column:1/-1;display:none">
+        <div><label>Model</label>
+          <input id="enModel" list="enModelList" placeholder="(uses provider default)"/>
+          <datalist id="enModelList"></datalist>
+          <small id="enModelHint" class="hint">Leave empty for default. For SGLang, must match GET /v1/models.</small></div>
+        <div id="enEndpointWrap"><label>Endpoint URL (api_base)</label><input id="enEndpoint" placeholder="http://localhost:30000/v1"/>
+          <small class="hint">Must include <code>/v1</code> for OpenAI-compatible servers.</small></div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px;gap:8px">
+        <button type="button" class="btn-sm" onclick="testEnrichProvider()">Test connection</button>
+        <button type="button" class="btn-sm" id="enDeleteCustomBtn" style="display:none" onclick="deleteCustomProvider()">Delete custom</button>
+      </div>
+      <div id="enTestResult" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card" id="enCustomForm" style="display:none;border-color:#93c5fd;background:#eff6ff">
+      <h3 style="color:#1e40af">Custom provider profile</h3>
+      <small class="hint">Saved to <code>./llm_providers.json</code> with <code>kind: custom</code>. API keys are never written to disk.</small>
+      <div class="row" style="margin-top:8px;gap:8px">
+        <button type="button" class="btn-sm btn-primary" onclick="applyCustomPreset('sglang_qwen')">Preset: SGLang + Qwen</button>
+        <button type="button" class="btn-sm" onclick="applyCustomPreset('openai_compatible')">Preset: OpenAI-compatible (empty)</button>
+      </div>
+      <div class="grid2" style="margin-top:12px">
+        <div><label>Name</label><input id="cpName" placeholder="sglang-qwen"/></div>
+        <div><label>Type</label>
+          <select id="cpType">
+            <option value="openai_compatible">OpenAI-compatible (SGLang, vLLM, LM Studio…)</option>
+            <option value="raw">Raw LiteLLM model string</option>
+          </select></div>
+        <div style="grid-column:1/-1"><label>Description</label><input id="cpDesc" placeholder="SGLang-hosted Qwen (local)"/></div>
+        <div><label>api_base</label><input id="cpBase" placeholder="http://localhost:30000/v1"/>
+          <small class="hint">Must end with <code>/v1</code>.</small></div>
+        <div><label>Model id</label>
+          <input id="cpModel" list="cpModelList" placeholder="Qwen/Qwen2.5-14B-Instruct"/>
+          <datalist id="cpModelList"></datalist>
+          <button type="button" class="btn-sm" style="margin-top:4px" onclick="refreshCustomModels()">Fetch /models</button>
+        </div>
+        <div id="cpRawWrap" style="display:none;grid-column:1/-1">
+          <label>LiteLLM model string</label>
+          <input id="cpLitellm" placeholder="openai/Qwen/Qwen2.5-14B-Instruct"/>
+        </div>
+        <div><label>api_key_env</label><input id="cpKeyEnv" placeholder="SGLANG_API_KEY"/>
+          <small class="hint">Local servers still need a non-empty key — set any dummy, e.g. <code>sk-local</code>.</small></div>
+        <div><label>Session key (test only)</label><input id="cpSessionKey" type="password" placeholder="sk-local"/></div>
+        <div style="grid-column:1/-1">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="cpSupportsJson" checked style="width:auto"/>
+            <span>supports_json (<code>response_format=json_object</code>) — turn off if Test fails on step 3</span>
+          </label>
+        </div>
+        <div style="grid-column:1/-1"><label>params (JSON object — free-form)</label>
+          <textarea id="cpParams" rows="4" class="mono">{"temperature": 0.2, "max_tokens": 4096, "timeout": 120}</textarea>
+          <small class="hint">Reserved keys stripped on save: model, messages, api_base, api_key, response_format.</small></div>
+      </div>
+      <div class="row" style="margin-top:12px;gap:8px">
+        <button type="button" class="btn-sm btn-primary" onclick="saveCustomProvider()">Save profile</button>
+        <button type="button" class="btn-sm" onclick="testCustomProviderForm()">Test connection</button>
+        <button type="button" class="btn-sm" onclick="closeCustomProviderForm()">Cancel</button>
+      </div>
+      <div id="cpTestResult" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card"><h3>Prompt engineering</h3>
+      <small class="hint">The system prompt covers column definitions, tags, and PII review rules. Use additional instructions for domain-specific naming, locale, or tag conventions.</small>
+      <div class="row" style="justify-content:space-between;margin-top:8px">
+        <label style="margin:0">System prompt</label>
+        <button class="btn-sm" onclick="loadDefaultPrompt(true)">↺ reset to default</button>
+      </div>
+      <textarea id="enPrompt" rows="14" placeholder="Loading default prompt…"></textarea>
+      <label>Additional instructions (appended — domain rules, tone, naming conventions…)</label>
+      <textarea id="enInstr" rows="4" placeholder="e.g. Use UK English. Treat 'msisdn' as PHONE_NUMBER. Tag revenue columns with 'financial'. Demote 'account_status' — it is not PII."></textarea>
+      <label>Example contracts — existing tables to use as few-shot (comma-separated)</label>
+      <input id="enExamples" placeholder="telecom.customers, sales.orders"/>
+    </div>
+
+    <div class="card"><h3>Masked sample data</h3>
+      <small class="hint">De-identified CSV, Parquet, or JSON exports (e.g. from the Masking page). Up to 25 rows are included in the LLM context for example_values — never upload raw PII here.</small>
+      <div class="row" style="margin-top:8px"><input type="file" id="enSampleFile" accept=".csv,.tsv,.parquet,.pq,.json"/>
+        <button class="btn-sm" onclick="uploadDoc('sample')">Upload</button></div>
+      <div id="enSampleList" class="doclist"></div>
+    </div>
+
+    <div class="card"><h3>Context documents</h3>
+      <small class="hint">Design docs, company/marketing info, data dictionaries — used to infer schema meaning and business definitions.</small>
+      <div class="row" style="margin-top:8px"><input type="file" id="enCtxFile"/>
+        <button class="btn-sm" onclick="uploadDoc('context')">Upload</button></div>
+      <div id="enCtxList" class="doclist"></div>
+    </div>
+
+    <div class="card"><h3>Example documents</h3>
+      <small class="hint">Sample/ideal contracts or write-ups the model should imitate (few-shot).</small>
+      <div class="row" style="margin-top:8px"><input type="file" id="enExFile"/>
+        <button class="btn-sm" onclick="uploadDoc('example')">Upload</button></div>
+      <div id="enExList" class="doclist"></div>
+    </div>
+
+    <div class="card" id="enRaiCard"><h3>External model safety (RAI)</h3>
+      <div id="enRaiPanel" class="hint">Loading residency check…</div>
+      <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;cursor:pointer">
+        <input type="checkbox" id="enBypassRai" style="width:auto;margin-top:3px"/>
+        <span><strong>Dev: skip RAI check</strong><br>
+          <small class="hint">Open-source only — allows external providers with PII-tagged contracts (logged, not for production).</small></span>
+      </label>
+      <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;cursor:pointer">
+        <input type="checkbox" id="enMaskedAck" style="width:auto;margin-top:3px" onchange="loadEnrichPreflight()"/>
+        <span><strong>Masked export approved for external LLM</strong><br>
+          <small class="hint">For enterprise external calls: upload de-identified samples; contract PII metadata is redacted.</small></span>
+      </label>
+    </div>
+
+    <div class="row" style="margin:4px 0 14px">
+      <button class="btn-primary" onclick="${modeAuto?'runEnrich()':'runEnrichFromContext()'}">Run enrichment</button>
+      ${STATE.memoryEnabled ? `<button class="btn-sm" id="enMemoryToggle" onclick="toggleMemoryHints()">Past steward reviews</button>` : ""}
+    </div>
+    ${STATE.memoryEnabled ? `<div class="card" id="enMemoryCard" style="display:none">
+      <h3>Similar past steward reviews</h3>
+      <small class="hint">Read-only hints from the on-prem column memory store (suggest-only — you still approve all changes).</small>
+      <div id="enMemoryHints" class="hint" style="margin-top:10px">Click "Past steward reviews" to load.</div></div>` : ""}
+    <div id="enResult"></div>`;
+  loadProviders();
+  loadDefaultPrompt(false);
+  refreshDocs('context');
+  refreshDocs('example');
+  refreshDocs('sample');
+  loadEnrichPreflight();
+  if(!modeAuto) loadEnrichContext();
+}
+let memoryHintsLoaded = false;
+function toggleMemoryHints(){
+  const card = $("enMemoryCard");
+  if(!card) return;
+  const opening = card.style.display === "none";
+  card.style.display = opening ? "" : "none";
+  if(opening && !memoryHintsLoaded){
+    memoryHintsLoaded = true;
+    loadMemoryHints();
+  }
+}
+function renderEnrichPreflight(p){
+  const el = $("enRaiPanel"); if(!el) return;
+  if(!p){
+    el.innerHTML = `<span class="hint">Select a provider to preview residency rules.</span>`;
+    return;
+  }
+  const residency = p.residency||"local";
+  const chip = residency==="local" ? "chip-green" : (p.would_block ? "chip-red" : "chip-amber");
+  const cols = (p.pii_columns||[]).map(c=>`<span class="chip chip-red mono">${esc(c)}</span>`).join(" ") || `<span class="hint">none flagged</span>`;
+  const hints = (p.hints||[]).map(h=>`<li>${esc(h)}</li>`).join("");
+  el.innerHTML = `
+    <div class="row" style="margin-bottom:8px">
+      <span class="chip ${chip}">residency: ${esc(residency)}</span>
+      <span class="chip chip-muted">${p.sample_data_count||0} masked sample file(s)</span>
+      ${p.would_block?`<span class="chip chip-red">would block</span>`:`<span class="chip chip-green">ready</span>`}
+    </div>
+    <div style="margin-bottom:6px"><strong>PII columns in contract:</strong> ${cols}</div>
+    ${p.block_reason?`<div class="banner invalid" style="margin-top:8px">${esc(p.block_reason)}</div>`:""}
+    ${hints?`<ul style="margin:8px 0 0 18px;font-size:12px">${hints}</ul>`:""}`;
+}
+async function loadEnrichPreflight(){
+  if(!STATE.table) return;
+  const prov = $("enProvider")?.value || "vllm";
+  const model = ($("enModel")?.value||"").trim();
+  const ack = !!$("enMaskedAck")?.checked;
+  const bypass = !!$("enBypassRai")?.checked;
+  const qs = new URLSearchParams({provider:prov, external_masked_acknowledged: ack?"true":"false"});
+  if(model) qs.set("model", model);
+  const extras = enrichPayloadExtras();
+  if(extras.endpoint_url) qs.set("endpoint_url", extras.endpoint_url);
+  try{
+    const p = await api("GET", `/api/contracts/${STATE.table}/enrich/preflight?${qs}`);
+    renderEnrichPreflight(p);
+  }catch(e){
+    renderEnrichPreflight(null);
+  }
+}
+async function loadMemoryHints(){
+  const box = $("enMemoryHints");
+  if(!box) return;
+  try{
+    const data = await api("GET","/api/contracts/"+STATE.table+"/memory/hints");
+    const cols = data.columns||[];
+    if(!cols.length){
+      box.innerHTML = `<div class="empty">No similar past steward reviews for this table yet.</div>`;
+      return;
+    }
+    box.innerHTML = cols.map(block=>{
+      const items = (block.hints||[]).map(h=>{
+        const fp = h.fingerprint||{};
+        const bits = [`similarity ${Number(h.similarity||0).toFixed(3)}`];
+        if(h.pii_verdict) bits.push(`PII: ${esc(h.pii_verdict)}`);
+        if(h.business_definition) bits.push(esc(h.business_definition));
+        if(h.rationale) bits.push(esc(h.rationale));
+        return `<li>${esc(fp.format_signature||'')} — ${bits.join(" · ")}</li>`;
+      }).join("");
+      return `<div style="margin-bottom:10px"><strong class="mono">${esc(block.column)}</strong><ul style="margin:6px 0 0 18px;font-size:12px">${items}</ul></div>`;
+    }).join("");
+  }catch(e){
+    box.innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+  }
+}
+function fmtDiffVal(v){
+  if(v==null||v==="") return `<span class="hint">—</span>`;
+  if(Array.isArray(v)) return esc(v.join(", "));
+  if(typeof v==="object") return `<code>${esc(JSON.stringify(v))}</code>`;
+  return esc(String(v));
+}
+function renderChangeDetail(ch){
+  if(ch.kind==="list"){
+    let h="";
+    if(ch.added&&ch.added.length) h+=`<div class="diff-add">+ ${esc(ch.added.join(", "))}</div>`;
+    if(ch.removed&&ch.removed.length) h+=`<div class="diff-remove">− ${esc(ch.removed.join(", "))}</div>`;
+    return h||fmtDiffVal(ch.after);
+  }
+  if(ch.kind==="demotion"){
+    return `<span class="diff-before">${fmtDiffVal(ch.before)}</span> → <span class="diff-after">${fmtDiffVal(ch.after)}</span>`;
+  }
+  return `<span class="diff-before">${fmtDiffVal(ch.before)}</span> → <span class="diff-after">${fmtDiffVal(ch.after)}</span>`;
+}
+function renderEnrichDiffReport(diff){
+  if(!diff) return `<div class="hint">No changes detected.</div>`;
+  if(diff.fields){
+    const s = diff.summary||{};
+    const chips = [
+      s.overrides?`<span class="chip chip-amber">${s.overrides} override(s)</span>`:"",
+      s.adds?`<span class="chip chip-green">${s.adds} add(s)</span>`:"",
+      s.unchanged?`<span class="chip chip-muted">${s.unchanged} unchanged</span>`:"",
+    ].filter(Boolean).join("");
+    const rows = (diff.fields||[]).filter(f=>f.kind!=="unchanged").map(f=>
+      `<tr><td class="mono">${esc(f.column)}</td><td><code>${esc(f.field)}</code></td>
+        <td><span class="chip chip-${f.kind==='add'?'green':'amber'}">${esc(f.kind)}</span></td>
+        <td>${fmtDiffVal(f.det_value)} → ${fmtDiffVal(f.llm_value)}</td></tr>`).join("");
+    return `<h3 style="margin-top:4px">Contract diff (deterministic → LLM)</h3>
+      <div class="diff-summary">${chips||`<span class="chip chip-muted">no changes</span>`}</div>
+      <table><thead><tr><th>Column</th><th>Field</th><th>Kind</th><th>Change</th></tr></thead>
+      <tbody>${rows||`<tr><td colspan="4" class="hint">No column-level changes</td></tr>`}</tbody></table>`;
+  }
+  const s = diff.summary||{};
+  const chips = [
+    s.columns_changed?`<span class="chip chip-blue">${s.columns_changed} column(s) changed</span>`:"",
+    s.definitions_added?`<span class="chip chip-green">${s.definitions_added} definition(s) added</span>`:"",
+    s.definitions_updated?`<span class="chip chip-amber">${s.definitions_updated} updated</span>`:"",
+    s.pii_changes?`<span class="chip chip-amber">${s.pii_changes} PII change(s)</span>`:"",
+    s.pii_demotions_pending?`<span class="chip chip-red">${s.pii_demotions_pending} demotion(s) on merge</span>`:"",
+    (diff.unchanged_columns||[]).length?`<span class="chip chip-muted">${diff.unchanged_columns.length} unchanged</span>`:"",
+  ].filter(Boolean).join("");
+  let tableTags = "";
+  const tt = diff.table_tags||{};
+  if((tt.added||[]).length||(tt.removed||[]).length){
+    tableTags = `<div style="margin:10px 0"><strong>Table tags</strong> `+
+      (tt.added||[]).map(t=>`<span class="chip chip-green">+ ${esc(t)}</span>`).join(" ")+
+      (tt.removed||[]).map(t=>`<span class="chip chip-red">− ${esc(t)}</span>`).join(" ")+
+      `</div>`;
+  }
+  const rows = (diff.columns||[]).map(col=>{
+    const cells = (col.changes||[]).map(ch=>
+      `<tr class="diff-row"><td class="mono">${esc(col.column)}</td>
+        <td><code>${esc(ch.field)}</code></td>
+        <td>${renderChangeDetail(ch)}</td></tr>`).join("");
+    return cells;
+  }).join("");
+  const body = rows || `<tr><td colspan="3" class="hint">No column-level changes</td></tr>`;
+  return `<h3 style="margin-top:4px">Change report</h3>
+    <small class="hint">Diff between the active contract (input) and the LLM enrichment candidate (output).</small>
+    <div class="diff-summary">${chips||`<span class="chip chip-muted">no changes</span>`}</div>
+    ${tableTags}
+    <table><thead><tr><th>Column</th><th>Field</th><th>Change</th></tr></thead><tbody>${body}</tbody></table>`;
+}
+function showEnrichResult(r){
+  const valid = r.valid;
+  const written = r.auto_written;
+  const banner = !valid ? `<div class="banner invalid">✗ Invalid — not written to active<br><small>${esc((r.errors||[]).join('; '))}</small></div>`
+    : written ? `<div class="banner valid">✓ Auto-written to active · v${esc(r.version_after||'?')} — verify in OpenMetadata using run diff artifacts</div>`
+    : `<div class="banner invalid">✗ Valid but not written</div>`;
+  const diffHtml = renderEnrichDiffReport(r.diff_report);
+  const art = r.run_artifacts||{};
+  const artKeys = Object.keys(art);
+  const artLine = artKeys.length ? `<small class="hint">Run artifacts: ${artKeys.map(k=>esc(k)).join(", ")}</small>` : "";
+  $("enResult").innerHTML = `<div class="card">${banner}${artLine}
+    <div class="row" style="margin-top:8px"><button class="btn-sm" onclick="setTab('contract')">View contract</button></div>
+    ${diffHtml}</div>`;
+}
+async function loadPendingEnrich(){
+  const el = $("enResult"); if(!el||!STATE.table) return;
+  try{
+    const d = await api("GET", contractPath(STATE.table, "/enrich/diff"));
+    showEnrichResult({valid:d.valid, errors:d.errors, diff_report:d.diff_report, candidate:null});
+  }catch(e){ /* no pending candidate */ }
+}
+function syncEnrichProviderUi(){
+  const list = window.ENRICH_PROVIDERS||[];
+  const p = list.find(x=>x.name===$("enProvider").value);
+  const local = $("enLocalFields");
+  const cloudKey = $("enCloudKey");
+  const sessionKey = $("enSessionKeyWrap");
+  const endpointWrap = $("enEndpointWrap");
+  const isDemo = p && (p.offline || p.kind==="demo" || p.name==="demo");
+  const isCloud = p && (p.cloud || p.residency==="public" || p.name==="claude" || p.name==="gemini");
+  const isCustom = p && (p.editable || p.kind==="custom");
+  if(local) local.style.display = isDemo ? "none" : "grid";
+  if(cloudKey) cloudKey.style.display = isCloud ? "block" : "none";
+  if(sessionKey) sessionKey.style.display = (!isCloud && !isDemo) ? "block" : "none";
+  if(endpointWrap) endpointWrap.style.display = (isCloud || isDemo) ? "none" : "block";
+  if(isCloud || isDemo){
+    const epEl = $("enEndpoint");
+    if(epEl) epEl.value = "";
+  } else if(p && p.api_base && $("enEndpoint") && !$("enEndpoint").dataset.touched){
+    $("enEndpoint").value = p.api_base;
+  }
+  const keyHint = $("enKeyEnvHint");
+  if(keyHint){
+    const extra = [];
+    if(p && p.api_key_env) extra.push(`env ${p.api_key_env}`);
+    if(p && p.api_key_saved) extra.push("saved key on file");
+    keyHint.textContent = extra.length ? `(or ${extra.join(" · ")})` : "";
+  }
+  const skHint = $("enSessionKeyHint");
+  if(skHint && p){
+    skHint.textContent = p.api_key_env
+      ? `(not saved · or set ${p.api_key_env})`
+      : "(not saved)";
+  }
+  const gemHint = $("enGeminiKeyHint");
+  if(gemHint){
+    const needsKey = p && p.name==="gemini" && !isDemo && !p.api_key_saved && !p.api_key_env_set;
+    gemHint.style.display = needsKey ? "block" : "none";
+    if(needsKey){
+      gemHint.innerHTML = `Default provider is Gemini — set <code>GEMINI_API_KEY</code> on the server, paste a session key above, or switch provider in <a href="/settings">Settings</a>.`;
+    }
+  }
+  const editBtn = $("enEditCustomBtn"), delBtn = $("enDeleteCustomBtn");
+  if(editBtn) editBtn.style.display = isCustom ? "" : "none";
+  if(delBtn) delBtn.style.display = isCustom ? "" : "none";
+  syncEnrichModelHint();
+  loadEnrichPreflight();
+}
+function enrichPayloadExtras(){
+  const list = window.ENRICH_PROVIDERS||[];
+  const p = list.find(x=>x.name===$("enProvider").value);
+  const isCloud = p && (p.cloud || p.residency==="public" || p.name==="claude" || p.name==="gemini");
+  const isDemo = p && (p.offline || p.kind==="demo" || p.name==="demo");
+  if(isCloud || isDemo) return {endpoint_url:undefined};
+  const ep=($("enEndpoint").value||"").trim();
+  return {endpoint_url: ep||undefined};
+}
+function enrichSessionKey(){
+  const list = window.ENRICH_PROVIDERS||[];
+  const p = list.find(x=>x.name===$("enProvider").value);
+  const isCloud = p && (p.cloud || p.residency==="public" || p.name==="claude" || p.name==="gemini");
+  if(isCloud) return ($("enKey").value||"").trim()||undefined;
+  return ($("enSessionKey").value||"").trim() || ($("enKey").value||"").trim() || undefined;
+}
+async function loadProviders(selectName){
+  try{
+    const [d, gs] = await Promise.all([
+      api("GET","/api/llm/providers").catch(()=>api("GET","/api/llm-providers")),
+      api("GET","/api/settings/global").catch(()=>({})),
+    ]);
+    window.ENRICH_PRESETS = (d && d.presets) || {};
+    const sel = $("enProvider");
+    const list = d.providers||[];
+    const llm = gs && typeof gs.llm_defaults === "object" ? gs.llm_defaults : {};
+    window.ENRICH_PROVIDERS = list;
+    if(list.length){
+      const order = ["gemini","claude","demo","ollama","vllm","sglang","openrouter","openai"];
+      const sorted = list.slice().sort(function(a,b){
+        if(a.editable && !b.editable) return -1;
+        if(!a.editable && b.editable) return 1;
+        const ia = order.indexOf(a.name), ib = order.indexOf(b.name);
+        if(ia>=0 && ib>=0) return ia-ib;
+        if(ia>=0) return -1;
+        if(ib>=0) return 1;
+        return a.name.localeCompare(b.name);
+      });
+      const groups = [
+        {label:"Custom profiles", filter:p=>p.editable || p.kind==="custom"},
+        {label:"Offline", filter:p=>p.offline},
+        {label:"Cloud (Claude, Gemini, …)", filter:p=>p.cloud||p.residency==="public"},
+        {label:"Local LLM", filter:p=>!p.offline&&!p.cloud&&!p.editable&&p.residency!=="public"&&p.api_base},
+        {label:"Other", filter:p=>!p.offline&&!p.cloud&&!p.editable&&!p.api_base},
+      ];
+      let html = "";
+      const used = new Set();
+      groups.forEach(g=>{
+        const items = sorted.filter(p=>g.filter(p) && !used.has(p.name));
+        if(!items.length) return;
+        html += `<optgroup label="${esc(g.label)}">`+items.map(p=>{
+          used.add(p.name);
+          const tag = p.editable ? "custom" : (p.offline ? "offline" : (p.cloud ? "cloud" : "local"));
+          return `<option value="${esc(p.name)}">${esc(p.name)} · ${tag}</option>`;
+        }).join("")+`</optgroup>`;
+      });
+      sorted.filter(p=>!used.has(p.name)).forEach(p=>{
+        html += `<option value="${esc(p.name)}">${esc(p.name)}</option>`;
+      });
+      sel.innerHTML = html;
+      const preferredProvider = selectName
+        || (llm.provider||"").trim()
+        || (d.default_provider||"").trim()
+        || "gemini";
+      if(preferredProvider && list.some(p=>p.name===preferredProvider)) sel.value = preferredProvider;
+      else if(list.some(p=>p.name==="gemini")) sel.value = "gemini";
+      sel.onchange = syncEnrichProviderUi;
+      const modelEl = $("enModel");
+      const endpointEl = $("enEndpoint");
+      if(endpointEl){
+        endpointEl.oninput = ()=>{ endpointEl.dataset.touched = "1"; };
+      }
+      if(modelEl && !modelEl.value && llm.model) modelEl.value = llm.model;
+      syncEnrichProviderUi();
+    }
+  }catch(e){}
+}
+function syncEnrichModelHint(){
+  const list = window.ENRICH_PROVIDERS||[];
+  const p = list.find(x=>x.name===$("enProvider").value);
+  const el = $("enModel"), hint = $("enModelHint"), dl = $("enModelList");
+  if(!p||!el) return;
+  const bare = p.default_model_bare || ((p.model||"").includes("/") ? p.model.split("/").slice(1).join("/") : (p.model||""));
+  el.placeholder = bare || "(provider default)";
+  if(dl){
+    dl.innerHTML = (p.known_models||[]).map(m=>`<option value="${esc(m)}">`).join("");
+  }
+  const examples = (p.known_models||[]).slice(0, 5).join(", ");
+  if(hint){
+    const env = p.api_key_env ? ` Key: ${p.api_key_env} or session key.` : "";
+    const jsonHint = p.supports_json === false ? " supports_json=off." : "";
+    hint.textContent = examples
+      ? `Default: ${p.model||bare}. Pick: ${examples}.${env}${jsonHint}`
+      : `Default: ${p.model||'from llm_providers.json'}.${env}${jsonHint}`;
+  }
+}
+function renderStagedTest(result, targetId){
+  const el = $(targetId); if(!el) return;
+  if(!result){ el.innerHTML = ""; return; }
+  const ok = result.ok;
+  const banner = ok
+    ? `<div class="banner valid">Connection OK</div>`
+    : `<div class="banner invalid">Connection failed</div>`;
+  const stages = (result.stages||[]).map(s=>{
+    const st = s.ok ? "chip-green" : "chip-red";
+    const err = s.error ? `<pre class="mono" style="white-space:pre-wrap;font-size:11px;margin:6px 0 0;max-height:160px;overflow:auto">${esc(s.error)}</pre>` : "";
+    const warn = s.warning ? `<div class="hint" style="margin-top:4px">${esc(s.warning)}</div>` : "";
+    const models = (s.models&&s.models.length) ? `<div class="hint">models: ${esc(s.models.slice(0,12).join(", "))}</div>` : "";
+    const detail = s.detail ? `<div class="hint">${esc(s.detail)}</div>` : "";
+    return `<div style="margin-top:8px"><span class="chip ${st}">${esc(s.stage)}</span>
+      ${s.latency_ms!=null?`<span class="chip chip-muted">${s.latency_ms} ms</span>`:""}
+      ${detail}${models}${warn}${err}</div>`;
+  }).join("");
+  const hint = result.hint ? `<div class="hint" style="margin-top:8px"><strong>Hint:</strong> ${esc(result.hint)}</div>` : "";
+  const raw = (!result.stages && result.error)
+    ? `<pre class="mono" style="white-space:pre-wrap;font-size:11px;margin-top:8px;max-height:200px;overflow:auto">${esc(result.error)}</pre>`
+    : "";
+  el.innerHTML = `${banner}${stages}${hint}${raw}`;
+}
+async function testEnrichProvider(){
+  const name = $("enProvider")?.value;
+  if(!name) return;
+  const box = $("enTestResult");
+  if(box) box.innerHTML = `<div class="hint">Testing ${esc(name)}…</div>`;
+  const list = window.ENRICH_PROVIDERS||[];
+  const p = list.find(x=>x.name===name) || {};
+  try{
+    const body = {
+      name,
+      api_key: enrichSessionKey(),
+      profile: {
+        name,
+        api_base: ($("enEndpoint")?.value||"").trim() || p.api_base || undefined,
+        model: ($("enModel")?.value||"").trim() || p.default_model_bare || undefined,
+        litellm_model: p.model,
+        model_prefix: p.model_prefix || "openai",
+        api_key_env: p.api_key_env || "",
+        supports_json: p.supports_json !== false,
+        params: p.params || {},
+        profile_type: "openai_compatible",
+      },
+    };
+    const r = await api("POST", "/api/llm/providers/test", body);
+    renderStagedTest(r, "enTestResult");
+  }catch(e){
+    if(box) box.innerHTML = `<div class="banner invalid">${esc(e.message||e)}</div>`;
+  }
+}
+function closeCustomProviderForm(){
+  const el = $("enCustomForm");
+  if(el) el.style.display = "none";
+}
+function openCustomProviderForm(edit){
+  const el = $("enCustomForm");
+  if(!el) return;
+  el.style.display = "";
+  if(edit){
+    const list = window.ENRICH_PROVIDERS||[];
+    const p = list.find(x=>x.name===$("enProvider").value);
+    if(p){
+      $("cpName").value = p.name;
+      $("cpDesc").value = p.description || "";
+      $("cpBase").value = p.api_base || "";
+      $("cpModel").value = p.default_model_bare || "";
+      $("cpLitellm").value = p.model || "";
+      $("cpKeyEnv").value = p.api_key_env || "";
+      $("cpSupportsJson").checked = p.supports_json !== false;
+      $("cpParams").value = JSON.stringify(p.params && Object.keys(p.params).length ? p.params : {temperature:0.2,max_tokens:4096,timeout:120}, null, 2);
+      $("cpType").value = "openai_compatible";
+    }
+  } else {
+    applyCustomPreset("sglang_qwen");
+  }
+  syncCustomTypeUi();
+  $("cpType").onchange = syncCustomTypeUi;
+  el.scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+function syncCustomTypeUi(){
+  const raw = $("cpType")?.value === "raw";
+  const wrap = $("cpRawWrap");
+  if(wrap) wrap.style.display = raw ? "block" : "none";
+}
+function applyCustomPreset(key){
+  const presets = window.ENRICH_PRESETS || {};
+  const p = presets[key] || (key==="sglang_qwen" ? {
+    name:"sglang-qwen", description:"SGLang-hosted Qwen (local)",
+    api_base:"http://localhost:30000/v1", api_key_env:"SGLANG_API_KEY",
+    litellm_model:"openai/Qwen/Qwen2.5-14B-Instruct", model_prefix:"openai",
+    supports_json:true, params:{temperature:0.2,max_tokens:4096,timeout:120},
+  } : {name:"", description:"OpenAI-compatible local server", api_base:"", api_key_env:"OPENAI_API_KEY",
+    litellm_model:"openai/", model_prefix:"openai", supports_json:true,
+    params:{temperature:0.2,max_tokens:4096,timeout:120}});
+  if($("cpName")) $("cpName").value = p.name || "";
+  if($("cpDesc")) $("cpDesc").value = p.description || "";
+  if($("cpBase")) $("cpBase").value = p.api_base || "";
+  if($("cpKeyEnv")) $("cpKeyEnv").value = p.api_key_env || "";
+  if($("cpLitellm")) $("cpLitellm").value = p.litellm_model || "";
+  if($("cpModel")){
+    const bare = (p.litellm_model||"").replace(/^openai\//,"");
+    $("cpModel").value = key==="openai_compatible" ? "" : (bare || "Qwen/Qwen2.5-14B-Instruct");
+  }
+  if($("cpSupportsJson")) $("cpSupportsJson").checked = p.supports_json !== false;
+  if($("cpParams")) $("cpParams").value = JSON.stringify(p.params||{}, null, 2);
+  if($("cpType")) $("cpType").value = "openai_compatible";
+  syncCustomTypeUi();
+}
+function collectCustomProfilePayload(){
+  let params = {};
+  try{
+    params = JSON.parse(($("cpParams").value||"{}").trim() || "{}");
+  }catch(e){
+    throw new Error("params must be valid JSON object: "+e.message);
+  }
+  if(params===null || typeof params!=="object" || Array.isArray(params)){
+    throw new Error("params must be a JSON object");
+  }
+  const profile_type = $("cpType").value || "openai_compatible";
+  return {
+    name: ($("cpName").value||"").trim(),
+    description: ($("cpDesc").value||"").trim(),
+    profile_type,
+    api_base: ($("cpBase").value||"").trim() || undefined,
+    model: ($("cpModel").value||"").trim(),
+    litellm_model: ($("cpLitellm").value||"").trim(),
+    model_prefix: profile_type==="raw" ? "" : "openai",
+    api_key_env: ($("cpKeyEnv").value||"").trim(),
+    supports_json: !!$("cpSupportsJson")?.checked,
+    residency: "local",
+    params,
+  };
+}
+async function refreshCustomModels(){
+  const base = ($("cpBase").value||"").trim();
+  if(!base){ toast("Set api_base first", false); return; }
+  try{
+    const r = await api("POST", "/api/llm/providers/test", {
+      profile: {
+        name: ($("cpName").value||"inline").trim() || "inline",
+        api_base: base,
+        model: ($("cpModel").value||"").trim() || "default",
+        model_prefix: "openai",
+        profile_type: "openai_compatible",
+        supports_json: false,
+        params: {},
+      },
+      api_key: ($("cpSessionKey").value||"").trim() || undefined,
+    });
+    const stage = (r.stages||[]).find(s=>s.stage==="reachability");
+    const models = (stage && stage.models) || r.models || [];
+    const dl = $("cpModelList");
+    if(dl) dl.innerHTML = models.map(m=>`<option value="${esc(m)}">`).join("");
+    if(models.length && $("cpModel") && !$("cpModel").value) $("cpModel").value = models[0];
+    renderStagedTest({
+      ok: !!(stage && stage.ok),
+      stages: stage ? [stage] : (r.stages||[]),
+      hint: models.length ? `Loaded ${models.length} model(s).` : (r.hint||r.error||""),
+      error: r.error,
+    }, "cpTestResult");
+  }catch(e){
+    renderStagedTest({ok:false, error:e.message||String(e)}, "cpTestResult");
+  }
+}
+async function saveCustomProvider(){
+  try{
+    const body = collectCustomProfilePayload();
+    if(!body.name){ toast("Name is required", false); return; }
+    const r = await api("POST", "/api/llm/providers", body);
+    toast(`Saved ${r.name}`);
+    closeCustomProviderForm();
+    await loadProviders(r.name);
+  }catch(e){
+    toast(e.message||String(e), false);
+    renderStagedTest({ok:false, error:e.message||String(e)}, "cpTestResult");
+  }
+}
+async function testCustomProviderForm(){
+  try{
+    const profile = collectCustomProfilePayload();
+    $("cpTestResult").innerHTML = `<div class="hint">Testing…</div>`;
+    const r = await api("POST", "/api/llm/providers/test", {
+      profile,
+      api_key: ($("cpSessionKey").value||"").trim() || undefined,
+    });
+    renderStagedTest(r, "cpTestResult");
+  }catch(e){
+    renderStagedTest({ok:false, error:e.message||String(e)}, "cpTestResult");
+  }
+}
+async function deleteCustomProvider(){
+  const name = $("enProvider")?.value;
+  if(!name) return;
+  if(!confirm(`Delete custom profile "${name}"?`)) return;
+  try{
+    await api("DELETE", "/api/llm/providers/"+encodeURIComponent(name));
+    toast(`Deleted ${name}`);
+    await loadProviders();
+  }catch(e){ toast(e.message||String(e), false); }
+}
+async function loadDefaultPrompt(force){
+  const ta = $("enPrompt"); if(!ta) return;
+  if(ta.value && !force) return;
+  try{ const d = await api("GET","/api/enrich/default-prompt"); ta.value = d.system_prompt||""; }catch(e){}
+}
+function docEndpoint(kind){
+  if(kind==='example') return 'example-docs';
+  if(kind==='sample') return 'sample-data';
+  return 'context-docs';
+}
+function docListEl(kind){
+  if(kind==='example') return $('enExList');
+  if(kind==='sample') return $('enSampleList');
+  return $('enCtxList');
+}
+function docFileEl(kind){
+  if(kind==='example') return $('enExFile');
+  if(kind==='sample') return $('enSampleFile');
+  return $('enCtxFile');
+}
+async function refreshDocs(kind){
+  const el = docListEl(kind); if(!el) return;
+  try{
+    const d = await api("GET","/api/contracts/"+STATE.table+"/"+docEndpoint(kind));
+    const docs = d.docs||[];
+    el.innerHTML = docs.length ? docs.map(n=>
+      `<span class="chip chip-blue">${esc(n)} <a onclick="deleteDoc(${jsArg(kind)},${jsArg(n)})" style="cursor:pointer">✕</a></span>`).join("")
+      : `<span class="hint">none</span>`;
+    if(kind==="sample") loadEnrichPreflight();
+  }catch(e){}
+}
+async function uploadDoc(kind){
+  const f = docFileEl(kind).files[0];
+  if(!f){ toast("Pick a file",false); return; }
+  const fd = new FormData(); fd.append("file", f);
+  try{ await api("POST","/api/contracts/"+STATE.table+"/"+docEndpoint(kind), fd, true); toast("Uploaded"); refreshDocs(kind); }
+  catch(e){ toast(e.message,false); }
+}
+async function deleteDoc(kind,name){
+  try{ await api("DELETE","/api/contracts/"+STATE.table+"/"+docEndpoint(kind)+"/"+encodeURIComponent(name)); toast("Removed"); refreshDocs(kind); }
+  catch(e){ toast(e.message,false); }
+}
+function renderEnrichError(e){
+  const msg = e.message || String(e);
+  let html = `<div class="banner invalid">Enrichment failed</div>
+    <details open style="margin-top:10px">
+      <summary style="cursor:pointer;font-weight:600">Error details (raw)</summary>
+      <pre class="mono" style="white-space:pre-wrap;font-size:11px;margin:8px 0 0;max-height:280px;overflow:auto;padding:10px;background:#fef2f2;border-radius:6px">${esc(msg)}</pre>
+    </details>`;
+  const rai = e.rai;
+  if(rai){
+    html += `<div style="margin-top:10px;font-size:12px">
+      <strong>RAI details</strong>
+      <div class="row" style="margin-top:6px">
+        <span class="chip chip-muted">residency: ${esc(rai.residency||"?")}</span>
+        <span class="chip chip-muted">${rai.sample_data_count||0} sample file(s)</span>
+      </div>
+      <div style="margin-top:8px"><strong>PII columns:</strong> ${(rai.pii_columns||[]).map(c=>`<span class="chip chip-red mono">${esc(c)}</span>`).join(" ")||"<span class='hint'>none</span>"}</div>
+      ${(rai.hints||[]).length?`<ul style="margin:8px 0 0 18px">${(rai.hints||[]).map(h=>`<li>${esc(h)}</li>`).join("")}</ul>`:""}
+    </div>`;
+  }
+  html += `<div class="hint" style="margin-top:10px">Tip: use <strong>Test connection</strong> above for staged diagnostics (reachability → completion → json_mode).</div>`;
+  return html;
+}
+async function runEnrichFromContext(){
+  if(!STATE.table) return;
+  collectContextEditsFromForm();
+  await saveEnrichContext();
+  const examples = ($("enExamples").value||"").split(",").map(s=>s.trim()).filter(Boolean);
+  const model = ($("enModel").value||"").trim();
+  const payload = { provider:$("enProvider").value, model:model||undefined, api_key:enrichSessionKey(),
+    ...enrichPayloadExtras(),
+    example_contracts:examples.length?examples:null,
+    external_masked_acknowledged: !!$("enMaskedAck")?.checked,
+    bypass_rai: !!$("enBypassRai")?.checked,
+    context: enrichContext };
+  $("enResult").innerHTML = `<div class="card">Running enrichment with edited context…</div>`;
+  try{
+    const r = await api("POST", "/api/enrich/"+encodeURIComponent(STATE.table)+"/run", payload);
+    showEnrichResult(r);
+  }catch(e){ $("enResult").innerHTML = `<div class="card">${renderEnrichError(e)}</div>`; }
+}
+async function runEnrich(){
+  const examples = ($("enExamples").value||"").split(",").map(s=>s.trim()).filter(Boolean);
+  const model = ($("enModel").value||"").trim();
+  const payload = { provider:$("enProvider").value, model:model||undefined, api_key:enrichSessionKey(),
+    ...enrichPayloadExtras(),
+    system_prompt:($("enPrompt").value||"").trim()||undefined, extra_instructions:($("enInstr").value||"").trim()||undefined,
+    example_contracts:examples.length?examples:null,
+    external_masked_acknowledged: !!$("enMaskedAck")?.checked,
+    bypass_rai: !!$("enBypassRai")?.checked };
+  $("enResult").innerHTML = `<div class="card">Running enrichment…</div>`;
+  try{
+    const r = await api("POST", contractPath(STATE.table, "/enrich"), payload);
+    showEnrichResult(r);
+  }catch(e){ $("enResult").innerHTML = `<div class="card">${renderEnrichError(e)}</div>`; }
+}
+async function mergeEnrich(){
+  if(!STATE.table){ toast("Select a table first", false); return; }
+  try{
+    const r = await api("POST", contractPath(STATE.table, "/enrich/merge"), {});
+    toast(`Merged enrichment → v${r.version_after}`);
+    setTab("contract");
+  }catch(e){
+    toast(e.message || "Merge failed", false);
+    const el = $("enResult");
+    if(el) el.innerHTML = `<div class="card">${formatApiError(e)}</div>`;
+  }
+}
+
+// ── Contract Synthesis (portable ODCS v3.1 — no upsert) ─────────────────────
+async function renderSynthesis(){
+  const body = $("tabBody");
+  body.innerHTML = `
+    <div class="card"><h3>Contract Synthesis</h3>
+      <small class="hint">Start from the active ODCS v3 contract, add requirements + Spark/SQL/DataStage sources,
+      and export a <strong>portable ODCS v3.1</strong> candidate. This path does <strong>not</strong> call
+      <code>ContractStore.upsert</code> and does not change Redibis active contracts.</small>
+      <div class="grid2" style="margin-top:12px">
+        <div><label>Analysis mode</label>
+          <select id="syMode"><option value="deterministic">deterministic (default)</option>
+            <option value="assisted">assisted (LLM gap-fill)</option></select></div>
+        <div><label>Provider (assisted)</label>
+          <input id="syProvider" placeholder="demo / vllm / …"/></div>
+        <div style="grid-column:1/-1"><label>Requirements &amp; sources (multi-file / ZIP)</label>
+          <input type="file" id="syFiles" multiple/></div>
+        <div style="grid-column:1/-1"><label>Output directory</label>
+          <input id="syOut" placeholder="./synthesis_out/${STATE.table.replace('.','!')}" value=""/></div>
+      </div>
+      <div class="row" style="margin-top:12px;gap:8px">
+        <button class="btn-primary" onclick="runSynthesis()">Run synthesis</button>
+        <button class="btn-sm" onclick="loadSynthesisGraph()">Reload lineage graph</button>
+      </div>
+      <div id="syResult" style="margin-top:12px"></div>
+      <div id="syGraph" style="margin-top:12px"></div>
+    </div>`;
+}
+async function runSynthesis(){
+  if(!STATE.table) return;
+  const fd = new FormData();
+  fd.append("analysis_mode", $("syMode").value || "deterministic");
+  fd.append("odcs_version", "v3.1.0");
+  if(($("syProvider").value||"").trim()) fd.append("provider", $("syProvider").value.trim());
+  if(($("syOut").value||"").trim()) fd.append("output_dir", $("syOut").value.trim());
+  const files = $("syFiles").files || [];
+  for(const f of files) fd.append("files", f);
+  $("syResult").innerHTML = `<div class="card">Running Contract Synthesis…</div>`;
+  try{
+    const token = (window.CSRF_TOKEN || document.querySelector('meta[name="csrf-token"]')?.content || "");
+    const headers = {};
+    if(token) headers["X-CSRF-Token"] = token;
+    const resp = await fetch("/api/synthesis/"+encodeURIComponent(STATE.table)+"/run", {
+      method: "POST", body: fd, headers, credentials: "same-origin",
+    });
+    const r = await resp.json();
+    if(!resp.ok) throw new Error(r.detail || JSON.stringify(r));
+    const cov = r.traceability || {};
+    const preview = r.candidate_preview || {};
+    $("syResult").innerHTML = `<div class="card">
+      <strong>${r.valid ? "VALID" : "INVALID"}</strong> portable candidate
+      <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">
+        <span class="chip chip-blue">apiVersion ${esc(preview.apiVersion||"?")}</span>
+        <span class="chip chip-muted">version ${esc(preview.version||"?")}</span>
+        <span class="chip chip-muted">${preview.property_count||0} properties</span>
+        <span class="chip chip-muted">writes_active=false</span>
+      </div>
+      <pre style="margin-top:10px;font-size:11px;white-space:pre-wrap">${esc(JSON.stringify({coverage:cov, artifacts:r.artifacts, errors:r.errors, warnings:r.warnings}, null, 2))}</pre>
+    </div>`;
+    if(r.lineage_react_flow) renderSynthesisGraph(r.lineage_react_flow);
+  }catch(e){
+    $("syResult").innerHTML = `<div class="card" style="color:#b91c1c">${esc(e.message||String(e))}</div>`;
+  }
+}
+function renderSynthesisGraph(g){
+  const el = $("syGraph"); if(!el) return;
+  const nodes = (g.nodes||[]);
+  const edges = (g.edges||[]);
+  const edgeKinds = {};
+  edges.forEach(e=>{ const k=(e.data&&e.data.kind)||e.label||"?"; edgeKinds[k]=(edgeKinds[k]||0)+1; });
+  el.innerHTML = `<div class="card"><h3>Lineage / relationships graph</h3>
+    <small class="hint">Edge kinds distinguish transformation lineage from foreign keys.
+      Profiling correlations and agent-run audit lineage are separate.</small>
+    <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">
+      <span class="chip">${nodes.length} nodes</span>
+      <span class="chip">${edges.length} edges</span>
+      ${Object.entries(edgeKinds).map(([k,v])=>`<span class="chip chip-muted">${esc(k)}: ${v}</span>`).join("")}
+    </div>
+    <div style="margin-top:10px;max-height:320px;overflow:auto">
+      <table class="table"><thead><tr><th>From</th><th>Kind</th><th>To</th></tr></thead>
+      <tbody>${edges.slice(0,200).map(e=>`<tr>
+        <td class="mono" style="font-size:11px">${esc(e.source)}</td>
+        <td><span class="chip chip-blue">${esc((e.data&&e.data.kind)||e.label||"")}</span></td>
+        <td class="mono" style="font-size:11px">${esc(e.target)}</td>
+      </tr>`).join("")}</tbody></table>
+    </div>
+  </div>`;
+}
+async function loadSynthesisGraph(){
+  if(!STATE.table) return;
+  const out = ($("syOut")&&$("syOut").value)||"";
+  const q = out ? ("?output_dir="+encodeURIComponent(out)) : "";
+  try{
+    const g = await api("GET", "/api/synthesis/"+encodeURIComponent(STATE.table)+"/graph"+q);
+    renderSynthesisGraph(g);
+  }catch(e){ toast(e.message||String(e)); }
+}
+
+// ── Share management ──────────────────────────────────────────────────────────
+async function renderShare(){
+  const body = $("tabBody");
+  let shares = [];
+  try{ shares = await api("GET","/api/contracts/"+STATE.table+"/shares"); }catch(e){}
+  const rows = shares.map(s=>
+    `<tr><td class="mono" style="font-size:11px">${esc(s.share_token)}</td>
+      <td><span class="chip chip-blue">${esc(s.scope)}</span></td>
+      <td>${esc(s.expires_at||'never')}</td>
+      <td><button class="btn-sm" onclick="copyLink(${jsArg(s.share_token)})">copy link</button>
+          <button class="btn-sm btn-danger" onclick="revoke(${jsArg(s.share_token)})">revoke</button></td></tr>`).join("");
+  body.innerHTML = `
+    <div class="card"><h3>Create scoped share link</h3>
+      <div class="row"><select id="shScope"><option value="business">business</option>
+        <option value="pii">pii</option><option value="quality">quality</option>
+        <option value="all">all</option></select>
+        <input id="shExpiry" placeholder="expires_at ISO (optional)" style="max-width:280px"/>
+        <button class="btn-primary" onclick="createShare()">Create</button></div>
+      <small class="hint">Share edits apply directly to the active contract, limited to the scope. All edits are audited.</small></div>
+    <div class="card"><h3>Existing shares</h3>
+      ${rows?`<table><thead><tr><th>Token</th><th>Scope</th><th>Expires</th><th></th></tr></thead><tbody>${rows}</tbody></table>`:`<div class="empty">No shares.</div>`}</div>`;
+}
+async function createShare(){
+  try{ const r = await api("POST","/api/contracts/"+STATE.table+"/share",
+        {scope:$("shScope").value, expires_at:$("shExpiry").value||null, created_by:"admin"});
+       toast("Share created"); renderShare(); }
+  catch(e){ toast(e.message,false); }
+}
+function copyLink(token){ const url = location.origin+"/share/"+token; navigator.clipboard.writeText(url); toast("Link copied: "+url); }
+async function revoke(token){ try{ await api("DELETE","/api/share/"+token); toast("Revoked"); renderShare(); }catch(e){ toast(e.message,false); } }
+
+// ── Simple modal (view / edit JSON) ───────────────────────────────────────────
+function openModal(text, onSave){
+  const wrap = document.createElement("div");
+  wrap.style.cssText="position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;z-index:60";
+  const editable = !!onSave;
+  wrap.innerHTML = `<div style="background:#fff;border-radius:14px;width:min(860px,92vw);max-height:86vh;display:flex;flex-direction:column;padding:18px">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px"><h3 style="margin:0">${editable?'Edit payload':'View'}</h3>
+      <button class="btn-sm" id="mdClose">close</button></div>
+    <textarea id="mdText" style="flex:1;min-height:360px" ${editable?'':'readonly'}>${esc(text)}</textarea>
+    ${editable?'<div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn-primary" id="mdSave">Save</button></div>':''}</div>`;
+  document.body.appendChild(wrap);
+  wrap.querySelector("#mdClose").onclick = ()=>wrap.remove();
+  if(editable) wrap.querySelector("#mdSave").onclick = ()=>{ onSave(wrap.querySelector("#mdText").value); wrap.remove(); };
+}
+
+// Boot — honor ?table=<schema.table>&session=<id>&tab=<contract|runs|enrich|share>
+// (the scan console's "Manage" button opens /v2?table=…&session=…).
+(function boot(){
+  const params = new URLSearchParams(location.search);
+  const t = params.get("table");
+  const sid = params.get("session");
+  const tab = params.get("tab");
+  if(tab) STATE.tab = tab;
+  let backHref = "/";
+  if(sid) backHref = "/?session="+encodeURIComponent(sid);
+  else if(t) backHref = "/?table="+encodeURIComponent(t);
+  else {
+    try{
+      const stored = JSON.parse(sessionStorage.getItem("redibis_last_session")||"null");
+      if(stored&&stored.session_id) backHref = "/?session="+encodeURIComponent(stored.session_id);
+    }catch(_){}
+  }
+  const backEl = $("backScan");
+  if(backEl) backEl.href = backHref;
+  loadMemoryStatus().then(()=> loadTables().then(()=>{ if(t) selectTable(t); }));
+})();
+</script>
+<script src="/static/auth.js"></script>
+<script src="/static/evidence_reviewer.js"></script>
+</body>
+</html>

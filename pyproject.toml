@@ -1,0 +1,177 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "redibis"
+version = "0.6.11"
+description = "Data contract pipeline — ODCS v3 with GE quality, Presidio + GLiNER PII detection, and Arabic + English support."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+keywords = ["pii", "nlp", "data-governance", "presidio", "gliner", "great-expectations", "odcs", "data-contracts"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "open-data-contract-standard>=3.1.2,<4",
+    "jsonschema>=4.18",
+    "pandas>=1.5",
+    "numpy>=1.24,<2.0",
+    "faiss-cpu>=1.7",
+    "pyyaml>=6.0",
+    "boto3>=1.26",
+    "rich>=13.0",
+    "phonenumbers>=8.13",
+    "packaging>=23.0",
+    "pydantic>=2.0,<3",
+]
+
+[project.optional-dependencies]
+contracts = ["datacontract-cli[avro,excel,protobuf,rdf,iceberg]>=0.12"]
+ge = ["great-expectations==0.17.23"]
+ner = ["presidio-analyzer>=2.2,<3", "gliner>=0.1,<0.3"]
+ner-runtime = ["presidio-analyzer>=2.2,<3", "gliner>=0.1,<0.3"]
+web = [
+    "fastapi>=0.100,<0.120",
+    "uvicorn>=0.23,<0.40",
+    "pydantic>=2.0,<3",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.6",
+    "httpx>=0.27,<0.28",
+    # Dashboard Data tab / masking (same as redibis[mask])
+    "faker>=24.0",
+    "cryptography>=42.0",
+    "pyarrow>=14.0,<22",
+    "rstr>=3.0",
+    "ff3>=1.0",
+]
+spark = ["pyspark>=3.5.1,<5.0"]
+enrich = ["litellm>=1.55,<1.75"]
+# Contract Synthesis: SQL lineage via sqlglot (Spark/DataStage parsers are stdlib).
+synthesis = ["sqlglot>=25.0", "jsonschema>=4.18"]
+# Data tab de-identification. Faker enriches locale fakers (embedded pools are
+# used when absent); cryptography enables AES-GCM; ff3 enables FF3-1 FPE;
+# pyarrow enables Parquet export; ff3 enables NIST FF3-1 FPE.
+mask = ["faker>=24.0", "cryptography>=42.0", "pyarrow>=14.0", "rstr>=3.0", "ff3>=1.0"]
+# OpenMetadata profiler uses pandas-native metrics; optional extra for discoverability.
+openmetadata = []
+# Catalog push (OpenMetadata / Atlas / DataHub) needs httpx for REST.
+catalog = ["httpx>=0.27,<0.28"]
+# OpenTelemetry SDK (optional — file exporter default; OTLP/Prometheus switchable).
+otel = [
+    "opentelemetry-sdk>=1.20",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.20",
+    "opentelemetry-exporter-prometheus>=0.41b0",
+]
+# Steward memory loop (sentence-transformer embeddings + optional pgvector store).
+memory = ["psycopg2-binary>=2.9", "pgvector>=0.2", "sentence-transformers>=3.0"]
+# Golden-column vector index: default in-memory backend uses faiss-cpu (core dep).
+# Install pgvector backend only when REDIBIS_VECTOR_BACKEND=pgvector.
+vector-pg = ["psycopg2-binary>=2.9", "pgvector>=0.2"]
+agents = ["langgraph>=0.2", "langgraph-checkpoint>=2.0"]
+copilotkit = ["ag-ui-langgraph>=0.0.41"]
+# Test + notebook stack (CI and data_scanning.ipynb). Pin GE like docker/local.
+dev = [
+    "pytest==8.2.0",
+    "numpy>=1.24,<2.0",
+    "duckdb==1.5.2",
+    "great-expectations==0.17.23",
+    "pyarrow>=14.0,<22",
+    "fastapi>=0.100,<0.120",
+    "python-multipart>=0.0.6",
+    "httpx>=0.27,<0.28",
+    "sqlalchemy>=1.4.52,<2.0",
+    "sqlglot>=25.0",
+    # Masking / FF3-1 (redibis[mask] — exercised by tests and the Data tab)
+    "faker>=24.0",
+    "cryptography>=42.0",
+    "rstr>=3.0",
+    "ff3>=1.0",
+    "sentence-transformers>=3.0",
+    # Enrich / LLM tests (test_llm_debug, test_v2_enrich)
+    "litellm>=1.55,<1.75",
+    # Regex/Presidio path used by deep_scan + PII suite
+    "presidio-analyzer>=2.2,<3",
+]
+# Slim “full local” extra — same intent as docker/local/environment.yml pip section.
+# Avoid datacontract-cli[all] (soda-core, every cloud connector, pyspark sdist).
+# For reproducible installs: pip install -e ".[all]" -c requirements/constraints.txt
+all = [
+    "great-expectations==0.17.23",
+    "presidio-analyzer>=2.2,<3",
+    "gliner>=0.1,<0.3",
+    "fastapi>=0.100,<0.120",
+    "uvicorn>=0.23,<0.40",
+    "pydantic>=2.0,<3",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.6",
+    "httpx>=0.27,<0.28",
+    "datacontract-cli[avro,excel,protobuf,rdf,iceberg]>=0.12",
+    "litellm>=1.55,<1.75",
+    "faker>=24.0",
+    "cryptography>=42.0",
+    "pyarrow>=14.0,<22",
+    "rstr>=3.0",
+    "ff3>=1.0",
+    "sqlalchemy>=1.4.52,<2.0",
+    "duckdb==1.5.2",
+]
+
+[project.scripts]
+redibis = "redibis.cli.main:main"
+
+[project.entry-points."redibis.profilers"]
+great_expectations = "redibis.profiling.great_expectations:GreatExpectationsProfiler"
+open_metadata = "redibis.profiling.openmetadata:OpenMetadataProfiler"
+
+[project.entry-points."redibis.validators"]
+great_expectations = "redibis.quality.validator:GreatExpectationsValidator"
+
+# Commercial/community agent tool plugins register here:
+# [project.entry-points."redibis.agent_tools"]
+# my_tool = "my_package.plugin:MyAgentToolPlugin"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["redibis*"]
+# Vendor-internal tree and any future top-level commercial packages.
+exclude = [
+    "enterprise*",
+    "redibis_codegen_service*",
+    "redibis_enterprise*",
+    "tests*",
+    "docs*",
+]
+
+[tool.setuptools.package-data]
+redibis = [
+    "webapp/templates/*.html",
+    "webapp/static/*",
+    "enrich/*.json",
+    "enrich/*.yaml",
+    "contracts/*.json",
+    "contracts/schemas/*.json",
+    "masking/*.json",
+    "classification/packs/*.yaml",
+    "store/bundled_configs/**/*.yaml",
+    "agents/packs/*.yaml",
+    "config/*.yaml",
+    "pii/text_preprocess/lexicons/*.yaml",
+    "DEVELOPER_GUIDE.md",
+    "py.typed",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: integration tests against golden fixtures or live engines",
+    "slow: tests that load GLiNER or run full scan paths",
+]

@@ -1,0 +1,151 @@
+columns:
+  - canonicalName: msisdn
+    aliases:
+      - mobile_number
+      - subscriber_phone
+      - calling_party
+    businessName: Mobile Station ISDN Number
+    definition: Unique telephone number assigned to a mobile subscriber.
+    domain: subscriber
+    expectedLogicalTypes:
+      - string
+    classifications:
+      - DataSensitivity:PII
+      - TelcoDataType:MSISDN
+    profilingHints:
+      expectedPatterns:
+        - E.164
+      highCardinality: true
+    notes:
+      - Do not classify internal extensions as MSISDN without evidence.
+
+  - canonicalName: customer_id
+    aliases:
+      - cust_id
+      - account_key
+    businessName: Customer Identifier
+    definition: Internal opaque key that identifies a customer account record.
+    domain: subscriber
+    expectedLogicalTypes:
+      - string
+      - integer
+    classifications:
+      - DataSensitivity:Confidential
+    notes:
+      - Not a national identifier by default.
+
+  - canonicalName: imsi
+    aliases:
+      - sim_imsi
+    businessName: International Mobile Subscriber Identity
+    definition: Identifier associated with the SIM/subscriber on the network.
+    domain: subscriber
+    expectedLogicalTypes:
+      - string
+    classifications:
+      - DataSensitivity:PII
+      - TelcoDataType:IMSI
+
+  - canonicalName: imei
+    aliases:
+      - device_imei
+    businessName: International Mobile Equipment Identity
+    definition: Identifier of the mobile device hardware.
+    domain: network
+    expectedLogicalTypes:
+      - string
+    classifications:
+      - TelcoDataType:IMEI
+
+  - canonicalName: invoice_amount
+    aliases:
+      - bill_amount
+      - charge_amount
+    businessName: Invoice Amount
+    definition: Monetary amount billed for a period or charge event.
+    domain: billing
+    expectedLogicalTypes:
+      - number
+      - decimal
+
+  - canonicalName: cell_id
+    aliases:
+      - cellid
+      - cgi
+    businessName: Cell Identifier
+    definition: Network cell identity used for radio access location.
+    domain: network
+    expectedLogicalTypes:
+      - string
+      - integer
+    notes:
+      - Network identifier; do not equate directly to a home address.
+
+  - canonicalName: email
+    aliases:
+      - email_address
+      - contact_email
+    businessName: Email Address
+    definition: Electronic mail address used to contact the subscriber.
+    domain: subscriber
+    expectedLogicalTypes:
+      - string
+    classifications:
+      - DataSensitivity:PII
+
+  - canonicalName: full_name
+    aliases:
+      - customer_name
+      - subscriber_name
+    businessName: Full Name
+    definition: Display name of the subscriber or account holder.
+    domain: subscriber
+    expectedLogicalTypes:
+      - string
+    classifications:
+      - DataSensitivity:PII
+
+  - canonicalName: national_id
+    aliases:
+      - national_identity
+      - gov_id
+    businessName: National Identifier
+    definition: Government-issued personal identity number.
+    domain: subscriber
+    expectedLogicalTypes:
+      - string
+    classifications:
+      - DataSensitivity:PII
+    notes:
+      - Require strong evidence; do not confuse with customer_id.
+
+  - canonicalName: billing_account
+    aliases:
+      - account_no
+      - ban
+    businessName: Billing Account Number
+    definition: Account number used for invoicing and collections.
+    domain: billing
+    expectedLogicalTypes:
+      - string
+
+  - canonicalName: activation_date
+    aliases:
+      - start_date
+      - onboarded_at
+    businessName: Activation Date
+    definition: Date the subscriber service became active.
+    domain: subscriber
+    expectedLogicalTypes:
+      - date
+      - timestamp
+
+  - canonicalName: plan_code
+    aliases:
+      - tariff_code
+      - product_code
+    businessName: Plan Code
+    definition: Commercial plan or tariff identifier.
+    domain: billing
+    expectedLogicalTypes:
+      - string

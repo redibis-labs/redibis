@@ -1,0 +1,42 @@
+apiVersion: redibis.enrichment/v1
+kind: EnrichmentPack
+
+metadata:
+  publisherId: com.redibis
+  name: telco-enrichment-lite
+  version: 1.0.0
+  displayName: Telco Enrichment Lite
+  description: Bounded reference pack for telecom contract enrichment demos.
+  vendor: Redibis
+  license: LicenseRef-Proprietary
+  homepage: https://example.com/redibis-packs/telco-lite
+  support: mailto:support@example.com
+
+compatibility:
+  redibis: ">=0.5,<0.7"
+  outputContract: redibis.enrichment-delta/v1
+
+prompt:
+  domain: prompts/domain.md
+  terminology: prompts/terminology.md
+  edgeCases: prompts/edge-cases.md
+
+context:
+  company: context/company.md
+  dataDomains: context/data-domains.md
+  columnGlossary: context/column-glossary.yaml
+  profilingGuidance: context/profiling-guidance.md
+  classification: context/classification.yaml
+
+selection:
+  glossaryTopK: 12
+  examplesTopK: 2
+  maxContextCharacters: 50000
+
+examples:
+  - id: customer
+    input: examples/customer-input.yaml
+    expectedDelta: examples/customer-expected-delta.yaml
+
+evals:
+  cases: evals/cases.yaml

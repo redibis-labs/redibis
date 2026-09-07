@@ -1,0 +1,384 @@
+{
+  "table_name": "telco_kyc_identity_document",
+  "table_business_name": "Telecom KYC identity document registry",
+  "description": "Stores identity-document attributes captured during SIM registration, account opening, or customer due diligence.",
+  "domain": "telecom_kyc",
+  "granularity": "One row per identity document submitted by a customer.",
+  "modality": "tabular_column",
+  "test_type": "column_classification",
+  "column_count": 10,
+  "pii_column_count": 8,
+  "non_pii_column_count": 2,
+  "column_evaluations": [
+    {
+      "test_id": "TABULAR_EVAL_02_001",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_kyc",
+        "test_type": "column_classification",
+        "table_name": "telco_kyc_identity_document",
+        "table_business_name": "Telecom KYC identity document registry",
+        "table_description": "Stores identity-document attributes captured during SIM registration, account opening, or customer due diligence.",
+        "column_business_name": "KYC document identifier",
+        "column_description": "Internal KYC document key.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": true,
+        "primary_key": true,
+        "unique": true
+      },
+      "input_data": {
+        "column_name": "kyc_document_id",
+        "sample_values": [
+          "KYC-00000001",
+          "KYC-00000002",
+          "KYC-00000003",
+          "KYC-00000004",
+          "KYC-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "NUMERIC_ID",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_02_002",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_kyc",
+        "test_type": "column_classification",
+        "table_name": "telco_kyc_identity_document",
+        "table_business_name": "Telecom KYC identity document registry",
+        "table_description": "Stores identity-document attributes captured during SIM registration, account opening, or customer due diligence.",
+        "column_business_name": "Customer identifier",
+        "column_description": "Foreign key to telecom customer profile.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": true,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "customer_id",
+        "sample_values": [
+          "KYC-00000001",
+          "KYC-00000002",
+          "KYC-00000003",
+          "KYC-00000004",
+          "KYC-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CUSTOMER_ID",
+          "is_pii": true,
+          "pii_category": "Linkable Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_02_003",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_kyc",
+        "test_type": "column_classification",
+        "table_name": "telco_kyc_identity_document",
+        "table_business_name": "Telecom KYC identity document registry",
+        "table_description": "Stores identity-document attributes captured during SIM registration, account opening, or customer due diligence.",
+        "column_business_name": "Egyptian national ID",
+        "column_description": "14-digit Egyptian National ID number.",
+        "logical_type": "string",
+        "physical_type": "CHAR(14)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "eg_national_id",
+        "sample_values": [
+          "KYC-00000001",
+          "KYC-00000002",
+          "KYC-00000003",
+          "KYC-00000004",
+          "KYC-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_NATIONAL_ID",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_02_004",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_kyc",
+        "test_type": "column_classification",
+        "table_name": "telco_kyc_identity_document",
+        "table_business_name": "Telecom KYC identity document registry",
+        "table_description": "Stores identity-document attributes captured during SIM registration, account opening, or customer due diligence.",
+        "column_business_name": "Passport number",
+        "column_description": "Passport number for Egyptian or non-Egyptian customers.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(20)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "passport_number",
+        "sample_values": [
+          "A10000000",
+          "B10000001",
+          "C10000002",
+          "D10000003",
+          "E10000004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_PASSPORT",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_02_005",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_kyc",
+        "test_type": "column_classification",
+        "table_name": "telco_kyc_identity_document",
+        "table_business_name": "Telecom KYC identity document registry",
+        "table_description": "Stores identity-document attributes captured during SIM registration, account opening, or customer due diligence.",
+        "column_business_name": "Residency permit number",
+        "column_description": "Permit number for non-Egyptian residents.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(30)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "residency_permit_number",
+        "sample_values": [
+          "residency_permit_number_00000001",
+          "residency_permit_number_00000002",
+          "residency_permit_number_00000003",
+          "residency_permit_number_00000004",
+          "residency_permit_number_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_RESIDENCY_PERMIT",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_02_006",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_kyc",
+        "test_type": "column_classification",
+        "table_name": "telco_kyc_identity_document",
+        "table_business_name": "Telecom KYC identity document registry",
+        "table_description": "Stores identity-document attributes captured during SIM registration, account opening, or customer due diligence.",
+        "column_business_name": "Driver license number",
+        "column_description": "Egyptian driver license or equivalent supporting ID.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(30)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "driver_license_number",
+        "sample_values": [
+          "DRI-100000",
+          "DRI-100001",
+          "DRI-100002",
+          "DRI-100003",
+          "DRI-100004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_DRIVER_LICENSE",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_02_007",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_kyc",
+        "test_type": "column_classification",
+        "table_name": "telco_kyc_identity_document",
+        "table_business_name": "Telecom KYC identity document registry",
+        "table_description": "Stores identity-document attributes captured during SIM registration, account opening, or customer due diligence.",
+        "column_business_name": "Military ID",
+        "column_description": "Military identity number where applicable.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(30)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "military_id",
+        "sample_values": [
+          "KYC-00000001",
+          "KYC-00000002",
+          "KYC-00000003",
+          "KYC-00000004",
+          "KYC-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_MILITARY_ID",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_02_008",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_kyc",
+        "test_type": "column_classification",
+        "table_name": "telco_kyc_identity_document",
+        "table_business_name": "Telecom KYC identity document registry",
+        "table_description": "Stores identity-document attributes captured during SIM registration, account opening, or customer due diligence.",
+        "column_business_name": "Professional syndicate ID",
+        "column_description": "Professional association card number such as doctors or engineers syndicate.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(40)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "syndicate_id",
+        "sample_values": [
+          "KYC-00000001",
+          "KYC-00000002",
+          "KYC-00000003",
+          "KYC-00000004",
+          "KYC-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_SYNDICATE_ID",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_02_009",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_kyc",
+        "test_type": "column_classification",
+        "table_name": "telco_kyc_identity_document",
+        "table_business_name": "Telecom KYC identity document registry",
+        "table_description": "Stores identity-document attributes captured during SIM registration, account opening, or customer due diligence.",
+        "column_business_name": "Document image reference",
+        "column_description": "Object-store reference to scanned identity image; do not store raw image in test data.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(256)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "document_image_ref",
+        "sample_values": [
+          "s3://synthetic-pii-artifacts/telco_kyc_identity_document/00000001.bin",
+          "s3://synthetic-pii-artifacts/telco_kyc_identity_document/00000002.bin",
+          "s3://synthetic-pii-artifacts/telco_kyc_identity_document/00000003.bin",
+          "s3://synthetic-pii-artifacts/telco_kyc_identity_document/00000004.bin",
+          "s3://synthetic-pii-artifacts/telco_kyc_identity_document/00000005.bin"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "BIOMETRIC_DATA",
+          "is_pii": true,
+          "pii_category": "Sensitive Document",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_02_010",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_kyc",
+        "test_type": "column_classification",
+        "table_name": "telco_kyc_identity_document",
+        "table_business_name": "Telecom KYC identity document registry",
+        "table_description": "Stores identity-document attributes captured during SIM registration, account opening, or customer due diligence.",
+        "column_business_name": "KYC verification timestamp",
+        "column_description": "Timestamp when KYC verification completed.",
+        "logical_type": "timestamp",
+        "physical_type": "TIMESTAMP",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "kyc_verified_at",
+        "sample_values": [
+          "2026-01-01 08:00:00",
+          "2026-01-01 08:07:00",
+          "2026-01-01 08:14:00",
+          "2026-01-01 08:21:00",
+          "2026-01-01 08:28:00"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "TIMESTAMP",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    }
+  ]
+}

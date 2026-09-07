@@ -1,0 +1,347 @@
+{
+  "table_name": "sensitive_customer_risk_profile",
+  "table_business_name": "Sensitive customer risk and eligibility profile",
+  "description": "Synthetic table for high-risk sensitive personal data classes under privacy and sector controls. Use only synthetic values.",
+  "domain": "cross_domain_sensitive",
+  "granularity": "One row per customer risk or eligibility assessment snapshot.",
+  "modality": "tabular_column",
+  "test_type": "column_classification",
+  "column_count": 9,
+  "pii_column_count": 8,
+  "non_pii_column_count": 1,
+  "column_evaluations": [
+    {
+      "test_id": "TABULAR_EVAL_14_001",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "cross_domain_sensitive",
+        "test_type": "column_classification",
+        "table_name": "sensitive_customer_risk_profile",
+        "table_business_name": "Sensitive customer risk and eligibility profile",
+        "table_description": "Synthetic table for high-risk sensitive personal data classes under privacy and sector controls. Use only synthetic values.",
+        "column_business_name": "Risk profile ID",
+        "column_description": "Internal risk profile key.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": true,
+        "primary_key": true,
+        "unique": true
+      },
+      "input_data": {
+        "column_name": "risk_profile_id",
+        "sample_values": [
+          "ID-00000001",
+          "ID-00000002",
+          "ID-00000003",
+          "ID-00000004",
+          "ID-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "NUMERIC_ID",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_14_002",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "cross_domain_sensitive",
+        "test_type": "column_classification",
+        "table_name": "sensitive_customer_risk_profile",
+        "table_business_name": "Sensitive customer risk and eligibility profile",
+        "table_description": "Synthetic table for high-risk sensitive personal data classes under privacy and sector controls. Use only synthetic values.",
+        "column_business_name": "Customer identifier",
+        "column_description": "Linked customer.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "customer_id",
+        "sample_values": [
+          "ID-00000001",
+          "ID-00000002",
+          "ID-00000003",
+          "ID-00000004",
+          "ID-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CUSTOMER_ID",
+          "is_pii": true,
+          "pii_category": "Linkable Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_14_003",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "cross_domain_sensitive",
+        "test_type": "column_classification",
+        "table_name": "sensitive_customer_risk_profile",
+        "table_business_name": "Sensitive customer risk and eligibility profile",
+        "table_description": "Synthetic table for high-risk sensitive personal data classes under privacy and sector controls. Use only synthetic values.",
+        "column_business_name": "Criminal record reference",
+        "column_description": "Police record or criminal-status reference where legally collected.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(60)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "criminal_record_reference",
+        "sample_values": [
+          "criminal_record_reference_00000001",
+          "criminal_record_reference_00000002",
+          "criminal_record_reference_00000003",
+          "criminal_record_reference_00000004",
+          "criminal_record_reference_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_CRIMINAL_RECORD",
+          "is_pii": true,
+          "pii_category": "Sensitive Personal Data",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_14_004",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "cross_domain_sensitive",
+        "test_type": "column_classification",
+        "table_name": "sensitive_customer_risk_profile",
+        "table_business_name": "Sensitive customer risk and eligibility profile",
+        "table_description": "Synthetic table for high-risk sensitive personal data classes under privacy and sector controls. Use only synthetic values.",
+        "column_business_name": "Health insurance identifier",
+        "column_description": "Health insurance or medical benefit member ID.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(30)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "health_insurance_id",
+        "sample_values": [
+          "ID-00000001",
+          "ID-00000002",
+          "ID-00000003",
+          "ID-00000004",
+          "ID-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "HEALTH_DATA",
+          "is_pii": true,
+          "pii_category": "Sensitive Personal Data",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_14_005",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "cross_domain_sensitive",
+        "test_type": "column_classification",
+        "table_name": "sensitive_customer_risk_profile",
+        "table_business_name": "Sensitive customer risk and eligibility profile",
+        "table_description": "Synthetic table for high-risk sensitive personal data classes under privacy and sector controls. Use only synthetic values.",
+        "column_business_name": "Medical record number",
+        "column_description": "Medical record number in partner add-on services.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(30)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "medical_record_number",
+        "sample_values": [
+          "MRN-100000",
+          "MRN-100001",
+          "MRN-100002",
+          "MRN-100003",
+          "MRN-100004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "MEDICAL_RECORD_NUMBER",
+          "is_pii": true,
+          "pii_category": "Sensitive Personal Data",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_14_006",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "cross_domain_sensitive",
+        "test_type": "column_classification",
+        "table_name": "sensitive_customer_risk_profile",
+        "table_business_name": "Sensitive customer risk and eligibility profile",
+        "table_description": "Synthetic table for high-risk sensitive personal data classes under privacy and sector controls. Use only synthetic values.",
+        "column_business_name": "Biometric template reference",
+        "column_description": "Reference to biometric template, fingerprint, face, or liveness artifact.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(256)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "biometric_template_ref",
+        "sample_values": [
+          "biometric_template_ref_00000001",
+          "biometric_template_ref_00000002",
+          "biometric_template_ref_00000003",
+          "biometric_template_ref_00000004",
+          "biometric_template_ref_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "BIOMETRIC_DATA",
+          "is_pii": true,
+          "pii_category": "Sensitive Personal Data",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_14_007",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "cross_domain_sensitive",
+        "test_type": "column_classification",
+        "table_name": "sensitive_customer_risk_profile",
+        "table_business_name": "Sensitive customer risk and eligibility profile",
+        "table_description": "Synthetic table for high-risk sensitive personal data classes under privacy and sector controls. Use only synthetic values.",
+        "column_business_name": "Religion",
+        "column_description": "Religion where collected for lawful personal-status context; avoid unless necessary.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(50)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "religion",
+        "sample_values": [
+          "Muslim",
+          "Christian",
+          "Prefer not to say",
+          "Muslim",
+          "Christian"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "RELIGION",
+          "is_pii": true,
+          "pii_category": "Sensitive Personal Data",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_14_008",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "cross_domain_sensitive",
+        "test_type": "column_classification",
+        "table_name": "sensitive_customer_risk_profile",
+        "table_business_name": "Sensitive customer risk and eligibility profile",
+        "table_description": "Synthetic table for high-risk sensitive personal data classes under privacy and sector controls. Use only synthetic values.",
+        "column_business_name": "Political affiliation",
+        "column_description": "Political view or affiliation if present in unstructured/third-party data.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(100)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "political_affiliation",
+        "sample_values": [
+          "EGY",
+          "SYR",
+          "SDN",
+          "JOR",
+          "PSE"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "NRP",
+          "is_pii": true,
+          "pii_category": "Sensitive Personal Data",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_14_009",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "cross_domain_sensitive",
+        "test_type": "column_classification",
+        "table_name": "sensitive_customer_risk_profile",
+        "table_business_name": "Sensitive customer risk and eligibility profile",
+        "table_description": "Synthetic table for high-risk sensitive personal data classes under privacy and sector controls. Use only synthetic values.",
+        "column_business_name": "Children data indicator",
+        "column_description": "Indicates whether data subject is a child/minor.",
+        "logical_type": "boolean",
+        "physical_type": "BOOLEAN",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "children_data_flag",
+        "sample_values": [
+          "guardian_verified_minor",
+          "school_delivery_contact",
+          "child_profile_flag",
+          "guardian_verified_minor",
+          "school_delivery_contact"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CHILDREN_DATA",
+          "is_pii": true,
+          "pii_category": "Sensitive Personal Data",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    }
+  ]
+}

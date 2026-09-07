@@ -1,0 +1,26 @@
+# Embedded Postgres + pgvector for redibis column memory.
+# Included by docker/local/docker-compose.yml and the root airgap compose.
+
+volumes:
+  postgres_memory_data:
+
+services:
+  postgres-memory:
+    build:
+      context: ../..
+      dockerfile: docker/postgres/Dockerfile
+    image: ${REDIBIS_POSTGRES_IMAGE:-redibis-postgres:pg16}
+    container_name: redibis-postgres-memory
+    environment:
+      POSTGRES_USER: redibis
+      POSTGRES_PASSWORD: redibis
+      POSTGRES_DB: redibis_memory
+    volumes:
+      - postgres_memory_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U redibis -d redibis_memory"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped

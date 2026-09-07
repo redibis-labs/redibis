@@ -1,0 +1,421 @@
+{
+  "table_name": "telco_billing_invoice",
+  "table_business_name": "Telecom billing and invoice table",
+  "description": "Billing-account and invoice data for postpaid, prepaid hybrid, and fixed-line telecom services.",
+  "domain": "telecom_billing",
+  "granularity": "One row per issued invoice or billing cycle document.",
+  "modality": "tabular_column",
+  "test_type": "column_classification",
+  "column_count": 11,
+  "pii_column_count": 10,
+  "non_pii_column_count": 1,
+  "column_evaluations": [
+    {
+      "test_id": "TABULAR_EVAL_06_001",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_billing",
+        "test_type": "column_classification",
+        "table_name": "telco_billing_invoice",
+        "table_business_name": "Telecom billing and invoice table",
+        "table_description": "Billing-account and invoice data for postpaid, prepaid hybrid, and fixed-line telecom services.",
+        "column_business_name": "Invoice identifier",
+        "column_description": "Internal invoice key.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": true,
+        "primary_key": true,
+        "unique": true
+      },
+      "input_data": {
+        "column_name": "invoice_id",
+        "sample_values": [
+          "ID-00000001",
+          "ID-00000002",
+          "ID-00000003",
+          "ID-00000004",
+          "ID-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "INVOICE_NUMBER",
+          "is_pii": true,
+          "pii_category": "Linkable Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_06_002",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_billing",
+        "test_type": "column_classification",
+        "table_name": "telco_billing_invoice",
+        "table_business_name": "Telecom billing and invoice table",
+        "table_description": "Billing-account and invoice data for postpaid, prepaid hybrid, and fixed-line telecom services.",
+        "column_business_name": "Billing account number",
+        "column_description": "Customer billing account number.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(30)",
+        "required": true,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "billing_account_number",
+        "sample_values": [
+          "billing_account_number_00000001",
+          "billing_account_number_00000002",
+          "billing_account_number_00000003",
+          "billing_account_number_00000004",
+          "billing_account_number_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "BILLING_ACCOUNT_NUMBER",
+          "is_pii": true,
+          "pii_category": "Financial Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_06_003",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_billing",
+        "test_type": "column_classification",
+        "table_name": "telco_billing_invoice",
+        "table_business_name": "Telecom billing and invoice table",
+        "table_description": "Billing-account and invoice data for postpaid, prepaid hybrid, and fixed-line telecom services.",
+        "column_business_name": "Customer identifier",
+        "column_description": "Customer billed by this invoice.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "customer_id",
+        "sample_values": [
+          "ID-00000001",
+          "ID-00000002",
+          "ID-00000003",
+          "ID-00000004",
+          "ID-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CUSTOMER_ID",
+          "is_pii": true,
+          "pii_category": "Linkable Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_06_004",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_billing",
+        "test_type": "column_classification",
+        "table_name": "telco_billing_invoice",
+        "table_business_name": "Telecom billing and invoice table",
+        "table_description": "Billing-account and invoice data for postpaid, prepaid hybrid, and fixed-line telecom services.",
+        "column_business_name": "Bill-to customer name",
+        "column_description": "Name printed on invoice.",
+        "logical_type": "string",
+        "physical_type": "NVARCHAR(160)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "bill_to_name",
+        "sample_values": [
+          "Ahmed Hassan ElSayed",
+          "Mohamed Mostafa Kamel",
+          "Mahmoud Tarek Fathy",
+          "Omar Fouad Abdelrahman",
+          "Youssef Ibrahim Nassar"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "PERSON",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_06_005",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_billing",
+        "test_type": "column_classification",
+        "table_name": "telco_billing_invoice",
+        "table_business_name": "Telecom billing and invoice table",
+        "table_description": "Billing-account and invoice data for postpaid, prepaid hybrid, and fixed-line telecom services.",
+        "column_business_name": "Bill-to mobile number",
+        "column_description": "Contact phone on invoice.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(16)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "bill_to_mobile",
+        "sample_values": [
+          "01010000000",
+          "01110007919",
+          "01210015838",
+          "01510023757",
+          "01010031676"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EGYPTIAN_MOBILE",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_06_006",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_billing",
+        "test_type": "column_classification",
+        "table_name": "telco_billing_invoice",
+        "table_business_name": "Telecom billing and invoice table",
+        "table_description": "Billing-account and invoice data for postpaid, prepaid hybrid, and fixed-line telecom services.",
+        "column_business_name": "Billing address",
+        "column_description": "Full physical billing address.",
+        "logical_type": "string",
+        "physical_type": "NVARCHAR(300)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "billing_address",
+        "sample_values": [
+          "12 Tahrir Street, Nasr City, Cairo",
+          "13 El Nasr Road, Maadi, Giza",
+          "14 Gameat El Dowal, Heliopolis, Alexandria",
+          "15 Corniche El Nile, Dokki, Dakahlia",
+          "16 Makram Ebeid, Mohandessin, Red Sea"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "LOCATION_ADDRESS",
+          "is_pii": true,
+          "pii_category": "Location",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_06_007",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_billing",
+        "test_type": "column_classification",
+        "table_name": "telco_billing_invoice",
+        "table_business_name": "Telecom billing and invoice table",
+        "table_description": "Billing-account and invoice data for postpaid, prepaid hybrid, and fixed-line telecom services.",
+        "column_business_name": "Tax registration number",
+        "column_description": "Egyptian TRN for business customer invoices.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(20)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "tax_registration_number",
+        "sample_values": [
+          "100000000",
+          "100000001",
+          "100000002",
+          "100000003",
+          "100000004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_TAX_REGISTRATION_NUMBER",
+          "is_pii": true,
+          "pii_category": "Business Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_06_008",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_billing",
+        "test_type": "column_classification",
+        "table_name": "telco_billing_invoice",
+        "table_business_name": "Telecom billing and invoice table",
+        "table_description": "Billing-account and invoice data for postpaid, prepaid hybrid, and fixed-line telecom services.",
+        "column_business_name": "Commercial registry number",
+        "column_description": "Egyptian CRN for business customers.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(20)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "commercial_registry_number",
+        "sample_values": [
+          "CR-100000",
+          "CR-100001",
+          "CR-100002",
+          "CR-100003",
+          "CR-100004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_COMMERCIAL_REGISTRY_NUMBER",
+          "is_pii": true,
+          "pii_category": "Business Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_06_009",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_billing",
+        "test_type": "column_classification",
+        "table_name": "telco_billing_invoice",
+        "table_business_name": "Telecom billing and invoice table",
+        "table_description": "Billing-account and invoice data for postpaid, prepaid hybrid, and fixed-line telecom services.",
+        "column_business_name": "Customer IBAN",
+        "column_description": "IBAN used for bank transfer or refund.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(34)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "iban",
+        "sample_values": [
+          "EG3800195000000000263180000",
+          "EG3900205000000000263180001",
+          "EG4000215000000000263180002",
+          "EG4100225000000000263180003",
+          "EG4200235000000000263180004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "IBAN_CODE",
+          "is_pii": true,
+          "pii_category": "Financial Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_06_010",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_billing",
+        "test_type": "column_classification",
+        "table_name": "telco_billing_invoice",
+        "table_business_name": "Telecom billing and invoice table",
+        "table_description": "Billing-account and invoice data for postpaid, prepaid hybrid, and fixed-line telecom services.",
+        "column_business_name": "Card last four digits",
+        "column_description": "Masked payment-card suffix.",
+        "logical_type": "string",
+        "physical_type": "CHAR(4)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "card_last4",
+        "sample_values": [
+          "4111111000000000",
+          "4111111000000001",
+          "4111111000000002",
+          "4111111000000003",
+          "4111111000000004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CREDIT_CARD",
+          "is_pii": true,
+          "pii_category": "Financial Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_06_011",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_billing",
+        "test_type": "column_classification",
+        "table_name": "telco_billing_invoice",
+        "table_business_name": "Telecom billing and invoice table",
+        "table_description": "Billing-account and invoice data for postpaid, prepaid hybrid, and fixed-line telecom services.",
+        "column_business_name": "Invoice amount in EGP",
+        "column_description": "Invoice amount.",
+        "logical_type": "number",
+        "physical_type": "DECIMAL(12,2)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "invoice_amount_egp",
+        "sample_values": [
+          "25.0",
+          "38.75",
+          "52.5",
+          "66.25",
+          "80.0"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "NUMERIC_ID",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+# Column memory — on-prem pgvector learning loop (external Postgres host).
+# For the embedded Docker stack, use config/examples/memory-docker.yaml instead.
+#
+# Usage:
+#   export REDIBIS_MEMORY_DSN='postgresql://redibis:redibis@localhost:5432/redibis_memory'
+#   export REDIBIS_CONFIG=config/examples/memory-pgvector.yaml
+#   redibis memory init-db
+#   redibis memory status
+#
+# Webapp: set REDIBIS_CONFIG before starting the dashboard to surface sampling-consent
+# and enrichment hint panels (only when memory.enabled is true).
+
+memory:
+  enabled: true
+  store: pgvector
+  dsn_ref: REDIBIS_MEMORY_DSN
+  embedding_provider: sentence_transformers
+  embedding_model: all-MiniLM-L6-v2
+  domain: telecom
+  top_k: 5
+  min_similarity: 0.0
+
+# Optional: richer fingerprints from catalog + pushdown (requires source connection).
+# source:
+#   engine: hive
+# profiling:
+#   metadata:
+#     enabled: true
+#   pushdown:
+#     enabled: true

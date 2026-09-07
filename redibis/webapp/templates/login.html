@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Redibis — Sign in</title>
+<link rel="stylesheet" href="/static/app.css"/>
+<link rel="icon" type="image/png" href="/static/logo.png"/>
+<style>
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px}
+.login-card{width:100%;max-width:420px;padding:32px}
+.login-card h1{font-size:28px;font-weight:800;color:var(--ink);letter-spacing:-.4px}
+.login-card p.sub{color:var(--muted);margin:6px 0 24px;font-size:14px}
+.login-card label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin:12px 0 6px;text-transform:uppercase;letter-spacing:.08em}
+.login-card input{width:100%;font:inherit;border:2px solid var(--ink);border-radius:8px;padding:10px 12px;background:#fff}
+.login-card button{margin-top:20px;width:100%;font:inherit;font-weight:800;border:2px solid var(--ink);background:var(--ink);color:#fff;border-radius:8px;padding:12px;cursor:pointer}
+.login-card button:hover{background:var(--dark-red);border-color:var(--dark-red)}
+.login-err{background:var(--red-bg);color:var(--red-text);border:1px solid #fca5a5;border-radius:8px;padding:10px 12px;font-weight:700;margin-bottom:14px}
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <form class="card login-card" method="post" action="/login" id="loginForm">
+    <h1>Redibis</h1>
+    <p class="sub">Sign in to the dashboard</p>
+    {% if error %}<div class="login-err">{{ error }}</div>{% endif %}
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"/>
+    <input type="hidden" name="next" value="{{ next or '/' }}"/>
+    <label for="username">Username</label>
+    <input id="username" name="username" autocomplete="username" required autofocus/>
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required/>
+    <button type="submit">Sign in</button>
+  </form>
+</div>
+<script src="/static/auth.js"></script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://redibis.io/schemas/quality/quality_run.v1alpha1.schema.json",
+  "title": "Redibis QualityRun v1alpha1",
+  "description": "One validate-only execution's outcome against a QualityRuleSet. apiVersion/kind follow a k8s/ODCS/OpenLineage-style envelope; every other field is snake_case. Produced by redibis.quality.schema.quality_run_from_validate_result(). Raw unexpected values are excluded by default — 'observed' is null unless the caller opts into include_raw_diagnostics.",
+  "type": "object",
+  "required": ["apiVersion", "kind", "run_id", "rule_set_ref", "status", "results", "summary"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": { "const": "redibis.io/quality/v1alpha1" },
+    "kind": { "const": "QualityRun" },
+    "run_id": { "type": "string" },
+    "rule_set_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rule_set_id": { "type": "string" },
+        "version": { "type": "string" },
+        "digest": { "type": "string", "description": "Must match the QualityRuleSet.semantic_digest that produced this run." }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "namespace": { "type": "string" },
+        "name": { "type": "string" },
+        "physical_name": { "type": "string" }
+      }
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contract_id": { "type": "string" },
+        "version": { "type": "string" },
+        "api_version": { "type": "string" }
+      }
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "examples": ["great_expectations"] },
+        "version": { "type": "string" }
+      }
+    },
+    "status": { "enum": ["success", "failed", "error", "skipped"] },
+    "started_at": { "type": "string", "format": "date-time" },
+    "completed_at": { "type": "string", "format": "date-time" },
+    "batch": {
+      "type": "object",
+      "description": "Sample identity metadata only (path/rows/source) — never raw row values."
+    },
+    "results": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/result" }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total", "passed", "failed"],
+      "properties": {
+        "total": { "type": "integer" },
+        "passed": { "type": "integer" },
+        "failed": { "type": "integer" }
+      }
+    },
+    "schema_drift": {
+      "type": ["object", "null"],
+      "properties": {
+        "added": { "type": "array", "items": { "type": "string" } },
+        "dropped": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "provenance": { "type": "object" },
+    "artifacts": {
+      "type": "object",
+      "description": "Artifact name -> storage key, e.g. quality_results.json, quality-report-{run_id}.html."
+    }
+  },
+  "$defs": {
+    "result": {
+      "type": "object",
+      "required": ["rule_id", "outcome"],
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": { "type": "string" },
+        "stable_id": { "type": "string" },
+        "column": { "type": ["string", "null"] },
+        "outcome": { "enum": ["pass", "fail", "error", "skip"] },
+        "severity": { "type": "string" },
+        "metric": { "type": ["string", "null"] },
+        "expected": {},
+        "observed": {
+          "description": "Redacted / excluded by default (include_raw_diagnostics=False)."
+        },
+        "evaluated_count": { "type": ["integer", "null"] },
+        "passed_count": { "type": ["integer", "null"] },
+        "failed_count": { "type": "integer" },
+        "null_count": { "type": ["integer", "null"] },
+        "message": { "type": "string" },
+        "duration_ms": { "type": ["number", "null"] }
+      }
+    }
+  }
+}

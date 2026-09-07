@@ -1,0 +1,90 @@
+name: redibis
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # --- Core Python & Jupyter Stack ---
+  - python=3.10.14
+  - pip=24.0
+  - jupyterlab=4.1.8
+  - notebook=7.1.2
+  - ipykernel=6.29.3
+  - ipywidgets=8.1.2
+  - nodejs=20.*         # Required by JupyterLab extensions
+
+  # --- Heavy Data Science Binaries (Conda for binary wheels) ---
+  - pandas=2.2.2
+  - numpy=1.26.4
+  - pyspark=3.5.1
+  - sqlalchemy=1.4.*    # Pinned for GE 0.17 compatibility
+  - psycopg2-binary=2.9.9
+  - openjdk=17.0.11     # Required by PySpark
+  - krb5=1.21.2         # Kerberos for Cloudera CDP auth
+
+  # --- Utilities ---
+  - python-dotenv=1.0.1
+  - requests=2.31.0
+  - pyyaml=6.0.1
+  - rich=13.7.1
+  - tqdm=4.66.2
+
+  # --- S3 / MinIO Storage (Conda resolves boto3/botocore conflicts instantly) ---
+  - boto3>=1.26
+  - s3fs>=2023.6
+
+  # --- PIP Section: all heavy AI / governance packages ---
+  - pip:
+      # 0. Stability patches
+      - httpx<0.28.0            # Resolves JupyterLab PyPI extension TypeError
+
+      # 1. Critical version alignment (prevents solver backtracking)
+      - typing-extensions>=4.10.0
+      - pydantic>=2.0
+
+      # 2. Great Expectations (GE 0.17 for Cloudera CDP)
+      - great-expectations==0.17.23
+      - duckdb==1.5.2
+
+      # 3. NER runtime (library code only — mount weights at /models)
+      - presidio-analyzer>=2.2
+      - gliner>=0.1
+
+      # 4. FastAPI web dashboard
+      - fastapi>=0.100
+      - uvicorn>=0.23
+      - python-multipart
+
+      # 4b. Contract export / rules (datacontract-cli) + LLM enrichment (litellm).
+      # Installed here because the package is installed with --no-deps, so the
+      # [all] extra in pyproject.toml is NOT resolved at image build time.
+      # NOTE: we deliberately AVOID [all] — it pulls every cloud connector +
+      # soda-core (only needed for `datacontract test`, which redibis never runs)
+      # and would force sqlalchemy>=2.0, conflicting with the pinned 1.4.52.
+      # Only the lightweight format-export extras are needed here.
+      - datacontract-cli[avro,excel,protobuf,rdf,iceberg]>=0.12
+      # Cap below 1.75: litellm >=~1.75 requires httpx>=0.28 (collides with the
+      # httpx<0.28 JupyterLab pin above) and tokenizers>=0.21 (collides with the
+      # transformers<4.42 -> tokenizers<0.20 pin used by GLiNER). 1.55-1.74 keep
+      # httpx<0.28-compatible and leave tokenizers unpinned.
+      - litellm>=1.55,<1.75
+
+      # 4c. Data masking (redibis[mask] — package is installed with --no-deps)
+      - faker>=24.0
+      - cryptography>=42.0
+      - pyarrow>=14.0,<22
+      - rstr>=3.0
+      - ff3>=1.0
+
+      # 4d. Column memory (pgvector store — embedded Postgres in compose)
+      - pgvector>=0.2
+      - sentence-transformers>=3.0
+
+      # 5. Dev tooling
+      - jupyterlab-git==0.50.0
+      - nbformat==5.10.4
+      - nbconvert==7.16.3
+      - pytest==8.2.0
+      - pytest-cov==5.0.0
+      - pytest-asyncio
+      - black
+      - ruff

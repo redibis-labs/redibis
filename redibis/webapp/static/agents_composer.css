@@ -1,0 +1,162 @@
+/* redibis agent composer — styles. Reuses .ag-btn / .ag-chip / CSS vars from agents.css. */
+
+.cmp-toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px; }
+.cmp-sel { display:inline-flex; align-items:center; gap:6px; font-size:13px;
+  padding:5px 10px; border:0.5px solid var(--border, rgba(0,0,0,.15)); border-radius:8px; color:var(--muted,#64748b); }
+.cmp-sel select { border:0; background:transparent; font-size:13px; color:var(--text,#0f172a); }
+.cmp-toolbar .ghost { margin-left:auto; }
+
+.cmp-box { border:0.5px solid var(--border-strong, rgba(0,0,0,.3)); border-radius:12px;
+  background:var(--surface,#fff); padding:10px 12px; }
+.cmp-input { width:100%; border:0; resize:vertical; font:inherit; font-size:15px; line-height:1.6;
+  background:transparent; color:var(--text,#0f172a); outline:none; }
+.cmp-actionbar { display:flex; align-items:center; gap:8px; margin-top:8px;
+  padding-top:8px; border-top:0.5px solid var(--border, rgba(0,0,0,.12)); }
+.cmp-actionbar-top { margin-top:0; padding-top:0; border-top:0; margin-bottom:10px; }
+.cmp-actions { display:flex; flex-wrap:wrap; gap:6px; }
+.cmp-actionbar-right { margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.cmp-action { display:inline-flex; align-items:center; gap:5px; font-size:12px; cursor:pointer;
+  padding:6px 10px; border-radius:8px; border:0.5px solid var(--border, rgba(0,0,0,.15));
+  background:transparent; color:var(--muted,#64748b); position:relative; }
+.cmp-action.on { background:var(--success-bg,#e1f5ee); color:var(--success,#0f6e56);
+  border-color:var(--success,#0f6e56); }
+.cmp-action.has-config.on .cmp-cfg-badge { color:var(--info,#185fa5); opacity:1; }
+.cmp-cfg-badge { font-size:11px; opacity:0.55; margin-left:2px; }
+.cmp-config-toggle { border-color:var(--info,#185fa5); color:var(--info,#185fa5); background:var(--surface,#fff); }
+.cmp-config-toggle.on { background:var(--info-bg,#e6f1fb); font-weight:500; }
+.cmp-hint { font-size:12px; color:var(--muted,#94a3b8); margin:8px 2px 14px; }
+
+/* Send — icon only, redibis red. Muted/outline until a model provider is validated; solid when ready. */
+.cmp-send { display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px;
+  border-radius:8px; border:0.5px solid var(--danger,#dc2626); color:var(--danger,#dc2626);
+  background:var(--danger-bg,#fee2e2); cursor:pointer; font-size:18px; }
+.cmp-send.ready { background:var(--danger,#dc2626); color:#fff; }
+.cmp-send:not(.ready) { opacity:0.55; }
+/* Keep Send clear of the Copilot FAB when that panel is enabled. */
+body:has(#agCopilotFab) .cmp-dock .cmp-actionbar-right { padding-right: 56px; }
+
+.cmp-prompt-panel { display:flex; flex-direction:column; gap:6px; margin-bottom:4px; }
+.cmp-prompt-label { display:flex; flex-wrap:wrap; align-items:baseline; gap:8px; font-size:13px; font-weight:500; color:var(--text,#0f172a); }
+.cmp-prompt-auto { width:100%; border:0.5px solid var(--border, rgba(0,0,0,.12)); border-radius:8px;
+  padding:10px 12px; font-family:var(--mono,monospace); font-size:12px; line-height:1.55;
+  background:var(--surface-2,#f8f7f4); color:var(--muted,#475569); resize:vertical; min-height:120px; }
+.cmp-notes { min-height:56px; font-size:14px; }
+
+.cmp-config { border:0.5px solid var(--border, rgba(0,0,0,.15)); border-radius:12px; overflow:hidden; margin-bottom:14px; }
+.cmp-tabstrip { display:flex; border-bottom:0.5px solid var(--border, rgba(0,0,0,.12)); font-size:13px; }
+.cmp-tab { padding:9px 14px; border:0; background:transparent; cursor:pointer; color:var(--muted,#64748b); }
+.cmp-tab.on { color:var(--info,#185fa5); border-bottom:2px solid var(--info,#185fa5); font-weight:500; }
+.cmp-tabbody { padding:14px; }
+
+.cmp-row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:10px; }
+.cmp-row label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted,#64748b); }
+.cmp-row input, .cmp-row select { font-size:13px; padding:7px 9px; border:0.5px solid var(--border, rgba(0,0,0,.15)); border-radius:8px; }
+.cmp-note { font-size:12px; color:var(--muted,#94a3b8); margin-top:6px; }
+.cmp-checks, .cmp-tbllist { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:6px; }
+.cmp-checks label, .cmp-tbllist label, .cmp-enrich { display:flex; align-items:center; gap:8px; font-size:13px; }
+.cmp-filelist { display:flex; flex-direction:column; gap:4px; }
+.cmp-file-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:4px 0; border-bottom:1px solid var(--border, #2a2a2a); }
+.cmp-file-row label { flex:1 1 140px; margin:0; }
+.cmp-file-del { margin-left:auto; color:var(--danger, #e55); }
+.cmp-src-actions { flex-wrap:wrap; align-items:center; gap:8px; }
+.cmp-enrich { margin-top:8px; background:var(--surface-2,#f1efe8); border-radius:8px; padding:9px 12px; }
+
+.cmp-engs, .cmp-scoperow { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.cmp-eng, .cmp-scope { display:inline-flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;
+  padding:6px 11px; border-radius:8px; border:0.5px solid var(--border, rgba(0,0,0,.15)); background:transparent; color:var(--muted,#64748b); }
+.cmp-eng.on, .cmp-scope.on { background:var(--info-bg,#e6f1fb); color:var(--info,#185fa5); border-color:var(--info,#185fa5); }
+.cmp-source { display:flex; flex-direction:column; gap:10px; }
+.cmp-sample { margin-left:auto; font-size:12px; color:var(--muted,#64748b); }
+
+.cmp-section { margin-bottom:18px; }
+.cmp-section-head { display:flex; align-items:center; gap:8px; font-weight:500; margin-bottom:8px; }
+
+.cmp-codecard { border:0.5px solid var(--border-strong, rgba(0,0,0,.3)); border-radius:12px; overflow:hidden; }
+.cmp-filetabs { display:flex; flex-wrap:wrap; background:var(--surface-2,#f1efe8); border-bottom:0.5px solid var(--border, rgba(0,0,0,.12)); }
+.cmp-filetab { padding:8px 12px; border:0; border-right:0.5px solid var(--border, rgba(0,0,0,.1)); background:transparent;
+  cursor:pointer; font-family:var(--mono,monospace); font-size:13px; color:var(--muted,#64748b); }
+.cmp-filetab.on { background:var(--surface,#fff); color:var(--text,#0f172a); }
+.cmp-monaco { height:300px; }
+.cmp-codefallback { margin:0; padding:14px; font-family:var(--mono,monospace); font-size:12px; overflow:auto; }
+.cmp-codebar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:10px 14px; border-top:0.5px solid var(--border, rgba(0,0,0,.12)); }
+.cmp-codebar-right { margin-left:auto; display:flex; gap:8px; }
+
+.cmp-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:100; align-items:center; justify-content:center; }
+.cmp-modal.open { display:flex; }
+.cmp-modal-box { background:var(--surface,#fff); border-radius:12px; padding:18px; width:min(720px,92vw); max-height:85vh; overflow:auto; box-shadow:0 8px 32px rgba(0,0,0,.15); }
+.cmp-modal-wide { width:min(960px,96vw); }
+.cmp-pack-layout { display:grid; grid-template-columns:220px 1fr; gap:14px; min-height:360px; }
+.cmp-pack-list { display:flex; flex-direction:column; gap:6px; border-right:0.5px solid var(--border, rgba(0,0,0,.12)); padding-right:12px; }
+.cmp-pack-item { text-align:left; border:0.5px solid var(--border, rgba(0,0,0,.12)); border-radius:8px; padding:8px 10px; background:transparent; cursor:pointer; font-size:13px; }
+.cmp-pack-item.on { background:var(--info-bg,#e6f1fb); border-color:var(--info,#185fa5); }
+.cmp-pack-item small { display:block; color:var(--muted,#94a3b8); font-size:11px; margin-top:2px; }
+.cmp-pack-editor { display:flex; flex-direction:column; gap:8px; }
+.cmp-pack-text { width:100%; font-family:var(--mono,monospace); font-size:12px; border:0.5px solid var(--border, rgba(0,0,0,.15)); border-radius:8px; padding:10px; flex:1; min-height:320px; }
+
+/* ── Bottom-docked layout (Claude/Gemini style): results scroll above, controls pinned below ── */
+#view-composer.on { display:flex; flex-direction:column; height:calc(100vh - 120px); min-height:420px; padding-bottom:0; }
+.cmp-feed { flex:1 1 auto; overflow-y:auto; padding:4px 2px 16px; }
+.cmp-dock { flex:0 0 auto; position:sticky; bottom:0; background:var(--bg,#fff);
+  border-top:0.5px solid var(--border, rgba(0,0,0,.12)); padding:12px 2px 14px; }
+.cmp-dock .cmp-hint { margin-bottom:0; }
+
+.cmp-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+  height:100%; text-align:center; color:var(--muted,#94a3b8); }
+.cmp-empty .ti { font-size:28px; opacity:.6; }
+.cmp-empty p { margin:0; max-width:420px; }
+
+/* run feed */
+.cmp-run { border:0.5px solid var(--border-strong, rgba(0,0,0,.25)); border-radius:12px; overflow:hidden; margin-bottom:14px; }
+.cmp-logbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:9px 12px;
+  background:var(--surface-2,#f8f7f4); border-bottom:0.5px solid var(--border, rgba(0,0,0,.12)); }
+.cmp-log-text { font-family:var(--mono,monospace); font-size:12px; color:var(--muted,#475569);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1 1 200px; }
+.cmp-logbar-right { margin-left:auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.cmp-runid { font-family:var(--mono,monospace); }
+.cmp-run-err { padding:8px 12px; color:var(--danger,#dc2626); font-size:13px; background:var(--danger-bg,#fee2e2); }
+.cmp-rt-list { display:flex; flex-direction:column; }
+.cmp-rt-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:9px 12px;
+  border-bottom:0.5px solid var(--border, rgba(0,0,0,.08)); font-size:13px; }
+.cmp-rt-row:last-child { border-bottom:0; }
+.cmp-rt-name { font-weight:500; color:var(--text,#0f172a); }
+.cmp-rt-err { color:var(--danger,#dc2626); font-size:12px; }
+.cmp-rt-links { margin-left:auto; display:flex; gap:10px; flex-wrap:wrap; }
+.cmp-link { border:0; background:transparent; cursor:pointer; color:var(--info,#185fa5); font-size:12px;
+  display:inline-flex; align-items:center; gap:4px; padding:0; }
+.cmp-link:hover { text-decoration:underline; }
+.cmp-spin { display:inline-flex; animation:cmp-spin 1s linear infinite; }
+@keyframes cmp-spin { to { transform:rotate(360deg); } }
+.cmp-link.on { font-weight:600; }
+
+/* inline report card (expanded under a table row) */
+.cmp-rt-card { padding:12px 14px; background:var(--surface-2,#f8f7f4); border-bottom:0.5px solid var(--border, rgba(0,0,0,.08)); }
+.cmp-steps { list-style:none; margin:0 0 10px; padding:0; display:flex; flex-wrap:wrap; gap:8px 16px; font-size:13px; }
+.cmp-steps li { display:inline-flex; align-items:center; gap:5px; color:var(--muted,#94a3b8); }
+.cmp-steps li.done { color:var(--success,#16a34a); }
+.cmp-metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(90px,1fr)); gap:10px; }
+.cmp-metric { background:var(--surface,#fff); border:0.5px solid var(--border, rgba(0,0,0,.1)); border-radius:8px; padding:8px 10px; text-align:center; }
+.cmp-metric-val { font-size:18px; font-weight:600; color:var(--text,#0f172a); }
+.cmp-metric-lbl { font-size:11px; color:var(--muted,#94a3b8); margin-top:2px; }
+
+/* inline report detail (PII table + skip/error notes) */
+.cmp-report-head { font-size:12px; font-weight:600; margin:10px 0 6px; display:flex; align-items:center; gap:6px; color:var(--text,#0f172a); }
+.cmp-report-tbl { width:100%; border-collapse:collapse; font-size:12px; }
+.cmp-report-tbl th, .cmp-report-tbl td { text-align:left; padding:5px 8px; border-bottom:0.5px solid var(--border, rgba(0,0,0,.08)); }
+.cmp-report-tbl th { color:var(--muted,#94a3b8); font-weight:500; }
+.cmp-report-notes { list-style:none; margin:10px 0 0; padding:0; display:flex; flex-direction:column; gap:5px; font-size:12px; }
+
+/* Debug log drawer (reuses scan-console SSE) */
+.cmp-debug-toggle { border-color:var(--muted,#64748b); color:var(--muted,#64748b); }
+.cmp-debug-toggle.on { background:var(--neutral-bg,#f1f5f9); color:var(--text,#0f172a); font-weight:500; }
+.cmp-debug { border:0.5px solid var(--border-strong, rgba(0,0,0,.25)); border-radius:12px; overflow:hidden; margin-bottom:12px; }
+.cmp-debug-head { display:flex; align-items:center; gap:8px; padding:8px 12px; font-size:13px; font-weight:500;
+  background:var(--surface-2,#f8f7f4); border-bottom:0.5px solid var(--border, rgba(0,0,0,.12)); }
+.cmp-debug-right { margin-left:auto; display:flex; gap:12px; }
+.cmp-debug-body { margin:0; padding:10px 12px; max-height:280px; overflow:auto; white-space:pre-wrap; word-break:break-word;
+  font-family:var(--mono,monospace); font-size:12px; line-height:1.5; color:var(--text,#0f172a); background:var(--surface,#fff); }
+
+/* Setup config tab (model / packs / recipe) */
+.cmp-setup .cmp-row { align-items:flex-end; }
+.cmp-setup select { min-width:150px; }
+.cmp-native-list { flex-direction:column; gap:6px; }
+.cmp-native-list li { display:block; }

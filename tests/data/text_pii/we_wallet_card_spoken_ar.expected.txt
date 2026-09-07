@@ -1,0 +1,28 @@
+# Expected deterministic findings for we_wallet_card_spoken_ar.txt
+# (preprocess + regex + phone; no LLM).
+#
+# Notes:
+# - Hundreds compounds: ربعمية وخمسين=450, ميتين وتمنين=280, سبعمية وتمنية=708
+# - Digit plurals: أربعة خمسات=5555
+# - Thousands: تلات ألاف وخمسة=3005
+# - Card PAN in the fixture uses a Luhn-valid check digit (…3457); the narrative
+#   target …3450 fails Luhn and would stay proposal-only.
+
+PHONE_NUMBER	01002030450
+PHONE_NUMBER	01122335555
+OTP	670219
+CREDIT_CARD	5234000189023457
+CREDIT_CARD_EXPIRATION	05/27
+CVV	708
+CREDIT_CARD	5078
+EG_NATIONAL_ID	28005122100403
+CREDIT_CARD	3005
+CREDIT_CARD	7092
+
+SPOKEN_PHONE_SURFACE	زيرو مية، عشرين تلاتين، ربعمية وخمسين
+SPOKEN_PHONE_SURFACE	زيرو حداشر، اتنين اتنين، تلاتة تلاتة، أربعة خمسات
+SPOKEN_CARD_SURFACE	خمسة اتنين تلاتة أربعة، زيرو زيرو زيرو واحد، تمنية تسعة زيرو اتنين، تلاتة ربعمية وخمسين
+SPOKEN_NID_SURFACE	ميتين وتمنين، زيرو خمسة اتناشر، واحد وعشرين، زيرو زيرو، ربعمية وتلاتة
+
+# NER-first
+# PERSON	محمود سيد متولي

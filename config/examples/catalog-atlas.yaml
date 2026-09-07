@@ -1,0 +1,20 @@
+# Push ODCS contracts to Apache Atlas.
+# Usage:
+#   export REDIBIS_CONFIG=config/examples/catalog-atlas.yaml
+#   export ATLAS_USERNAME=admin
+#   export ATLAS_PASSWORD=admin
+#   redibis catalog push-file ./telecom.customers.yaml
+
+catalog:
+  backend: atlas
+  push:
+    tags: true
+    glossary: true
+    contract: true
+    masked_samples: false
+  atlas:
+    host: http://localhost:21000
+    username_env: ATLAS_USERNAME
+    password_env: ATLAS_PASSWORD
+    cluster: redibis
+    entity_type: hive_table

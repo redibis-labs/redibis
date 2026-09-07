@@ -1,0 +1,17 @@
+version: 1
+max_attempts: 3
+# Optional: override RAI for this workflow (null = use redibis.yaml / defaults)
+rai_enabled: null
+steps:
+  - id: columns
+    kind: column_definitions
+    enabled: true
+  - id: privacy
+    kind: classification_pii
+    enabled: true
+  - id: table
+    kind: table_definition
+    enabled: true
+  - id: review
+    kind: contract_review
+    enabled: true

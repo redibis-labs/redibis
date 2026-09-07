@@ -1,0 +1,44 @@
+contract_uuid: 11111111-1111-4111-8111-111111111111
+version: "1.0.0"
+database_name: telecom
+table_name: customers
+physicalName: telecom.customers
+description: Customer master; one row per subscriber at activation.
+schema:
+  - name: telecom_customers
+    physicalName: telecom.customers
+    properties:
+      - name: msisdn
+        logicalType: string
+        physicalType: VARCHAR(20)
+        businessName: Mobile Phone (MSISDN)
+        description: >-
+          Customer primary mobile number, E.164 Egyptian numbering plan;
+          set at activation, never null.
+        privacy:
+          classification_engine:
+            detected: true
+            entity_type: PHONE_NUMBER
+            confidence: 0.92
+          masking_policy:
+            default_strategy: fpe
+            reversible: true
+        tags: [regulated]
+      - name: national_id
+        logicalType: string
+        physicalType: VARCHAR(14)
+        businessName: National ID
+        description: Egyptian national ID; 14 digits, checksum validated.
+        privacy:
+          classification_engine:
+            detected: true
+            entity_type: NATIONAL_ID
+            confidence: 0.95
+          masking_policy:
+            default_strategy: hash
+            reversible: false
+      - name: status
+        logicalType: string
+        physicalType: CHAR(1)
+        description: "A=active, S=suspended (non-payment), C=churned."
+        tags: [lifecycle]

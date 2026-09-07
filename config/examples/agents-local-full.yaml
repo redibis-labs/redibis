@@ -1,0 +1,74 @@
+# Example: full local agentic stack (SGLang)
+
+# Bind the webapp to loopback when using auto_approve_writes / dynamic_sandbox.
+# Prefer: ./scripts/webapp.sh --start with REDIBIS_CONFIG pointing here and host 127.0.0.1
+
+table: telecom.customers
+
+scan_types:
+  - profile
+  - quality
+  - pii
+
+llm:
+  default:
+    provider: sglang
+    model: default
+  roles:
+    agent.planner:
+      inherit: default
+    agent.planner_repair:
+      inherit: agent.planner
+    agent.router:
+      inherit: default
+      enabled: false
+    agent.copilot:
+      inherit: agent.planner
+    contract.enrichment:
+      inherit: default
+    contract.enrichment_repair:
+      inherit: contract.enrichment
+    pii.refiner:
+      inherit: default
+      enabled: false
+    codegen.generator:
+      inherit: default
+      residency_policy: local_only
+      fallback: template
+    codegen.judge:
+      enabled: false
+      residency_policy: local_only
+    pack.evaluator:
+      inherit: default
+    provider.probe:
+      inherit: default
+
+agents:
+  enabled: true
+  runs_dir: ./agent_runs
+  single_table_executor: langgraph
+  batch_executor: langgraph
+  copilotkit_enabled: true
+  dynamic_sandbox_enabled: true
+  auto_approve_writes: true
+  allow_external_codegen: true
+  codegen_mode: local
+  planner_provider: sglang
+  planner_model: default
+
+rai:
+  enabled: true
+  mode: report
+  enforce: false
+  hard_block_external_pii: false
+  default_residency: local
+
+memory:
+  enabled: false
+
+classification:
+  enabled: true
+  policy_pack: telecom
+
+contract:
+  automerge: none

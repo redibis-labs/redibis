@@ -1,0 +1,532 @@
+{
+  "table_name": "fintech_payment_transaction",
+  "table_business_name": "Egypt fintech payment transaction",
+  "description": "Unified payment-transaction table covering card, Meeza, Fawry, mobile-wallet, InstaPay, and bank-transfer flows used by telecom and e-commerce.",
+  "domain": "fintech_payments",
+  "granularity": "One row per payment authorization, capture, transfer, or settlement transaction.",
+  "modality": "tabular_column",
+  "test_type": "column_classification",
+  "column_count": 14,
+  "pii_column_count": 13,
+  "non_pii_column_count": 1,
+  "column_evaluations": [
+    {
+      "test_id": "TABULAR_EVAL_10_001",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "fintech_payments",
+        "test_type": "column_classification",
+        "table_name": "fintech_payment_transaction",
+        "table_business_name": "Egypt fintech payment transaction",
+        "table_description": "Unified payment-transaction table covering card, Meeza, Fawry, mobile-wallet, InstaPay, and bank-transfer flows used by telecom and e-commerce.",
+        "column_business_name": "Payment transaction ID",
+        "column_description": "Payment gateway transaction key.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(64)",
+        "required": true,
+        "primary_key": true,
+        "unique": true
+      },
+      "input_data": {
+        "column_name": "payment_transaction_id",
+        "sample_values": [
+          "PAY-00000001",
+          "PAY-00000002",
+          "PAY-00000003",
+          "PAY-00000004",
+          "PAY-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "STRIPE_PAYMENT_INTENT",
+          "is_pii": true,
+          "pii_category": "Financial Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_10_002",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "fintech_payments",
+        "test_type": "column_classification",
+        "table_name": "fintech_payment_transaction",
+        "table_business_name": "Egypt fintech payment transaction",
+        "table_description": "Unified payment-transaction table covering card, Meeza, Fawry, mobile-wallet, InstaPay, and bank-transfer flows used by telecom and e-commerce.",
+        "column_business_name": "Customer identifier",
+        "column_description": "Customer associated with payment.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "customer_id",
+        "sample_values": [
+          "PAY-00000001",
+          "PAY-00000002",
+          "PAY-00000003",
+          "PAY-00000004",
+          "PAY-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CUSTOMER_ID",
+          "is_pii": true,
+          "pii_category": "Linkable Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_10_003",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "fintech_payments",
+        "test_type": "column_classification",
+        "table_name": "fintech_payment_transaction",
+        "table_business_name": "Egypt fintech payment transaction",
+        "table_description": "Unified payment-transaction table covering card, Meeza, Fawry, mobile-wallet, InstaPay, and bank-transfer flows used by telecom and e-commerce.",
+        "column_business_name": "Payer name",
+        "column_description": "Name of payer when captured.",
+        "logical_type": "string",
+        "physical_type": "NVARCHAR(160)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "payer_name",
+        "sample_values": [
+          "Ahmed Hassan ElSayed",
+          "Mohamed Mostafa Kamel",
+          "Mahmoud Tarek Fathy",
+          "Omar Fouad Abdelrahman",
+          "Youssef Ibrahim Nassar"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "PERSON",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_10_004",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "fintech_payments",
+        "test_type": "column_classification",
+        "table_name": "fintech_payment_transaction",
+        "table_business_name": "Egypt fintech payment transaction",
+        "table_description": "Unified payment-transaction table covering card, Meeza, Fawry, mobile-wallet, InstaPay, and bank-transfer flows used by telecom and e-commerce.",
+        "column_business_name": "Payer mobile",
+        "column_description": "Mobile number linked to wallet or payer contact.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(16)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "payer_mobile",
+        "sample_values": [
+          "01010000000",
+          "01110007919",
+          "01210015838",
+          "01510023757",
+          "01010031676"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_MOBILE_WALLET_NUMBER",
+          "is_pii": true,
+          "pii_category": "Financial Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_10_005",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "fintech_payments",
+        "test_type": "column_classification",
+        "table_name": "fintech_payment_transaction",
+        "table_business_name": "Egypt fintech payment transaction",
+        "table_description": "Unified payment-transaction table covering card, Meeza, Fawry, mobile-wallet, InstaPay, and bank-transfer flows used by telecom and e-commerce.",
+        "column_business_name": "InstaPay address",
+        "column_description": "InstaPay payment address or IPA.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(80)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "instapay_address",
+        "sample_values": [
+          "ahmed.elsayed000@instapay",
+          "mohamed.kamel001@instapay",
+          "mahmoud.fathy002@instapay",
+          "omar.abdelrahman003@instapay",
+          "youssef.nassar004@instapay"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "INSTAPAY_ADDRESS",
+          "is_pii": true,
+          "pii_category": "Financial Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_10_006",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "fintech_payments",
+        "test_type": "column_classification",
+        "table_name": "fintech_payment_transaction",
+        "table_business_name": "Egypt fintech payment transaction",
+        "table_description": "Unified payment-transaction table covering card, Meeza, Fawry, mobile-wallet, InstaPay, and bank-transfer flows used by telecom and e-commerce.",
+        "column_business_name": "Fawry reference number",
+        "column_description": "Fawry payment reference used for cash collection or bill payment.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(40)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "fawry_reference",
+        "sample_values": [
+          "FWY202600000000",
+          "FWY202600000001",
+          "FWY202600000002",
+          "FWY202600000003",
+          "FWY202600000004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_FAWRY_REFERENCE",
+          "is_pii": true,
+          "pii_category": "Financial Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_10_007",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "fintech_payments",
+        "test_type": "column_classification",
+        "table_name": "fintech_payment_transaction",
+        "table_business_name": "Egypt fintech payment transaction",
+        "table_description": "Unified payment-transaction table covering card, Meeza, Fawry, mobile-wallet, InstaPay, and bank-transfer flows used by telecom and e-commerce.",
+        "column_business_name": "Meeza card PAN",
+        "column_description": "Synthetic Meeza card number; never include real PANs in golden data.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(19)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "meeza_card_pan",
+        "sample_values": [
+          "6270331000000000",
+          "6270331000000001",
+          "6270331000000002",
+          "6270331000000003",
+          "6270331000000004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_MEEZA_CARD",
+          "is_pii": true,
+          "pii_category": "Financial Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_10_008",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "fintech_payments",
+        "test_type": "column_classification",
+        "table_name": "fintech_payment_transaction",
+        "table_business_name": "Egypt fintech payment transaction",
+        "table_description": "Unified payment-transaction table covering card, Meeza, Fawry, mobile-wallet, InstaPay, and bank-transfer flows used by telecom and e-commerce.",
+        "column_business_name": "Payment card PAN",
+        "column_description": "Card primary account number; use tokenized or synthetic values only.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(19)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "card_pan",
+        "sample_values": [
+          "4111111000000000",
+          "4111111000000001",
+          "4111111000000002",
+          "4111111000000003",
+          "4111111000000004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CREDIT_CARD",
+          "is_pii": true,
+          "pii_category": "Financial Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_10_009",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "fintech_payments",
+        "test_type": "column_classification",
+        "table_name": "fintech_payment_transaction",
+        "table_business_name": "Egypt fintech payment transaction",
+        "table_description": "Unified payment-transaction table covering card, Meeza, Fawry, mobile-wallet, InstaPay, and bank-transfer flows used by telecom and e-commerce.",
+        "column_business_name": "Card expiry",
+        "column_description": "Card expiration date.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(7)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "card_expiry",
+        "sample_values": [
+          "01/26",
+          "02/27",
+          "03/28",
+          "04/29",
+          "05/30"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CARD_EXPIRY",
+          "is_pii": true,
+          "pii_category": "Financial Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_10_010",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "fintech_payments",
+        "test_type": "column_classification",
+        "table_name": "fintech_payment_transaction",
+        "table_business_name": "Egypt fintech payment transaction",
+        "table_description": "Unified payment-transaction table covering card, Meeza, Fawry, mobile-wallet, InstaPay, and bank-transfer flows used by telecom and e-commerce.",
+        "column_business_name": "Card verification value",
+        "column_description": "Card CVV; should not be stored after authorization.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(4)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "cvv",
+        "sample_values": [
+          "100",
+          "101",
+          "102",
+          "103",
+          "104"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CVV",
+          "is_pii": true,
+          "pii_category": "Credential Financial",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_10_011",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "fintech_payments",
+        "test_type": "column_classification",
+        "table_name": "fintech_payment_transaction",
+        "table_business_name": "Egypt fintech payment transaction",
+        "table_description": "Unified payment-transaction table covering card, Meeza, Fawry, mobile-wallet, InstaPay, and bank-transfer flows used by telecom and e-commerce.",
+        "column_business_name": "IBAN",
+        "column_description": "Bank account IBAN used for bank transfer or refund.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(34)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "iban",
+        "sample_values": [
+          "EG3800195000000000263180000",
+          "EG3900205000000000263180001",
+          "EG4000215000000000263180002",
+          "EG4100225000000000263180003",
+          "EG4200235000000000263180004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "IBAN_CODE",
+          "is_pii": true,
+          "pii_category": "Financial Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_10_012",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "fintech_payments",
+        "test_type": "column_classification",
+        "table_name": "fintech_payment_transaction",
+        "table_business_name": "Egypt fintech payment transaction",
+        "table_description": "Unified payment-transaction table covering card, Meeza, Fawry, mobile-wallet, InstaPay, and bank-transfer flows used by telecom and e-commerce.",
+        "column_business_name": "Local bank account number",
+        "column_description": "Egyptian or generic bank account number.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(30)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "bank_account_number",
+        "sample_values": [
+          "100000000000",
+          "100000000001",
+          "100000000002",
+          "100000000003",
+          "100000000004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_BANK_ACCOUNT",
+          "is_pii": true,
+          "pii_category": "Financial Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_10_013",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "fintech_payments",
+        "test_type": "column_classification",
+        "table_name": "fintech_payment_transaction",
+        "table_business_name": "Egypt fintech payment transaction",
+        "table_description": "Unified payment-transaction table covering card, Meeza, Fawry, mobile-wallet, InstaPay, and bank-transfer flows used by telecom and e-commerce.",
+        "column_business_name": "SWIFT/BIC",
+        "column_description": "Bank routing identifier.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(11)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "swift_bic",
+        "sample_values": [
+          "swift_bic_00000001",
+          "swift_bic_00000002",
+          "swift_bic_00000003",
+          "swift_bic_00000004",
+          "swift_bic_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "SWIFT_BIC_EGYPT",
+          "is_pii": true,
+          "pii_category": "Financial Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_10_014",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "fintech_payments",
+        "test_type": "column_classification",
+        "table_name": "fintech_payment_transaction",
+        "table_business_name": "Egypt fintech payment transaction",
+        "table_description": "Unified payment-transaction table covering card, Meeza, Fawry, mobile-wallet, InstaPay, and bank-transfer flows used by telecom and e-commerce.",
+        "column_business_name": "Amount in EGP",
+        "column_description": "Transaction amount.",
+        "logical_type": "number",
+        "physical_type": "DECIMAL(12,2)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "amount_egp",
+        "sample_values": [
+          "25.0",
+          "38.75",
+          "52.5",
+          "66.25",
+          "80.0"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "NUMERIC_ID",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    }
+  ]
+}

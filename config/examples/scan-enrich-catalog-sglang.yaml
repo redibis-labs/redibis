@@ -1,0 +1,148 @@
+# Full local pipeline: scan → enrich (SGLang/Qwen) → OpenMetadata catalog push.
+#
+# Companion provider file: config/examples/llm-providers-sglang-qwen.json
+# Tutorial:          docs/tutorials/SCAN_ENRICH_CATALOG_SGLANG.md
+# Field reference:   docs/tutorials/SCAN_ENRICH_CATALOG_SGLANG_CONFIG.md
+#
+# Usage:
+#   export REDIBIS_CONFIG=config/examples/scan-enrich-catalog-sglang.yaml
+#   export REDIBIS_LLM_PROVIDERS=config/examples/llm-providers-sglang-qwen.json
+#   export SGLANG_API_KEY=sk-local
+#   export OM_BOT_JWT='...'
+#
+# Note: the top-level ``llm:`` block is for agent/role routing when the webapp
+# or capability layer reads raw YAML. CLI ``redibis enrich --provider …`` uses
+# ``llm_providers.json`` (or REDIBIS_LLM_PROVIDERS) regardless.
+
+table: telecom.customers
+
+scan_types:
+  - profile
+  - quality
+  - pii
+
+source:
+  engine: none
+
+profiling:
+  engine: great_expectations
+  triage_threshold: 0.0
+  arabic_threshold: 0.05
+  metadata:
+    enabled: false
+  pushdown:
+    enabled: false
+
+quality:
+  generate_ge_docs: true
+
+pii:
+  engines: both
+  equation_mode: balanced
+  sample_size: 100
+  use_phonenumbers: true
+  default_region: EG
+  msisdn_valid_rate_min: 0.80
+  phone_gate_conf: 0.10
+  geo_require_pair: true
+  geo_egypt_geofence: false
+  msisdn_prefixes: ["010", "011", "012", "015"]
+  ner:
+    type: gliner
+    model_path: ""
+    device: cpu
+    threshold: 0.3
+    batch_size: 8
+  llm:
+    enabled: false
+    provider: sglang
+    model_name: Qwen/Qwen2.5-14B-Instruct
+    endpoint_url: http://localhost:30000/v1
+    temperature: 0.0
+
+storage:
+  backend: local
+  runs_bucket: pii-reports
+  contracts_bucket: active-contracts
+  pii_runs_bucket: pii-contracts
+  quality_runs_bucket: quality-contracts
+
+contract:
+  auto_create: true
+  auto_write: false
+  automerge: both
+  validate: true
+
+report:
+  formats: [profile, quality, pii]
+  output_dir: ./reports
+
+enrich:
+  include_pii_evidence: false
+  similar_context:
+    enabled: false
+    k: 5
+
+# Role routing (optional; agents / capability layer). Provider name must match
+# a key in llm_providers.json.
+llm:
+  default:
+    provider: sglang-qwen
+    model: Qwen/Qwen2.5-14B-Instruct
+  roles:
+    contract.enrichment:
+      inherit: default
+    contract.enrichment_repair:
+      inherit: contract.enrichment
+    provider.probe:
+      inherit: default
+    pack.evaluator:
+      inherit: contract.enrichment
+    agent.planner:
+      inherit: default
+      enabled: false
+    pii.refiner:
+      inherit: default
+      enabled: false
+
+rai:
+  enabled: true
+  mode: report
+  enforce: false
+  hard_block_external_pii: false
+  default_residency: local
+
+catalog:
+  backend: openmetadata
+  push:
+    tags: true
+    glossary: true
+    contract: true
+    masked_samples: false
+    lifecycle_diff: true
+  openmetadata:
+    host: http://localhost:8585
+    jwt_env: OM_BOT_JWT
+    service_name: redibis
+    default_schema: default
+
+memory:
+  enabled: false
+
+classification:
+  enabled: true
+  policy_pack: telecom
+  default_jurisdiction: EG
+
+agents:
+  enabled: false
+
+observability:
+  log_level: INFO
+  persist_run_log: true
+  decision_log: true
+  llm_debug: false
+  llm_log_prompts: false
+
+behavior:
+  enabled: false

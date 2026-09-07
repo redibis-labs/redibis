@@ -1,0 +1,17 @@
+{
+  "_comment": "Role-based masking defaults. For each role, the value per classification is one of: 'none' (reveal raw value — full access), 'default' (apply the column's suggested strategy), or a concrete strategy (mask | hash | fpe | fake | redact | encrypt). Override on the fly via the REDIBIS_MASKING_ROLES env var, a ./masking_roles.json file, or a settings dict passed to PIIContractWriter. Classification keys: pii_personal, pii_sensitive, pii_indirect, security_sensitive (internal falls back to pii_personal).",
+  "roles": {
+    "admin": {
+      "pii_personal": "none",
+      "pii_sensitive": "none",
+      "pii_indirect": "none",
+      "security_sensitive": "none"
+    },
+    "data_science": {
+      "pii_personal": "default",
+      "pii_sensitive": "hash",
+      "pii_indirect": "default",
+      "security_sensitive": "redact"
+    }
+  }
+}

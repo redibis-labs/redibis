@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Redibis — Settings</title>
+  <link rel="stylesheet" href="/static/app.css?v={{ asset_v }}"/>
+  <link rel="stylesheet" href="/static/settings.css?v={{ asset_v }}"/>
+  <link rel="icon" type="image/png" href="/static/logo.png"/>
+</head>
+<body class="settings-page">
+  <nav class="nav">
+    <a class="nav-left" href="/" aria-label="Open scan console">
+      <img src="/static/logo.png" alt="R" class="nav-logo-img" onerror="this.style.display='none'"/>
+      <div class="nav-brand">Redibis</div>
+      <div class="nav-tagline">settings</div>
+    </a>
+    <div id="navTabs" class="nav-tabs"></div>
+    <div class="nav-right">
+      <a class="nav-link" href="/">◈ Scan</a>
+      <a class="nav-link" href="/v2">◈ Contracts</a>
+      <a class="nav-link" href="/reports">◈ Reports</a>
+      <a class="nav-link" href="/gateway">◈ Gateway</a>
+      <a class="nav-link" href="/docs" target="_blank">◉ API Docs</a>
+      {% if user and user.role == 'admin' %}
+      <a class="nav-link" href="/users">👤 Users</a>
+      {% endif %}
+      {% include "_user_menu.html" %}
+    </div>
+  </nav>
+  {% if user and user.role != 'admin' %}
+  <div class="page" style="padding:40px 32px"><p>Settings require the <b>admin</b> role.</p></div>
+  {% else %}
+  <div id="app"></div>
+  <div id="overlays"></div>
+  {% endif %}
+  <div class="footer-strip">redibis · easily govern · Apache-2.0 license</div>
+  <script>window.REDIBIS_SETTINGS_PAGE = true;</script>
+  <script>window.REDIBIS_USER = {% if user %}{"username":"{{ user.username }}","role":"{{ user.role }}"}{% else %}null{% endif %};</script>
+  <script src="/static/auth.js"></script>
+  <script src="/static/app.js?v={{ asset_v }}"></script>
+</body>
+</html>

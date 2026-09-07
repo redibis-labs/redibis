@@ -1,0 +1,27 @@
+# Push ODCS contracts to OpenMetadata.
+# Usage:
+#   export REDIBIS_CONFIG=config/examples/catalog-openmetadata.yaml
+#   export OM_BOT_JWT='...'
+#   redibis catalog push-file ./telecom.customers.yaml
+
+catalog:
+  backend: openmetadata
+  push:
+    tags: true
+    glossary: true
+    contract: true
+    quality: true          # legacy shorthand for quality.publish.sinks: [openmetadata]
+    masked_samples: false
+  openmetadata:
+    host: http://localhost:8585
+    jwt_env: OM_BOT_JWT
+    service_name: redibis
+    default_schema: default
+
+# Optional: same effect as catalog.push.quality above, but the explicit,
+# multi-destination form for `redibis quality-monitor` result publishing. Uncomment
+# to add more sinks later (e.g. `[openmetadata, console]`) without touching
+# the catalog.push block. See docs/cli/monitor.md#canonical-schema-and-result-sinks.
+# quality:
+#   publish:
+#     sinks: [openmetadata]

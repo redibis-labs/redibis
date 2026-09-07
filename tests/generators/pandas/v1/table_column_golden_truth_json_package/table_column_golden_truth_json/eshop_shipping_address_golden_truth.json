@@ -1,0 +1,458 @@
+{
+  "table_name": "eshop_shipping_address",
+  "table_business_name": "E-commerce shipping address book",
+  "description": "Address-book table containing Egyptian delivery-address components needed for e-commerce fulfillment.",
+  "domain": "ecommerce_fulfillment",
+  "granularity": "One row per saved customer shipping address.",
+  "modality": "tabular_column",
+  "test_type": "column_classification",
+  "column_count": 12,
+  "pii_column_count": 11,
+  "non_pii_column_count": 1,
+  "column_evaluations": [
+    {
+      "test_id": "TABULAR_EVAL_08_001",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_fulfillment",
+        "test_type": "column_classification",
+        "table_name": "eshop_shipping_address",
+        "table_business_name": "E-commerce shipping address book",
+        "table_description": "Address-book table containing Egyptian delivery-address components needed for e-commerce fulfillment.",
+        "column_business_name": "Address identifier",
+        "column_description": "Internal address key.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": true,
+        "primary_key": true,
+        "unique": true
+      },
+      "input_data": {
+        "column_name": "address_id",
+        "sample_values": [
+          "ADDR-00000001",
+          "ADDR-00000002",
+          "ADDR-00000003",
+          "ADDR-00000004",
+          "ADDR-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "NUMERIC_ID",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_08_002",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_fulfillment",
+        "test_type": "column_classification",
+        "table_name": "eshop_shipping_address",
+        "table_business_name": "E-commerce shipping address book",
+        "table_description": "Address-book table containing Egyptian delivery-address components needed for e-commerce fulfillment.",
+        "column_business_name": "E-shop customer ID",
+        "column_description": "Customer who owns this address.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "eshop_customer_id",
+        "sample_values": [
+          "ADDR-00000001",
+          "ADDR-00000002",
+          "ADDR-00000003",
+          "ADDR-00000004",
+          "ADDR-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CUSTOMER_ID",
+          "is_pii": true,
+          "pii_category": "Linkable Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_08_003",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_fulfillment",
+        "test_type": "column_classification",
+        "table_name": "eshop_shipping_address",
+        "table_business_name": "E-commerce shipping address book",
+        "table_description": "Address-book table containing Egyptian delivery-address components needed for e-commerce fulfillment.",
+        "column_business_name": "Recipient name",
+        "column_description": "Name of recipient at delivery location.",
+        "logical_type": "string",
+        "physical_type": "NVARCHAR(160)",
+        "required": true,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "recipient_name",
+        "sample_values": [
+          "Ahmed Hassan ElSayed",
+          "Mohamed Mostafa Kamel",
+          "Mahmoud Tarek Fathy",
+          "Omar Fouad Abdelrahman",
+          "Youssef Ibrahim Nassar"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "PERSON",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_08_004",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_fulfillment",
+        "test_type": "column_classification",
+        "table_name": "eshop_shipping_address",
+        "table_business_name": "E-commerce shipping address book",
+        "table_description": "Address-book table containing Egyptian delivery-address components needed for e-commerce fulfillment.",
+        "column_business_name": "Recipient mobile",
+        "column_description": "Mobile used by courier for delivery.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(16)",
+        "required": true,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "recipient_mobile",
+        "sample_values": [
+          "01010000000",
+          "01110007919",
+          "01210015838",
+          "01510023757",
+          "01010031676"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EGYPTIAN_MOBILE",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_08_005",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_fulfillment",
+        "test_type": "column_classification",
+        "table_name": "eshop_shipping_address",
+        "table_business_name": "E-commerce shipping address book",
+        "table_description": "Address-book table containing Egyptian delivery-address components needed for e-commerce fulfillment.",
+        "column_business_name": "Governorate",
+        "column_description": "Egyptian governorate such as Cairo, Giza, Alexandria.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(60)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "governorate",
+        "sample_values": [
+          "Cairo",
+          "Giza",
+          "Alexandria",
+          "Dakahlia",
+          "Red Sea"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "GOVERNORATE",
+          "is_pii": true,
+          "pii_category": "Location",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_08_006",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_fulfillment",
+        "test_type": "column_classification",
+        "table_name": "eshop_shipping_address",
+        "table_business_name": "E-commerce shipping address book",
+        "table_description": "Address-book table containing Egyptian delivery-address components needed for e-commerce fulfillment.",
+        "column_business_name": "City",
+        "column_description": "City or town.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(80)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "city",
+        "sample_values": [
+          "12 Tahrir Street, Nasr City, Cairo",
+          "13 El Nasr Road, Maadi, Giza",
+          "14 Gameat El Dowal, Heliopolis, Alexandria",
+          "15 Corniche El Nile, Dokki, Dakahlia",
+          "16 Makram Ebeid, Mohandessin, Red Sea"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "LOCATION_ADDRESS",
+          "is_pii": true,
+          "pii_category": "Location",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_08_007",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_fulfillment",
+        "test_type": "column_classification",
+        "table_name": "eshop_shipping_address",
+        "table_business_name": "E-commerce shipping address book",
+        "table_description": "Address-book table containing Egyptian delivery-address components needed for e-commerce fulfillment.",
+        "column_business_name": "District or neighborhood",
+        "column_description": "District, area, or neighborhood.",
+        "logical_type": "string",
+        "physical_type": "NVARCHAR(120)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "district",
+        "sample_values": [
+          "district_00000001",
+          "district_00000002",
+          "district_00000003",
+          "district_00000004",
+          "district_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_DISTRICT",
+          "is_pii": true,
+          "pii_category": "Location",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_08_008",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_fulfillment",
+        "test_type": "column_classification",
+        "table_name": "eshop_shipping_address",
+        "table_business_name": "E-commerce shipping address book",
+        "table_description": "Address-book table containing Egyptian delivery-address components needed for e-commerce fulfillment.",
+        "column_business_name": "Street address",
+        "column_description": "Street name and house/building number.",
+        "logical_type": "string",
+        "physical_type": "NVARCHAR(240)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "street_address",
+        "sample_values": [
+          "12 Tahrir Street, Nasr City, Cairo",
+          "13 El Nasr Road, Maadi, Giza",
+          "14 Gameat El Dowal, Heliopolis, Alexandria",
+          "15 Corniche El Nile, Dokki, Dakahlia",
+          "16 Makram Ebeid, Mohandessin, Red Sea"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "LOCATION_ADDRESS",
+          "is_pii": true,
+          "pii_category": "Location",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_08_009",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_fulfillment",
+        "test_type": "column_classification",
+        "table_name": "eshop_shipping_address",
+        "table_business_name": "E-commerce shipping address book",
+        "table_description": "Address-book table containing Egyptian delivery-address components needed for e-commerce fulfillment.",
+        "column_business_name": "Building floor and apartment",
+        "column_description": "Building, floor, apartment, landmark, or unit details.",
+        "logical_type": "string",
+        "physical_type": "NVARCHAR(120)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "building_floor_apartment",
+        "sample_values": [
+          "building_floor_apartment_00000001",
+          "building_floor_apartment_00000002",
+          "building_floor_apartment_00000003",
+          "building_floor_apartment_00000004",
+          "building_floor_apartment_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_BUILDING_DETAILS",
+          "is_pii": true,
+          "pii_category": "Location",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_08_010",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_fulfillment",
+        "test_type": "column_classification",
+        "table_name": "eshop_shipping_address",
+        "table_business_name": "E-commerce shipping address book",
+        "table_description": "Address-book table containing Egyptian delivery-address components needed for e-commerce fulfillment.",
+        "column_business_name": "Postal code",
+        "column_description": "Egyptian five-digit postal code.",
+        "logical_type": "string",
+        "physical_type": "CHAR(5)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "postal_code",
+        "sample_values": [
+          "postal_code_00000001",
+          "postal_code_00000002",
+          "postal_code_00000003",
+          "postal_code_00000004",
+          "postal_code_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_POSTAL_CODE",
+          "is_pii": true,
+          "pii_category": "Location",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_08_011",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_fulfillment",
+        "test_type": "column_classification",
+        "table_name": "eshop_shipping_address",
+        "table_business_name": "E-commerce shipping address book",
+        "table_description": "Address-book table containing Egyptian delivery-address components needed for e-commerce fulfillment.",
+        "column_business_name": "Delivery GPS coordinates",
+        "column_description": "Optional GPS coordinates captured by courier or app.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(50)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "gps_pair",
+        "sample_values": [
+          "gps_pair_00000001",
+          "gps_pair_00000002",
+          "gps_pair_00000003",
+          "gps_pair_00000004",
+          "gps_pair_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "GPS_PAIR",
+          "is_pii": true,
+          "pii_category": "Precise Location",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_08_012",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_fulfillment",
+        "test_type": "column_classification",
+        "table_name": "eshop_shipping_address",
+        "table_business_name": "E-commerce shipping address book",
+        "table_description": "Address-book table containing Egyptian delivery-address components needed for e-commerce fulfillment.",
+        "column_business_name": "What3Words address",
+        "column_description": "Optional what3words precise address.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(80)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "what3words",
+        "sample_values": [
+          "what3words_00000001",
+          "what3words_00000002",
+          "what3words_00000003",
+          "what3words_00000004",
+          "what3words_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "WHAT3WORDS",
+          "is_pii": true,
+          "pii_category": "Precise Location",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    }
+  ]
+}

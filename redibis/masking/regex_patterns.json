@@ -1,0 +1,92 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "description": "Built-in regex pattern library for rstr-based fake data generation. Used by the 'fake' strategy with kind='regex'. Users can override or extend via REDIBIS_REGEX_PATTERNS env var or a regex_patterns.json in the working directory."
+  },
+  "patterns": {
+    "eg_mobile": {
+      "label": "Egyptian Mobile",
+      "regex": "01[0125]\\d{8}",
+      "description": "Egyptian mobile number (010/011/012/015 + 8 digits)",
+      "category": "phone",
+      "examples": ["01012345678", "01512345678"]
+    },
+    "eg_national_id": {
+      "label": "Egyptian National ID",
+      "regex": "[23]\\d{13}",
+      "description": "Egyptian national ID (14 digits, starts with 2 or 3)",
+      "category": "id",
+      "examples": ["29901011234567"]
+    },
+    "us_ssn": {
+      "label": "US SSN",
+      "regex": "[1-9]\\d{2}-\\d{2}-\\d{4}",
+      "description": "US Social Security Number (XXX-XX-XXXX)",
+      "category": "id",
+      "examples": ["123-45-6789"]
+    },
+    "us_phone": {
+      "label": "US Phone",
+      "regex": "\\([2-9]\\d{2}\\) [2-9]\\d{2}-\\d{4}",
+      "description": "US phone number (XXX) XXX-XXXX",
+      "category": "phone",
+      "examples": ["(212) 555-1234"]
+    },
+    "email_simple": {
+      "label": "Simple Email",
+      "regex": "[a-z]{3,8}\\.[a-z]{3,8}@(example|test|demo)\\.(com|net|org)",
+      "description": "Simple fake email address",
+      "category": "email",
+      "examples": ["john.doe@example.com"]
+    },
+    "uuid_v4": {
+      "label": "UUID v4",
+      "regex": "[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}",
+      "description": "UUID version 4",
+      "category": "id",
+      "examples": ["550e8400-e29b-41d4-a716-446655440000"]
+    },
+    "iso_date": {
+      "label": "ISO Date",
+      "regex": "20[12]\\d-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])",
+      "description": "ISO date (2000–2029)",
+      "category": "date",
+      "examples": ["2024-06-15"]
+    },
+    "credit_card_visa": {
+      "label": "Visa Card",
+      "regex": "4\\d{3}-\\d{4}-\\d{4}-\\d{4}",
+      "description": "Visa card number (starts with 4, dash-separated groups)",
+      "category": "financial",
+      "examples": ["4111-1111-1111-1111"]
+    },
+    "iban_eg": {
+      "label": "Egyptian IBAN",
+      "regex": "EG\\d{27}",
+      "description": "Egyptian IBAN (EG + 27 digits)",
+      "category": "financial",
+      "examples": ["EG123456789012345678901234567"]
+    },
+    "ipv4": {
+      "label": "IPv4 Address",
+      "regex": "(1\\d{2}|2[0-4]\\d|25[0-5]|[1-9]\\d?)\\.(1\\d{2}|2[0-4]\\d|25[0-5]|\\d{1,2})\\.(1\\d{2}|2[0-4]\\d|25[0-5]|\\d{1,2})\\.(1\\d{2}|2[0-4]\\d|25[0-5]|\\d{1,2})",
+      "description": "IPv4 address",
+      "category": "network",
+      "examples": ["192.168.1.1"]
+    },
+    "hex_color": {
+      "label": "Hex Color",
+      "regex": "#[0-9a-fA-F]{6}",
+      "description": "Hex color code",
+      "category": "other",
+      "examples": ["#FF5733"]
+    },
+    "sa_mobile": {
+      "label": "Saudi Mobile",
+      "regex": "05[0-9]\\d{7}",
+      "description": "Saudi Arabian mobile number (05X + 7 digits)",
+      "category": "phone",
+      "examples": ["0501234567"]
+    }
+  }
+}

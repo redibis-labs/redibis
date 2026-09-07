@@ -1,0 +1,25 @@
+{
+  "description": "Egyptian telecom PII eval set — labelled columns for precision/recall",
+  "thresholds": {
+    "PHONE_NUMBER": {"precision_min": 0.90, "recall_min": 0.90, "f1_min": 0.90},
+    "IMSI": {"precision_min": 0.90, "recall_min": 0.85, "f1_min": 0.85},
+    "IMEI": {"precision_min": 0.90, "recall_min": 0.85, "f1_min": 0.85},
+    "LOCATION": {"precision_min": 0.85, "recall_min": 0.85, "f1_min": 0.85}
+  },
+  "columns": [
+    {"name": "msisdn_bare10", "entity": "PHONE_NUMBER", "is_pii": true, "values": ["1007746235", "1012345678", "1209876543"]},
+    {"name": "msisdn_plus20", "entity": "PHONE_NUMBER", "is_pii": true, "values": ["+201007746235", "+201112345678", "+201512345678"]},
+    {"name": "msisdn_bare20", "entity": "PHONE_NUMBER", "is_pii": true, "values": ["201007746235", "201112345678", "201512345678"]},
+    {"name": "msisdn_int", "entity": "PHONE_NUMBER", "is_pii": true, "values": [1007746235, 1012345678, 1209876543]},
+    {"name": "imsi_eg", "entity": "IMSI", "is_pii": true, "values": ["602010123456789", "602020123456789", "602030123456789"]},
+    {"name": "imei_valid", "entity": "IMEI", "is_pii": true, "values": ["356938035643809", "356938035643809", "356938035643809"]},
+    {"name": "lat", "entity": "LOCATION", "is_pii": true, "values": ["30.0444", "31.2001", "29.9737"]},
+    {"name": "lon", "entity": "LOCATION", "is_pii": true, "values": ["31.2357", "29.9187", "31.0011"]},
+    {"name": "order_id", "entity": null, "is_pii": false, "values": ["ORD00001", "ORD00002", "ORD00003"]},
+    {"name": "account_num", "entity": null, "is_pii": false, "values": ["9876543210", "8765432109", "7654321098"]},
+    {"name": "age", "entity": null, "is_pii": false, "values": [25, 30, 35, 40, 45]},
+    {"name": "rating", "entity": null, "is_pii": false, "values": [1, 2, 3, 4, 5]},
+    {"name": "epoch_ts", "entity": null, "is_pii": false, "values": [1700000000, 1700003600, 1700007200]},
+    {"name": "bad_15digit", "entity": null, "is_pii": false, "values": ["123456789012345", "123456789012345", "123456789012345"]}
+  ]
+}

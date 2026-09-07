@@ -1,0 +1,138 @@
+# General-purpose classification policy pack (minimal starter — extend as needed).
+version: "1.0.0"
+name: general
+description: Generic data classification for non-telecom domains
+
+domains:
+  DataSensitivity:
+    tags:
+      PII:
+        attributes: {}
+      pii_indirect:
+        attributes: {}
+      security_sensitive:
+        attributes: {}
+      BusinessConfidential:
+        attributes: {}
+      PublicData:
+        attributes: {}
+
+  DataSecurity:
+    tags:
+      Public: {order: 0}
+      Internal: {order: 1}
+      Confidential: {order: 2}
+      Restricted: {order: 3}
+
+  RegulatoryCompliance:
+    tags:
+      GDPR:
+        attributes: {}
+      PCI_DSS:
+        attributes: {}
+
+security_derivation:
+  PII: Confidential
+  pii_indirect: Confidential
+  security_sensitive: Restricted
+  BusinessConfidential: Internal
+  PublicData: Public
+
+entity_type_mapping:
+  EMAIL:
+    domain: DataSensitivity
+    tag: PII
+  EMAIL_ADDRESS:
+    domain: DataSensitivity
+    tag: PII
+  PHONE_NUMBER:
+    domain: DataSensitivity
+    tag: PII
+  PERSON:
+    domain: DataSensitivity
+    tag: PII
+  LOCATION:
+    domain: DataSensitivity
+    tag: PII
+  SOCIAL_PROFILE_URL:
+    domain: DataSensitivity
+    tag: PII
+  SESSION_ID:
+    domain: DataSensitivity
+    tag: pii_indirect
+  PSEUDO_ID:
+    domain: DataSensitivity
+    tag: pii_indirect
+  DEVICE_ID:
+    domain: DataSensitivity
+    tag: pii_indirect
+  COOKIE_ID:
+    domain: DataSensitivity
+    tag: pii_indirect
+  TRACKING_ID:
+    domain: DataSensitivity
+    tag: pii_indirect
+  IP_ADDRESS:
+    domain: DataSensitivity
+    tag: pii_indirect
+  PASSWORD_HASH:
+    domain: DataSensitivity
+    tag: security_sensitive
+  CSRF_TOKEN:
+    domain: DataSensitivity
+    tag: security_sensitive
+  API_KEY:
+    domain: DataSensitivity
+    tag: security_sensitive
+  SECRET:
+    domain: DataSensitivity
+    tag: security_sensitive
+  JWT:
+    domain: DataSensitivity
+    tag: security_sensitive
+  SESSION_TOKEN:
+    domain: DataSensitivity
+    tag: security_sensitive
+  EMPLOYER:
+    domain: DataSensitivity
+    tag: pii_indirect
+
+edge_rules:
+  - id: session_token_is_security
+    when: { name_matches: "(?i)(access|auth|refresh|session)[_-]?token" }
+    then: { set_entity: SESSION_TOKEN }
+  - id: api_key_is_security
+    when: { name_matches: "(?i)api[_-]?key" }
+    then: { set_entity: API_KEY }
+  - id: secret_is_security
+    when: { name_matches: "(?i)secret" }
+    then: { set_entity: SECRET }
+  - id: jwt_is_security
+    when: { name_matches: "(?i)jwt|bearer" }
+    then: { set_entity: JWT }
+  - id: session_is_indirect_pii
+    when: { name_matches: "(?i)session|(^|_)sid($|_)" }
+    then: { set_entity: SESSION_ID }
+  - id: surrogate_id_is_indirect
+    when: { name_matches: "(?i)(^|_)(customer|user|client|account)_id$", nid_checksum: fail }
+    then: { set_entity: PSEUDO_ID }
+  - id: csrf_is_security
+    when: { name_matches: "(?i)csrf|xsrf" }
+    then: { set_entity: CSRF_TOKEN }
+  - id: pwdhash_is_security
+    when: { name_matches: "(?i)password|passwd|pwd|_hash$" }
+    then: { set_entity: PASSWORD_HASH }
+  - id: social_url_is_direct
+    when: { entity: URL, name_matches: "(?i)social|profile|oauth" }
+    then: { set_entity: SOCIAL_PROFILE_URL }
+  - id: employer_is_indirect_pii
+    when: { name_matches: "(?i)employer|workplace" }
+    then:
+      set_entity: EMPLOYER
+      note: "employer/workplace name indirectly identifies the associated person"
+  - id: organization_reference_not_pii
+    when:
+      name_matches: "(?i)manufacturer|(^|_)brand($|_)|(^|_)make($|_)|(^|_)oem($|_)|(^|_)(company|organi[sz]ation|merchant|vendor|supplier)(_name)?($|_)"
+    then:
+      set_entity: ORGANIZATION
+      note: "device/company/brand reference is an organization, not personal data -- overrides NER mislabeling (e.g. a manufacturer name tagged as a person)"

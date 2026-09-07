@@ -1,0 +1,59 @@
+{
+  "table": "golden.tutorial_customers",
+  "source_csv": "tests/data/golden_tutorial_customers.csv",
+  "engines": "regex",
+  "equation": "independent",
+  "notes": "Synthetic tutorial fixture with structurally valid EG NIDs (nid_valid_rate gate) and unquoted MSISDNs matching real source data; CSV loaders preserve leading zeros with dtype=str. Assert entity types and detected flags; confidence floors are soft.",
+  "columns": {
+    "customer_id": {
+      "detected": false,
+      "entity_type": null,
+      "min_confidence": 0.0,
+      "notes": "Structured CUST-#### key; usually non-PII under independent equation (naming heuristics may occasionally mark PSEUDO_ID — not asserted as required_non_pii)"
+    },
+    "full_name": {
+      "detected": true,
+      "entity_type": "PERSON",
+      "min_confidence": 0.7,
+      "presidio_pattern": "person_name_latin"
+    },
+    "email": {
+      "detected": true,
+      "entity_type": "EMAIL_ADDRESS",
+      "min_confidence": 0.9,
+      "presidio_pattern": "email_address"
+    },
+    "mobile_number": {
+      "detected": true,
+      "entity_type": "PHONE_NUMBER",
+      "min_confidence": 0.9,
+      "presidio_pattern": "msisdn_egypt_international"
+    },
+    "national_id": {
+      "detected": true,
+      "entity_type": "EG_NATIONAL_ID",
+      "min_confidence": 0.9,
+      "presidio_pattern": "national_id_egypt_strict"
+    },
+    "account_status": {
+      "detected": false,
+      "entity_type": null,
+      "min_confidence": 0.0
+    },
+    "created_at": {
+      "detected": false,
+      "entity_type": null,
+      "min_confidence": 0.0
+    }
+  },
+  "required_pii_columns": [
+    "full_name",
+    "email",
+    "mobile_number",
+    "national_id"
+  ],
+  "required_non_pii_columns": [
+    "account_status",
+    "created_at"
+  ]
+}

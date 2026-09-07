@@ -1,0 +1,130 @@
+{
+  "_comment": "Redibis LLM provider registry. Add or edit providers here — no code needed. Every provider is called through LiteLLM, so the request shape is identical regardless of vendor. Copy this file to ./llm_providers.json (or point REDIBIS_LLM_PROVIDERS at it) and edit. Fields: litellm_model (default model, includes the LiteLLM provider prefix), model_prefix (prefix applied to a bare --model override), api_base (for self-hosted/local), api_key or api_key_env (literal key or env var name), supports_json (request a JSON response_format), params (default kwargs like temperature/max_tokens).",
+  "providers": {
+    "demo": {
+      "kind": "demo",
+      "description": "Offline demo — template definitions, no LLM or network (capability showcase)",
+      "residency": "local"
+    },
+    "vllm": {
+      "description": "Local / self-hosted vLLM (OpenAI-compatible server)",
+      "litellm_model": "hosted_vllm/Qwen/Qwen2.5-7B-Instruct",
+      "model_prefix": "hosted_vllm",
+      "api_base": "http://localhost:8001/v1",
+      "api_key_env": "VLLM_API_KEY",
+      "supports_json": true,
+      "known_models": [
+        "Qwen/Qwen2.5-7B-Instruct",
+        "Qwen/Qwen2.5-14B-Instruct",
+        "meta-llama/Llama-3.1-8B-Instruct",
+        "mistralai/Mistral-7B-Instruct-v0.3"
+      ],
+      "params": { "temperature": 0.2 }
+    },
+    "ollama": {
+      "description": "Local Ollama model server",
+      "litellm_model": "ollama/llama3.3",
+      "model_prefix": "ollama",
+      "api_base": "http://localhost:11434",
+      "supports_json": true,
+      "known_models": [
+        "llama3.3",
+        "gemma4",
+        "gemma4:12b",
+        "gemma4:26b",
+        "qwen2.5",
+        "mistral",
+        "llama3.2"
+      ],
+      "params": { "temperature": 0.2 }
+    },
+    "sglang": {
+      "description": "Local SGLang OpenAI-compatible server (alias: slang)",
+      "litellm_model": "openai/default",
+      "model_prefix": "openai",
+      "api_base": "http://localhost:30000/v1",
+      "supports_json": true,
+      "residency": "local",
+      "known_models": [
+        "default",
+        "meta-llama/Llama-3.1-8B-Instruct",
+        "Qwen/Qwen2.5-7B-Instruct"
+      ],
+      "params": { "temperature": 0.2 }
+    },
+    "openrouter": {
+      "description": "OpenRouter hosted gateway",
+      "litellm_model": "openrouter/openai/gpt-4o-mini",
+      "model_prefix": "openrouter",
+      "api_key_env": "OPENROUTER_API_KEY",
+      "supports_json": true,
+      "params": { "temperature": 0.2 }
+    },
+    "claude": {
+      "description": "Anthropic Claude (cloud API)",
+      "litellm_model": "anthropic/claude-sonnet-5",
+      "model_prefix": "anthropic",
+      "residency": "public",
+      "known_models": [
+        "claude-sonnet-5",
+        "claude-opus-4-8",
+        "claude-sonnet-4-6",
+        "claude-sonnet-4-5",
+        "claude-haiku-4-5"
+      ],
+      "api_key_env": "ANTHROPIC_API_KEY",
+      "supports_json": false,
+      "params": { "max_tokens": 8192 }
+    },
+    "gemini": {
+      "description": "Google Gemini via LiteLLM (legacy path)",
+      "litellm_model": "gemini/gemini-3.5-flash",
+      "model_prefix": "gemini",
+      "residency": "public",
+      "known_models": [
+        "gemini-3.5-flash",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-1.5-pro"
+      ],
+      "api_key_env": "GEMINI_API_KEY",
+      "supports_json": true,
+      "params": { "temperature": 0.2 }
+    },
+    "google_genai": {
+      "kind": "google_genai",
+      "description": "Google Gen AI SDK (Vertex or Gemini Developer API) — preferred for codegen",
+      "default_model": "gemini-3.5-flash",
+      "model_prefix": "",
+      "residency": "gcp",
+      "use_vertex": false,
+      "location": "us-central1",
+      "known_models": [
+        "gemini-2.5-flash",
+        "gemini-2.5-pro",
+        "gemini-2.0-flash",
+        "gemini-3.5-flash"
+      ],
+      "api_key_env": "GEMINI_API_KEY",
+      "supports_json": true,
+      "params": { "temperature": 0.2 }
+    },
+    "openai": {
+      "description": "OpenAI",
+      "litellm_model": "openai/gpt-4.1",
+      "model_prefix": "openai",
+      "api_key_env": "OPENAI_API_KEY",
+      "supports_json": true,
+      "known_models": [
+        "gpt-4.1",
+        "gpt-4.1-mini",
+        "gpt-4o",
+        "gpt-4o-mini",
+        "o4-mini",
+        "o3-mini"
+      ],
+      "params": { "temperature": 0.2 }
+    }
+  }
+}

@@ -1,0 +1,40 @@
+version: "1.0"
+capabilities:
+  - id: ge.value_set_expectations
+    engine: great_expectations
+    label: "Candidate value-set expectations"
+    description: "Suggest expect_column_values_to_be_in_set for low-cardinality columns"
+    params:
+      max_unique: { type: int, default: 50, min: 2, max: 500 }
+    output: profiling_report
+    cost: low
+  - id: native.relationships
+    engine: native
+    label: "Cross-column relationships (Spark/pandas)"
+    description: "Duplicate rows, constant/near-constant columns, correlations, redundant pairs"
+    params:
+      methods: { type: enum_multi, choices: [pearson, spearman], default: [pearson, spearman] }
+      redundancy_threshold: { type: float, default: 0.95, min: 0.5, max: 1.0 }
+      near_constant_threshold: { type: float, default: 0.99, min: 0.5, max: 1.0 }
+    output: profiling_report
+    cost: low
+  - id: ydata.correlations
+    engine: ydata
+    label: "Column correlation matrix"
+    description: "Pearson/Spearman correlations across numeric columns (YData when installed, pandas fallback)"
+    params:
+      methods: { type: enum_multi, choices: [pearson, spearman], default: [pearson] }
+    output: profiling_report
+    cost: medium
+  - id: ydata.profile_report
+    engine: ydata
+    label: "YData HTML profile report"
+    description: "Rich HTML report with histograms, correlation heatmap, missing-value map, and alerts"
+    params:
+      minimal: { type: boolean, default: true }
+      title: { type: string, default: "" }
+    output: html_report
+    cost: high
+deny:
+  - "*.execute_arbitrary_code"
+  - "*.write_*"

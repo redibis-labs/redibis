@@ -1,0 +1,12 @@
+# Dependency version pins to prevent solver backtracking.
+# Canonical copy for pip installs: requirements/constraints.txt (keep in sync).
+sqlalchemy==1.4.52
+httpx<0.28.0
+pydantic>=2.0,<3.0
+# GLiNER transitive — pin to a known-good wheel to avoid pulling latest heavy builds
+torch>=2.1.0,<2.4.0
+transformers>=4.40.0,<4.42.0
+# Regex-only Presidio path uses nlp_engine=None — no spaCy model wheel required
+# Golden vector index (default in-memory backend)
+faiss-cpu>=1.7,<1.10
+numpy>=1.24,<2.0

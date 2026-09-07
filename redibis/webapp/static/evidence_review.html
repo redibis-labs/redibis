@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Evidence Review — Redibis</title>
+  <style>
+    body { font-family: Inter, system-ui, -apple-system, sans-serif; background: #f8fafc; margin: 0; }
+    .er-wrap { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+    .er-page-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+    .er-page-header a { color: #2563eb; text-decoration: none; font-size: .85em; }
+  </style>
+</head>
+<body>
+  <div class="er-wrap">
+    <div class="er-page-header">
+      <h1 style="font-size:18px;margin:0">Evidence Review</h1>
+      <a href="/v2" id="erBackLink">back to contracts</a>
+    </div>
+    <p id="erSubtitle" style="color:#64748b;font-size:.9em">
+      Load a table review from the query string: <code>?table=db.table&amp;run_id=optional</code>
+    </p>
+    <div id="erExplorer"></div>
+  </div>
+  <script src="/static/evidence_reviewer.js"></script>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var table = params.get("table") || "";
+      var runId = params.get("run_id") || "";
+      var compareTo = params.get("compare_to") || "";
+      if (!table) {
+        document.getElementById("erExplorer").textContent = "No table specified.";
+        return;
+      }
+      document.getElementById("erSubtitle").textContent = "Table: " + table;
+      document.getElementById("erBackLink").href = "/v2?table=" + encodeURIComponent(table) + "&tab=review";
+      EvidenceReviewer.mountRunExplorer(document.getElementById("erExplorer"), {
+        table: table,
+        runId: runId,
+        readOnly: false,
+      });
+      if (compareTo) {
+        var compareUrl = "/api/evidence/" + encodeURIComponent(table) + "/runs/compare?a=" +
+          encodeURIComponent(runId) + "&b=" + encodeURIComponent(compareTo);
+        var compareDiv = document.createElement("div");
+        compareDiv.style.marginTop = "16px";
+        compareDiv.innerHTML = "<h3>Comparing " + runId + " → " + compareTo + "</h3><div id='erCompareBody'>Loading…</div>";
+        document.getElementById("erExplorer").parentNode.appendChild(compareDiv);
+        fetch(compareUrl).then(function (r) { return r.json(); }).then(function (data) {
+          var rows = (data.columns || []).filter(function (c) { return c.changed; });
+          var body = document.getElementById("erCompareBody");
+          if (!rows.length) { body.textContent = "No effective-verdict changes between runs."; return; }
+          body.innerHTML = "<table style='width:100%;border-collapse:collapse'><thead><tr>" +
+            "<th style='text-align:left'>Column</th><th style='text-align:left'>Run A</th><th style='text-align:left'>Run B</th>" +
+            "</tr></thead><tbody>" + rows.map(function (r) {
+              return "<tr><td>" + r.column + "</td><td>" + JSON.stringify(r.effective_verdict_a) +
+                "</td><td>" + JSON.stringify(r.effective_verdict_b) + "</td></tr>";
+            }).join("") + "</tbody></table>";
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

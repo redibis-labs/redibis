@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://redibis.io/schemas/quality/quality_ruleset.v1alpha1.schema.json",
+  "title": "Redibis QualityRuleSet v1alpha1",
+  "description": "Portable, versioned quality rule set. apiVersion/kind follow a k8s/ODCS/OpenLineage-style envelope; every other field is snake_case, matching Redibis' existing JSON artifacts. Produced by redibis.quality.schema.rule_set_from_contract().",
+  "type": "object",
+  "required": ["apiVersion", "kind", "rule_set_id", "rules"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": { "const": "redibis.io/quality/v1alpha1" },
+    "kind": { "const": "QualityRuleSet" },
+    "rule_set_id": {
+      "type": "string",
+      "description": "Stable identity for this rule set — the physical table name by default."
+    },
+    "version": { "type": "string", "default": "1" },
+    "semantic_digest": {
+      "type": "string",
+      "description": "sha256[:16] of the serialized rule bodies — changes whenever rule content changes."
+    },
+    "contract": { "$ref": "#/$defs/contractRef" },
+    "asset": { "$ref": "#/$defs/assetRef" },
+    "rules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/rule" }
+    },
+    "extensions": {
+      "type": "object",
+      "description": "Namespaced escape hatch for fields not yet promoted to the core schema."
+    }
+  },
+  "$defs": {
+    "assetRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "namespace": { "type": "string" },
+        "name": { "type": "string" },
+        "physical_name": { "type": "string", "description": "schema.table, the cross-workflow matching key." }
+      }
+    },
+    "contractRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contract_id": { "type": "string", "description": "ODCS contract_uuid, if known." },
+        "version": { "type": "string" },
+        "api_version": { "type": "string", "default": "odcs-v3" }
+      }
+    },
+    "engineBinding": {
+      "type": "object",
+      "required": ["engine", "definition", "fidelity"],
+      "additionalProperties": false,
+      "properties": {
+        "engine": { "type": "string", "examples": ["great_expectations", "soda", "dbt"] },
+        "definition": {
+          "type": "object",
+          "description": "Engine-native rule payload, verbatim (e.g. GE expectation_type + kwargs)."
+        },
+        "fidelity": { "enum": ["lossless", "lossy", "unsupported"] }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "required": ["id", "scope", "metric_fidelity", "bindings"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Contract-stable rule identity (survives edits — see redibis.contracts.rules.stable_rule_id)."
+        },
+        "scope": { "enum": ["column", "dataset"] },
+        "column": { "type": ["string", "null"] },
+        "metric_namespace": { "type": ["string", "null"] },
+        "metric": {
+          "type": ["string", "null"],
+          "description": "ODCS 3.1 metric vocabulary where possible: nullValues | missingValues | invalidValues | duplicateValues | rowCount. Null when metric_fidelity is 'unsupported'."
+        },
+        "operator": {
+          "type": ["string", "null"],
+          "description": "ODCS 3.1 comparator: mustBe | mustNotBe | mustBeLessThan | mustBeGreaterThan | mustBeLessOrEqualTo | mustBeGreaterOrEqualTo | mustBeBetween."
+        },
+        "expected": {},
+        "unit": { "type": ["string", "null"] },
+        "metric_fidelity": {
+          "enum": ["lossless", "lossy", "unsupported"],
+          "description": "lossless: exact ODCS 3.1 metric mapping. lossy: portable shape but a Redibis-specific metric name. unsupported: no portable metric — only the engine binding is authoritative."
+        },
+        "severity": { "type": "string", "examples": ["P0", "P1", "P2"] },
+        "description": { "type": "string" },
+        "dimension": { "type": ["string", "null"] },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "stable_id": {
+          "type": "string",
+          "description": "Execution-binding identity — hash of (expectation_type, column, kwargs). Used to match a run result to this rule, independent of contract edits."
+        },
+        "bindings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/engineBinding" }
+        },
+        "extensions": { "type": "object" }
+      }
+    }
+  }
+}

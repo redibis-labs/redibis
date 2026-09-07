@@ -1,0 +1,347 @@
+{
+  "table_name": "eshop_order_header",
+  "table_business_name": "E-commerce order header",
+  "description": "Order-level table connecting customers, delivery address, payment channel, and fulfillment status.",
+  "domain": "ecommerce_orders",
+  "granularity": "One row per placed order.",
+  "modality": "tabular_column",
+  "test_type": "column_classification",
+  "column_count": 9,
+  "pii_column_count": 5,
+  "non_pii_column_count": 4,
+  "column_evaluations": [
+    {
+      "test_id": "TABULAR_EVAL_09_001",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_orders",
+        "test_type": "column_classification",
+        "table_name": "eshop_order_header",
+        "table_business_name": "E-commerce order header",
+        "table_description": "Order-level table connecting customers, delivery address, payment channel, and fulfillment status.",
+        "column_business_name": "Order identifier",
+        "column_description": "Order key visible to customer and support.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": true,
+        "primary_key": true,
+        "unique": true
+      },
+      "input_data": {
+        "column_name": "order_id",
+        "sample_values": [
+          "ORD-00000001",
+          "ORD-00000002",
+          "ORD-00000003",
+          "ORD-00000004",
+          "ORD-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "NUMERIC_ID",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_09_002",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_orders",
+        "test_type": "column_classification",
+        "table_name": "eshop_order_header",
+        "table_business_name": "E-commerce order header",
+        "table_description": "Order-level table connecting customers, delivery address, payment channel, and fulfillment status.",
+        "column_business_name": "E-shop customer ID",
+        "column_description": "Customer placing the order.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": true,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "eshop_customer_id",
+        "sample_values": [
+          "ORD-00000001",
+          "ORD-00000002",
+          "ORD-00000003",
+          "ORD-00000004",
+          "ORD-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CUSTOMER_ID",
+          "is_pii": true,
+          "pii_category": "Linkable Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_09_003",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_orders",
+        "test_type": "column_classification",
+        "table_name": "eshop_order_header",
+        "table_business_name": "E-commerce order header",
+        "table_description": "Order-level table connecting customers, delivery address, payment channel, and fulfillment status.",
+        "column_business_name": "Recipient name snapshot",
+        "column_description": "Recipient name copied from address at order time.",
+        "logical_type": "string",
+        "physical_type": "NVARCHAR(160)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "recipient_name",
+        "sample_values": [
+          "Ahmed Hassan ElSayed",
+          "Mohamed Mostafa Kamel",
+          "Mahmoud Tarek Fathy",
+          "Omar Fouad Abdelrahman",
+          "Youssef Ibrahim Nassar"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "PERSON",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_09_004",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_orders",
+        "test_type": "column_classification",
+        "table_name": "eshop_order_header",
+        "table_business_name": "E-commerce order header",
+        "table_description": "Order-level table connecting customers, delivery address, payment channel, and fulfillment status.",
+        "column_business_name": "Recipient mobile snapshot",
+        "column_description": "Delivery contact mobile.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(16)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "recipient_mobile",
+        "sample_values": [
+          "01010000000",
+          "01110007919",
+          "01210015838",
+          "01510023757",
+          "01010031676"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EGYPTIAN_MOBILE",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_09_005",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_orders",
+        "test_type": "column_classification",
+        "table_name": "eshop_order_header",
+        "table_business_name": "E-commerce order header",
+        "table_description": "Order-level table connecting customers, delivery address, payment channel, and fulfillment status.",
+        "column_business_name": "Shipping address snapshot",
+        "column_description": "Full delivery address at order time.",
+        "logical_type": "string",
+        "physical_type": "NVARCHAR(500)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "shipping_address_text",
+        "sample_values": [
+          "12 Tahrir Street, Nasr City, Cairo",
+          "13 El Nasr Road, Maadi, Giza",
+          "14 Gameat El Dowal, Heliopolis, Alexandria",
+          "15 Corniche El Nile, Dokki, Dakahlia",
+          "16 Makram Ebeid, Mohandessin, Red Sea"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "LOCATION_ADDRESS",
+          "is_pii": true,
+          "pii_category": "Location",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_09_006",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_orders",
+        "test_type": "column_classification",
+        "table_name": "eshop_order_header",
+        "table_business_name": "E-commerce order header",
+        "table_description": "Order-level table connecting customers, delivery address, payment channel, and fulfillment status.",
+        "column_business_name": "Shipping tracking number",
+        "column_description": "Carrier tracking number shared with logistics provider.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(60)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "shipping_tracking_number",
+        "sample_values": [
+          "EG-TRK-2026000000",
+          "EG-TRK-2026000001",
+          "EG-TRK-2026000002",
+          "EG-TRK-2026000003",
+          "EG-TRK-2026000004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "SHIPPING_TRACKING_NUMBER",
+          "is_pii": true,
+          "pii_category": "Linkable Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_09_007",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_orders",
+        "test_type": "column_classification",
+        "table_name": "eshop_order_header",
+        "table_business_name": "E-commerce order header",
+        "table_description": "Order-level table connecting customers, delivery address, payment channel, and fulfillment status.",
+        "column_business_name": "Payment method",
+        "column_description": "Cash on delivery, card, Meeza, mobile wallet, Fawry, InstaPay, or BNPL.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(40)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "payment_method",
+        "sample_values": [
+          "payment_method_00000001",
+          "payment_method_00000002",
+          "payment_method_00000003",
+          "payment_method_00000004",
+          "payment_method_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CATEGORY",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_09_008",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_orders",
+        "test_type": "column_classification",
+        "table_name": "eshop_order_header",
+        "table_business_name": "E-commerce order header",
+        "table_description": "Order-level table connecting customers, delivery address, payment channel, and fulfillment status.",
+        "column_business_name": "Order total EGP",
+        "column_description": "Total payable order amount.",
+        "logical_type": "number",
+        "physical_type": "DECIMAL(12,2)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "order_total_egp",
+        "sample_values": [
+          "order_total_egp_00000001",
+          "order_total_egp_00000002",
+          "order_total_egp_00000003",
+          "order_total_egp_00000004",
+          "order_total_egp_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "NUMERIC_ID",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_09_009",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_orders",
+        "test_type": "column_classification",
+        "table_name": "eshop_order_header",
+        "table_business_name": "E-commerce order header",
+        "table_description": "Order-level table connecting customers, delivery address, payment channel, and fulfillment status.",
+        "column_business_name": "Order creation timestamp",
+        "column_description": "Order creation timestamp.",
+        "logical_type": "timestamp",
+        "physical_type": "TIMESTAMP",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "created_at",
+        "sample_values": [
+          "2026-01-01 08:00:00",
+          "2026-01-01 08:07:00",
+          "2026-01-01 08:14:00",
+          "2026-01-01 08:21:00",
+          "2026-01-01 08:28:00"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "TIMESTAMP",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    }
+  ]
+}

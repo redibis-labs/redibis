@@ -1,0 +1,36 @@
+# Expected deterministic / structurally validated findings for
+# we_call_center_spoken_ar.txt (preprocess + regex + phone).
+# PERSON / LOCATION remain NER-first and are listed under # NER.
+#
+# Notes:
+# - Spoken Egyptian compounds: ميتين=200, سبعة وستين=67, إلخ.
+#   Parenthetical digit forms in the fixture are the operator ground truth
+#   when Whisper/target digits disagree with strict linguistic expansion.
+# - Card/IMEI in the fixture use Luhn-valid check digits (…2346 / …435).
+# - NID spoken expands to 13 digits (2950713120016) → proposal only.
+
+PHONE_NUMBER	01143215567
+PHONE_NUMBER	0227945430
+PHONE_NUMBER	01228364910
+PHONE_NUMBER	01002675324
+PHONE_NUMBER	01002693012
+PHONE_NUMBER	01099887766
+PHONE_NUMBER	01555123498
+EMAIL_ADDRESS	ahmed.sayed89@yahoo.com
+CREDIT_CARD	5123456789012346
+IMEI	358912098765435
+TRANSACTION_ID	TXN-89321
+EG_NATIONAL_ID	2950713120016
+
+# Spoken surfaces that must appear in a PHONE_NUMBER span (combined OK)
+SPOKEN_PHONE_SURFACE	زيرو حداشر أربعة تلاتة اتنين واحد خمسة خمسة ستة سبعة
+SPOKEN_PHONE_SURFACE	زيرو اتناشر اتنين تمانية تلاتة ستة أربعة تسعة واحد زيرو
+
+# Context-labeled invalid-length NID surface (must be proposal when present)
+EG_NATIONAL_ID_SURFACE	اتنين تسعة خمسة زيرو سبعة واحد تلاتة اتناشر زيرو زيرو واحد ستة
+
+# NER / PERSON when a model is attached
+# PERSON	محمد عبد السلام ابراهيم مرسي
+# PERSON	شريف نبيل الدسوقي
+# PERSON	ندى هاني كمال
+# LOCATION	شارع فيصل محطة العشرين برج الإيمان الدور السادس شقة 14

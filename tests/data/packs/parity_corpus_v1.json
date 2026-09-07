@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "equation": "independent",
+  "engines": "regex",
+  "pii_config": {
+    "use_phonenumbers": false,
+    "geo_require_pair": true
+  },
+  "columns": {
+    "email": {
+      "detected": true,
+      "entity_type": "EMAIL_ADDRESS",
+      "confidence": 1.0,
+      "presidio_pattern": "email_address",
+      "presidio_match_rate": 1.0,
+      "sample_match_rate": null
+    },
+    "msisdn_plus20": {
+      "detected": true,
+      "entity_type": "PHONE_NUMBER",
+      "confidence": 1.0,
+      "presidio_pattern": "msisdn_egypt_international",
+      "presidio_match_rate": 1.0,
+      "sample_match_rate": null
+    },
+    "imsi_eg": {
+      "detected": true,
+      "entity_type": "IMSI",
+      "confidence": 1.0,
+      "presidio_pattern": "imsi_generic",
+      "presidio_match_rate": 1.0,
+      "sample_match_rate": null
+    },
+    "imei_valid": {
+      "detected": true,
+      "entity_type": "IMEI",
+      "confidence": 1.0,
+      "presidio_pattern": "imei",
+      "presidio_match_rate": 1.0,
+      "sample_match_rate": null
+    },
+    "national_id": {
+      "detected": true,
+      "entity_type": "EG_NATIONAL_ID",
+      "confidence": 1.0,
+      "presidio_pattern": "national_id_egypt_strict",
+      "presidio_match_rate": 1.0,
+      "sample_match_rate": null
+    },
+    "order_id": {
+      "detected": false,
+      "entity_type": null,
+      "confidence": 0.0,
+      "presidio_pattern": null,
+      "presidio_match_rate": 0.0,
+      "sample_match_rate": null
+    },
+    "age": {
+      "detected": false,
+      "entity_type": null,
+      "confidence": 0.0,
+      "presidio_pattern": null,
+      "presidio_match_rate": 0.0,
+      "sample_match_rate": null
+    },
+    "رقم_قومي": {
+      "detected": true,
+      "entity_type": "EG_NATIONAL_ID",
+      "confidence": 1.0,
+      "presidio_pattern": "national_id_egypt_strict",
+      "presidio_match_rate": 1.0,
+      "sample_match_rate": null
+    },
+    "هاتف": {
+      "detected": true,
+      "entity_type": "PHONE_NUMBER",
+      "confidence": 1.0,
+      "presidio_pattern": "msisdn_egypt_international",
+      "presidio_match_rate": 1.0,
+      "sample_match_rate": null
+    }
+  }
+}

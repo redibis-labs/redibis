@@ -1,0 +1,15 @@
+# Column memory — wired for the embedded postgres-memory service in Docker Compose.
+# REDIBIS_MEMORY_DSN is set by compose; do not commit secrets here.
+#
+# Local lab:  http://localhost:8080  (Contract → sampling consent, Enrich → hints)
+# Prod stack: http://localhost:8000
+
+memory:
+  enabled: true
+  store: pgvector
+  dsn_ref: REDIBIS_MEMORY_DSN
+  embedding_provider: sentence_transformers
+  embedding_model: all-MiniLM-L6-v2
+  domain: ""
+  top_k: 5
+  min_similarity: 0.0

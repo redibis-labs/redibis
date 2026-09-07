@@ -1,0 +1,129 @@
+# Tutorial config: golden CSV PII scan → enrich → OpenMetadata catalog push.
+#
+# Companion assets:
+#   tests/data/golden_tutorial_customers.csv
+#   tests/data/tutorial_pii_enrich/
+#   config/examples/llm-providers-sglang-qwen.json
+# Tutorial:
+#   docs/tutorials/PII_CSV_ENRICH_OPENMETADATA_CLI.md
+#
+# Usage:
+#   export REDIBIS_CONFIG=config/examples/pii-csv-enrich-catalog-tutorial.yaml
+#   export REDIBIS_LLM_PROVIDERS=config/examples/llm-providers-sglang-qwen.json
+#   export SGLANG_API_KEY=sk-local
+#   export OM_BOT_JWT='...'
+
+table: golden.tutorial_customers
+
+scan_types:
+  - pii
+
+source:
+  engine: none
+
+profiling:
+  engine: great_expectations
+  triage_threshold: 0.0
+  arabic_threshold: 0.05
+  metadata:
+    enabled: false
+  pushdown:
+    enabled: false
+
+quality:
+  generate_ge_docs: false
+
+pii:
+  engines: regex
+  equation_mode: independent
+  sample_size: 100
+  use_phonenumbers: true
+  default_region: EG
+  msisdn_valid_rate_min: 0.80
+  phone_gate_conf: 0.10
+  geo_require_pair: true
+  geo_egypt_geofence: false
+  msisdn_prefixes: ["010", "011", "012", "015"]
+  ner:
+    type: gliner
+    model_path: ""
+    device: cpu
+    threshold: 0.3
+    batch_size: 8
+  llm:
+    enabled: false
+
+storage:
+  backend: local
+  runs_bucket: pii-reports
+  contracts_bucket: active-contracts
+  pii_runs_bucket: pii-contracts
+  quality_runs_bucket: quality-contracts
+
+contract:
+  auto_create: true
+  auto_write: false
+  automerge: pii
+  validate: true
+
+report:
+  formats: [pii]
+  output_dir: ./reports
+
+enrich:
+  include_pii_evidence: true
+  similar_context:
+    enabled: false
+    k: 5
+
+llm:
+  default:
+    provider: sglang-qwen
+    model: Qwen/Qwen2.5-14B-Instruct
+  roles:
+    contract.enrichment:
+      inherit: default
+    provider.probe:
+      inherit: default
+
+rai:
+  enabled: true
+  mode: report
+  enforce: false
+  hard_block_external_pii: false
+  default_residency: local
+
+catalog:
+  backend: openmetadata
+  push:
+    tags: true
+    glossary: true
+    contract: true
+    masked_samples: false
+    lifecycle_diff: true
+  openmetadata:
+    host: http://localhost:8585
+    jwt_env: OM_BOT_JWT
+    service_name: redibis
+    default_schema: default
+
+memory:
+  enabled: false
+
+classification:
+  enabled: true
+  policy_pack: telecom
+  default_jurisdiction: EG
+
+agents:
+  enabled: false
+
+observability:
+  log_level: INFO
+  persist_run_log: true
+  decision_log: true
+  llm_debug: false
+  llm_log_prompts: false
+
+behavior:
+  enabled: false

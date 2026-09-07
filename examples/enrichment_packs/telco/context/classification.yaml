@@ -1,0 +1,5 @@
+domains:
+  DataSensitivity:
+    notes: Prefer existing pack tags when evidence supports them.
+  TelcoDataType:
+    notes: Map phone-like columns to MSISDN only with supporting evidence.

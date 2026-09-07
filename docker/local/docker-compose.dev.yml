@@ -1,0 +1,57 @@
+# ============================================================
+# redibis — docker-compose.dev.yml
+#
+# Development overlay — adds source-tree volume mounts so
+# changes to Python/HTML files are live without docker cp.
+#
+# Usage (replaces run-local.sh for day-to-day dev):
+#   export PROJECT_ROOT_MNT=$(pwd)
+#   docker compose \
+#     -f docker/local/docker-compose.yml \
+#     -f docker/local/docker-compose.dev.yml \
+#     up --build
+#
+# Or add a helper alias to your shell:
+#   alias redibis-dev='PROJECT_ROOT_MNT=$(pwd) docker compose \
+#     -f docker/local/docker-compose.yml \
+#     -f docker/local/docker-compose.dev.yml up'
+# ============================================================
+
+services:
+  redibis-lab:
+    volumes:
+      # ── Live-reload source mounts ──────────────────────────
+      # Python package source → replaces the installed copy
+      # ANY file save in these dirs is immediately live.
+      - .:/home/jovyan/work
+      - ${PROJECT_ROOT_MNT:-.}/redibis:/app/redibis:ro
+
+      # scan_output on host so you can browse artifacts directly
+      - ${PROJECT_ROOT_MNT:-.}/scan_output:/app/scan_output
+
+      # configs (saved regex / quality rule sets) on host
+      - ${PROJECT_ROOT_MNT:-.}/configs:/app/configs
+
+    environment:
+      # Tell uvicorn to watch for source changes and reload
+      UVICORN_RELOAD: "true"
+      UVICORN_RELOAD_DIR: "/app/redibis"
+
+      # Point redibis at the mounted paths
+      SCAN_OUTPUT_DIR: "/app/scan_output"
+      CONFIGS_DIR: "/app/configs"
+
+      # Cloud LLM keys — export on the host before `docker compose up`, or paste in Settings → LLM
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+
+    # Override the default CMD to start uvicorn with --reload
+    command: >
+      uvicorn redibis.webapp.backend:app
+        --host 0.0.0.0
+        --port 8000
+        --reload
+        --reload-dir /app/redibis
+        --log-level info

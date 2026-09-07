@@ -1,0 +1,421 @@
+{
+  "table_name": "merchant_seller_registry",
+  "table_business_name": "Marketplace merchant and seller registry",
+  "description": "Business seller registry for Egyptian e-commerce marketplaces, covering tax, commercial, settlement, and contact identifiers.",
+  "domain": "ecommerce_merchant",
+  "granularity": "One row per merchant legal entity or sole proprietor seller.",
+  "modality": "tabular_column",
+  "test_type": "column_classification",
+  "column_count": 11,
+  "pii_column_count": 11,
+  "non_pii_column_count": 0,
+  "column_evaluations": [
+    {
+      "test_id": "TABULAR_EVAL_12_001",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_merchant",
+        "test_type": "column_classification",
+        "table_name": "merchant_seller_registry",
+        "table_business_name": "Marketplace merchant and seller registry",
+        "table_description": "Business seller registry for Egyptian e-commerce marketplaces, covering tax, commercial, settlement, and contact identifiers.",
+        "column_business_name": "Merchant identifier",
+        "column_description": "Internal seller or merchant key.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": true,
+        "primary_key": true,
+        "unique": true
+      },
+      "input_data": {
+        "column_name": "merchant_id",
+        "sample_values": [
+          "ID-00000001",
+          "ID-00000002",
+          "ID-00000003",
+          "ID-00000004",
+          "ID-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CUSTOMER_ID",
+          "is_pii": true,
+          "pii_category": "Linkable Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_12_002",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_merchant",
+        "test_type": "column_classification",
+        "table_name": "merchant_seller_registry",
+        "table_business_name": "Marketplace merchant and seller registry",
+        "table_description": "Business seller registry for Egyptian e-commerce marketplaces, covering tax, commercial, settlement, and contact identifiers.",
+        "column_business_name": "Merchant legal name",
+        "column_description": "Registered business or sole proprietor legal name.",
+        "logical_type": "string",
+        "physical_type": "NVARCHAR(200)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "merchant_legal_name",
+        "sample_values": [
+          "Ahmed Hassan ElSayed",
+          "Mohamed Mostafa Kamel",
+          "Mahmoud Tarek Fathy",
+          "Omar Fouad Abdelrahman",
+          "Youssef Ibrahim Nassar"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "PERSON",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_12_003",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_merchant",
+        "test_type": "column_classification",
+        "table_name": "merchant_seller_registry",
+        "table_business_name": "Marketplace merchant and seller registry",
+        "table_description": "Business seller registry for Egyptian e-commerce marketplaces, covering tax, commercial, settlement, and contact identifiers.",
+        "column_business_name": "Merchant contact person",
+        "column_description": "Operational contact person.",
+        "logical_type": "string",
+        "physical_type": "NVARCHAR(160)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "merchant_contact_name",
+        "sample_values": [
+          "Ahmed Hassan ElSayed",
+          "Mohamed Mostafa Kamel",
+          "Mahmoud Tarek Fathy",
+          "Omar Fouad Abdelrahman",
+          "Youssef Ibrahim Nassar"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "PERSON",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_12_004",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_merchant",
+        "test_type": "column_classification",
+        "table_name": "merchant_seller_registry",
+        "table_business_name": "Marketplace merchant and seller registry",
+        "table_description": "Business seller registry for Egyptian e-commerce marketplaces, covering tax, commercial, settlement, and contact identifiers.",
+        "column_business_name": "Merchant mobile",
+        "column_description": "Mobile number for merchant contact and OTP.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(16)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "merchant_mobile",
+        "sample_values": [
+          "01010000000",
+          "01110007919",
+          "01210015838",
+          "01510023757",
+          "01010031676"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EGYPTIAN_MOBILE",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_12_005",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_merchant",
+        "test_type": "column_classification",
+        "table_name": "merchant_seller_registry",
+        "table_business_name": "Marketplace merchant and seller registry",
+        "table_description": "Business seller registry for Egyptian e-commerce marketplaces, covering tax, commercial, settlement, and contact identifiers.",
+        "column_business_name": "Merchant email",
+        "column_description": "Merchant contact email.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(254)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "merchant_email",
+        "sample_values": [
+          "ahmed.elsayed0000@example.eg",
+          "mohamed.kamel0001@mail.test",
+          "mahmoud.fathy0002@customer.invalid",
+          "omar.abdelrahman0003@synthetic.local",
+          "youssef.nassar0004@example.eg"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EMAIL_ADDRESS",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_12_006",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_merchant",
+        "test_type": "column_classification",
+        "table_name": "merchant_seller_registry",
+        "table_business_name": "Marketplace merchant and seller registry",
+        "table_description": "Business seller registry for Egyptian e-commerce marketplaces, covering tax, commercial, settlement, and contact identifiers.",
+        "column_business_name": "Tax registration number",
+        "column_description": "Egyptian tax registration number.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(20)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "tax_registration_number",
+        "sample_values": [
+          "100000000",
+          "100000001",
+          "100000002",
+          "100000003",
+          "100000004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_TAX_REGISTRATION_NUMBER",
+          "is_pii": true,
+          "pii_category": "Business Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_12_007",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_merchant",
+        "test_type": "column_classification",
+        "table_name": "merchant_seller_registry",
+        "table_business_name": "Marketplace merchant and seller registry",
+        "table_description": "Business seller registry for Egyptian e-commerce marketplaces, covering tax, commercial, settlement, and contact identifiers.",
+        "column_business_name": "Commercial registry number",
+        "column_description": "Egyptian commercial registry number.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(20)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "commercial_registry_number",
+        "sample_values": [
+          "CR-100000",
+          "CR-100001",
+          "CR-100002",
+          "CR-100003",
+          "CR-100004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_COMMERCIAL_REGISTRY_NUMBER",
+          "is_pii": true,
+          "pii_category": "Business Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_12_008",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_merchant",
+        "test_type": "column_classification",
+        "table_name": "merchant_seller_registry",
+        "table_business_name": "Marketplace merchant and seller registry",
+        "table_description": "Business seller registry for Egyptian e-commerce marketplaces, covering tax, commercial, settlement, and contact identifiers.",
+        "column_business_name": "Unified national number",
+        "column_description": "Unified establishment number where available.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(30)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "unified_national_number",
+        "sample_values": [
+          "unified_national_number_00000001",
+          "unified_national_number_00000002",
+          "unified_national_number_00000003",
+          "unified_national_number_00000004",
+          "unified_national_number_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_UNIFIED_NATIONAL_NUMBER",
+          "is_pii": true,
+          "pii_category": "Business Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_12_009",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_merchant",
+        "test_type": "column_classification",
+        "table_name": "merchant_seller_registry",
+        "table_business_name": "Marketplace merchant and seller registry",
+        "table_description": "Business seller registry for Egyptian e-commerce marketplaces, covering tax, commercial, settlement, and contact identifiers.",
+        "column_business_name": "Settlement IBAN",
+        "column_description": "Bank account IBAN for merchant settlement.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(34)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "settlement_iban",
+        "sample_values": [
+          "EG3800195000000000263180000",
+          "EG3900205000000000263180001",
+          "EG4000215000000000263180002",
+          "EG4100225000000000263180003",
+          "EG4200235000000000263180004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "IBAN_CODE",
+          "is_pii": true,
+          "pii_category": "Financial Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_12_010",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_merchant",
+        "test_type": "column_classification",
+        "table_name": "merchant_seller_registry",
+        "table_business_name": "Marketplace merchant and seller registry",
+        "table_description": "Business seller registry for Egyptian e-commerce marketplaces, covering tax, commercial, settlement, and contact identifiers.",
+        "column_business_name": "Business address",
+        "column_description": "Registered business address.",
+        "logical_type": "string",
+        "physical_type": "NVARCHAR(300)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "business_address",
+        "sample_values": [
+          "12 Tahrir Street, Nasr City, Cairo",
+          "13 El Nasr Road, Maadi, Giza",
+          "14 Gameat El Dowal, Heliopolis, Alexandria",
+          "15 Corniche El Nile, Dokki, Dakahlia",
+          "16 Makram Ebeid, Mohandessin, Red Sea"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "LOCATION_ADDRESS",
+          "is_pii": true,
+          "pii_category": "Location",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_12_011",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "ecommerce_merchant",
+        "test_type": "column_classification",
+        "table_name": "merchant_seller_registry",
+        "table_business_name": "Marketplace merchant and seller registry",
+        "table_description": "Business seller registry for Egyptian e-commerce marketplaces, covering tax, commercial, settlement, and contact identifiers.",
+        "column_business_name": "National real estate ID",
+        "column_description": "Property identifier for business premises where available.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(40)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "national_real_estate_id",
+        "sample_values": [
+          "ID-00000001",
+          "ID-00000002",
+          "ID-00000003",
+          "ID-00000004",
+          "ID-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EG_NATIONAL_REAL_ESTATE_ID",
+          "is_pii": true,
+          "pii_category": "Location Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    }
+  ]
+}

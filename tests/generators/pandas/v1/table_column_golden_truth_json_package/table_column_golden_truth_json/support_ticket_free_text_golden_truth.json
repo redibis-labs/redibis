@@ -1,0 +1,310 @@
+{
+  "table_name": "support_ticket_free_text",
+  "table_business_name": "Support ticket and free-text interaction log",
+  "description": "Free-text ticket data for evaluating entity extraction from notes, SMS bodies, chat transcripts, emails, and logs.",
+  "domain": "cross_domain_support",
+  "granularity": "One row per support interaction or message.",
+  "modality": "tabular_column",
+  "test_type": "column_classification",
+  "column_count": 8,
+  "pii_column_count": 4,
+  "non_pii_column_count": 4,
+  "column_evaluations": [
+    {
+      "test_id": "TABULAR_EVAL_13_001",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "cross_domain_support",
+        "test_type": "column_classification",
+        "table_name": "support_ticket_free_text",
+        "table_business_name": "Support ticket and free-text interaction log",
+        "table_description": "Free-text ticket data for evaluating entity extraction from notes, SMS bodies, chat transcripts, emails, and logs.",
+        "column_business_name": "Ticket identifier",
+        "column_description": "Support ticket identifier.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": true,
+        "primary_key": true,
+        "unique": true
+      },
+      "input_data": {
+        "column_name": "ticket_id",
+        "sample_values": [
+          "ID-00000001",
+          "ID-00000002",
+          "ID-00000003",
+          "ID-00000004",
+          "ID-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "NUMERIC_ID",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_13_002",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "cross_domain_support",
+        "test_type": "column_classification",
+        "table_name": "support_ticket_free_text",
+        "table_business_name": "Support ticket and free-text interaction log",
+        "table_description": "Free-text ticket data for evaluating entity extraction from notes, SMS bodies, chat transcripts, emails, and logs.",
+        "column_business_name": "Customer identifier",
+        "column_description": "Customer linked to ticket.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "customer_id",
+        "sample_values": [
+          "ID-00000001",
+          "ID-00000002",
+          "ID-00000003",
+          "ID-00000004",
+          "ID-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CUSTOMER_ID",
+          "is_pii": true,
+          "pii_category": "Linkable Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_13_003",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "cross_domain_support",
+        "test_type": "column_classification",
+        "table_name": "support_ticket_free_text",
+        "table_business_name": "Support ticket and free-text interaction log",
+        "table_description": "Free-text ticket data for evaluating entity extraction from notes, SMS bodies, chat transcripts, emails, and logs.",
+        "column_business_name": "Interaction channel",
+        "column_description": "Call center, chat, email, WhatsApp, SMS, app, or branch.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(30)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "channel",
+        "sample_values": [
+          "channel_00000001",
+          "channel_00000002",
+          "channel_00000003",
+          "channel_00000004",
+          "channel_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CATEGORY",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_13_004",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "cross_domain_support",
+        "test_type": "column_classification",
+        "table_name": "support_ticket_free_text",
+        "table_business_name": "Support ticket and free-text interaction log",
+        "table_description": "Free-text ticket data for evaluating entity extraction from notes, SMS bodies, chat transcripts, emails, and logs.",
+        "column_business_name": "Agent free-text notes",
+        "column_description": "Free text may contain phone, national ID, email, address, OTP, card, IBAN, IMEI, IMSI, ICCID, or passport values.",
+        "logical_type": "string",
+        "physical_type": "NVARCHAR(4000)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "agent_notes",
+        "sample_values": [
+          "Your OTP is 100000 for login to your account. Do not share it.",
+          "Customer +201110007919 confirmed NID 26608140210170 and requested update for IMEI 490154203237001.",
+          "Customer +201210015838 confirmed NID 26703270310347 and requested update for IMEI 490154203237002.",
+          "Customer +201510023757 confirmed NID 26810120410514 and requested update for IMEI 490154203237003.",
+          "Customer +201010031676 confirmed NID 26905251110681 and requested update for IMEI 490154203237004."
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "FREE_TEXT",
+          "is_pii": true,
+          "pii_category": "Mixed Unstructured Pii",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_13_005",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "cross_domain_support",
+        "test_type": "column_classification",
+        "table_name": "support_ticket_free_text",
+        "table_business_name": "Support ticket and free-text interaction log",
+        "table_description": "Free-text ticket data for evaluating entity extraction from notes, SMS bodies, chat transcripts, emails, and logs.",
+        "column_business_name": "SMS body",
+        "column_description": "SMS content for OTP and notification detection.",
+        "logical_type": "string",
+        "physical_type": "NVARCHAR(500)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "sms_body",
+        "sample_values": [
+          "Your OTP is 100000 for login to your account. Do not share it.",
+          "Customer +201110007919 confirmed NID 26608140210170 and requested update for IMEI 490154203237001.",
+          "Customer +201210015838 confirmed NID 26703270310347 and requested update for IMEI 490154203237002.",
+          "Customer +201510023757 confirmed NID 26810120410514 and requested update for IMEI 490154203237003.",
+          "Customer +201010031676 confirmed NID 26905251110681 and requested update for IMEI 490154203237004."
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "FREE_TEXT",
+          "is_pii": true,
+          "pii_category": "Mixed Unstructured Pii",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_13_006",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "cross_domain_support",
+        "test_type": "column_classification",
+        "table_name": "support_ticket_free_text",
+        "table_business_name": "Support ticket and free-text interaction log",
+        "table_description": "Free-text ticket data for evaluating entity extraction from notes, SMS bodies, chat transcripts, emails, and logs.",
+        "column_business_name": "Extracted attachment text",
+        "column_description": "OCR or extracted attachment text, often containing ID documents or invoices.",
+        "logical_type": "string",
+        "physical_type": "NVARCHAR(4000)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "attachment_text",
+        "sample_values": [
+          "Your OTP is 100000 for login to your account. Do not share it.",
+          "Customer +201110007919 confirmed NID 26608140210170 and requested update for IMEI 490154203237001.",
+          "Customer +201210015838 confirmed NID 26703270310347 and requested update for IMEI 490154203237002.",
+          "Customer +201510023757 confirmed NID 26810120410514 and requested update for IMEI 490154203237003.",
+          "Customer +201010031676 confirmed NID 26905251110681 and requested update for IMEI 490154203237004."
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "FREE_TEXT",
+          "is_pii": true,
+          "pii_category": "Mixed Unstructured Pii",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_13_007",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "cross_domain_support",
+        "test_type": "column_classification",
+        "table_name": "support_ticket_free_text",
+        "table_business_name": "Support ticket and free-text interaction log",
+        "table_description": "Free-text ticket data for evaluating entity extraction from notes, SMS bodies, chat transcripts, emails, and logs.",
+        "column_business_name": "Detected language",
+        "column_description": "Language code for text-processing evaluation.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(10)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "detected_language",
+        "sample_values": [
+          "detected_language_00000001",
+          "detected_language_00000002",
+          "detected_language_00000003",
+          "detected_language_00000004",
+          "detected_language_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CATEGORY",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_13_008",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "cross_domain_support",
+        "test_type": "column_classification",
+        "table_name": "support_ticket_free_text",
+        "table_business_name": "Support ticket and free-text interaction log",
+        "table_description": "Free-text ticket data for evaluating entity extraction from notes, SMS bodies, chat transcripts, emails, and logs.",
+        "column_business_name": "Ticket creation timestamp",
+        "column_description": "Ticket timestamp.",
+        "logical_type": "timestamp",
+        "physical_type": "TIMESTAMP",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "created_at",
+        "sample_values": [
+          "2026-01-01 08:00:00",
+          "2026-01-01 08:07:00",
+          "2026-01-01 08:14:00",
+          "2026-01-01 08:21:00",
+          "2026-01-01 08:28:00"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "TIMESTAMP",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    }
+  ]
+}

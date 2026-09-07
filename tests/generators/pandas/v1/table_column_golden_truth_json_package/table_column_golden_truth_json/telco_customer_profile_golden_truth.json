@@ -1,0 +1,421 @@
+{
+  "table_name": "telco_customer_profile",
+  "table_business_name": "Telecom customer master profile",
+  "description": "Core customer profile used by CRM, billing, support, marketing consent, and KYC workflows for Egyptian telecom operators.",
+  "domain": "telecom_crm",
+  "granularity": "One row per natural person or business customer account holder.",
+  "modality": "tabular_column",
+  "test_type": "column_classification",
+  "column_count": 11,
+  "pii_column_count": 9,
+  "non_pii_column_count": 2,
+  "column_evaluations": [
+    {
+      "test_id": "TABULAR_EVAL_01_001",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_crm",
+        "test_type": "column_classification",
+        "table_name": "telco_customer_profile",
+        "table_business_name": "Telecom customer master profile",
+        "table_description": "Core customer profile used by CRM, billing, support, marketing consent, and KYC workflows for Egyptian telecom operators.",
+        "column_business_name": "Customer identifier",
+        "column_description": "Internal customer key used across CRM and billing.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(36)",
+        "required": true,
+        "primary_key": true,
+        "unique": true
+      },
+      "input_data": {
+        "column_name": "customer_id",
+        "sample_values": [
+          "CUST-00000001",
+          "CUST-00000002",
+          "CUST-00000003",
+          "CUST-00000004",
+          "CUST-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CUSTOMER_ID",
+          "is_pii": true,
+          "pii_category": "Linkable Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_01_002",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_crm",
+        "test_type": "column_classification",
+        "table_name": "telco_customer_profile",
+        "table_business_name": "Telecom customer master profile",
+        "table_description": "Core customer profile used by CRM, billing, support, marketing consent, and KYC workflows for Egyptian telecom operators.",
+        "column_business_name": "Full legal name in English",
+        "column_description": "Customer name written in Latin characters.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(160)",
+        "required": true,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "full_name_en",
+        "sample_values": [
+          "Ahmed Hassan ElSayed",
+          "Mohamed Mostafa Kamel",
+          "Mahmoud Tarek Fathy",
+          "Omar Fouad Abdelrahman",
+          "Youssef Ibrahim Nassar"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "PERSON",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_01_003",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_crm",
+        "test_type": "column_classification",
+        "table_name": "telco_customer_profile",
+        "table_business_name": "Telecom customer master profile",
+        "table_description": "Core customer profile used by CRM, billing, support, marketing consent, and KYC workflows for Egyptian telecom operators.",
+        "column_business_name": "Full legal name in Arabic",
+        "column_description": "Customer name written in Arabic characters.",
+        "logical_type": "string",
+        "physical_type": "NVARCHAR(160)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "full_name_ar",
+        "sample_values": [
+          "أحمد حسن السيد",
+          "محمد مصطفى كامل",
+          "محمود طارق فتحي",
+          "عمر فؤاد عبد الرحمن",
+          "يوسف إبراهيم نصار"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "PERSON",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_01_004",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_crm",
+        "test_type": "column_classification",
+        "table_name": "telco_customer_profile",
+        "table_business_name": "Telecom customer master profile",
+        "table_description": "Core customer profile used by CRM, billing, support, marketing consent, and KYC workflows for Egyptian telecom operators.",
+        "column_business_name": "Primary Egyptian mobile number",
+        "column_description": "Primary contact number, normally normalized to E.164.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(16)",
+        "required": true,
+        "primary_key": false,
+        "unique": true
+      },
+      "input_data": {
+        "column_name": "primary_mobile",
+        "sample_values": [
+          "+201010000000",
+          "+201110007919",
+          "+201210015838",
+          "+201510023757",
+          "+201010031676"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EGYPTIAN_MOBILE",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_01_005",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_crm",
+        "test_type": "column_classification",
+        "table_name": "telco_customer_profile",
+        "table_business_name": "Telecom customer master profile",
+        "table_description": "Core customer profile used by CRM, billing, support, marketing consent, and KYC workflows for Egyptian telecom operators.",
+        "column_business_name": "Alternate contact phone",
+        "column_description": "Secondary mobile or landline number.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(20)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "alternate_phone",
+        "sample_values": [
+          "0201000000",
+          "01110007919",
+          "01210015838",
+          "0501010713",
+          "01010031676"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "PHONE_NUMBER",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_01_006",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_crm",
+        "test_type": "column_classification",
+        "table_name": "telco_customer_profile",
+        "table_business_name": "Telecom customer master profile",
+        "table_description": "Core customer profile used by CRM, billing, support, marketing consent, and KYC workflows for Egyptian telecom operators.",
+        "column_business_name": "Email address",
+        "column_description": "Customer email used for notifications and account recovery.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(254)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "email_address",
+        "sample_values": [
+          "ahmed.elsayed0000@example.eg",
+          "mohamed.kamel0001@mail.test",
+          "mahmoud.fathy0002@customer.invalid",
+          "omar.abdelrahman0003@synthetic.local",
+          "youssef.nassar0004@example.eg"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "EMAIL_ADDRESS",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_01_007",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_crm",
+        "test_type": "column_classification",
+        "table_name": "telco_customer_profile",
+        "table_business_name": "Telecom customer master profile",
+        "table_description": "Core customer profile used by CRM, billing, support, marketing consent, and KYC workflows for Egyptian telecom operators.",
+        "column_business_name": "Date of birth",
+        "column_description": "Customer birth date.",
+        "logical_type": "date",
+        "physical_type": "DATE",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "date_of_birth",
+        "sample_values": [
+          "1965-01-01",
+          "1966-08-14",
+          "1967-03-27",
+          "1968-10-12",
+          "1969-05-25"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "DATE_OF_BIRTH",
+          "is_pii": true,
+          "pii_category": "Quasi Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_01_008",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_crm",
+        "test_type": "column_classification",
+        "table_name": "telco_customer_profile",
+        "table_business_name": "Telecom customer master profile",
+        "table_description": "Core customer profile used by CRM, billing, support, marketing consent, and KYC workflows for Egyptian telecom operators.",
+        "column_business_name": "Gender",
+        "column_description": "Customer gender as collected in CRM/KYC.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(20)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "gender",
+        "sample_values": [
+          "M",
+          "F",
+          "Unspecified",
+          "M",
+          "F"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "GENDER_INDICATOR",
+          "is_pii": true,
+          "pii_category": "Demographic",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_01_009",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_crm",
+        "test_type": "column_classification",
+        "table_name": "telco_customer_profile",
+        "table_business_name": "Telecom customer master profile",
+        "table_description": "Core customer profile used by CRM, billing, support, marketing consent, and KYC workflows for Egyptian telecom operators.",
+        "column_business_name": "Nationality",
+        "column_description": "ISO alpha-3 nationality code.",
+        "logical_type": "string",
+        "physical_type": "CHAR(3)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "nationality",
+        "sample_values": [
+          "EGY",
+          "SYR",
+          "SDN",
+          "JOR",
+          "PSE"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "NRP",
+          "is_pii": true,
+          "pii_category": "Sensitive Demographic",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_01_010",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_crm",
+        "test_type": "column_classification",
+        "table_name": "telco_customer_profile",
+        "table_business_name": "Telecom customer master profile",
+        "table_description": "Core customer profile used by CRM, billing, support, marketing consent, and KYC workflows for Egyptian telecom operators.",
+        "column_business_name": "Marketing consent flag",
+        "column_description": "Indicates whether customer opted in to promotional communication.",
+        "logical_type": "boolean",
+        "physical_type": "BOOLEAN",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "marketing_consent_flag",
+        "sample_values": [
+          "False",
+          "True",
+          "False",
+          "True",
+          "False"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CONSENT_STATUS",
+          "is_pii": false,
+          "pii_category": "Privacy Preference",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_01_011",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_crm",
+        "test_type": "column_classification",
+        "table_name": "telco_customer_profile",
+        "table_business_name": "Telecom customer master profile",
+        "table_description": "Core customer profile used by CRM, billing, support, marketing consent, and KYC workflows for Egyptian telecom operators.",
+        "column_business_name": "Creation timestamp",
+        "column_description": "Record creation timestamp.",
+        "logical_type": "timestamp",
+        "physical_type": "TIMESTAMP",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "created_at",
+        "sample_values": [
+          "2026-01-01 08:00:00",
+          "2026-01-01 08:07:00",
+          "2026-01-01 08:14:00",
+          "2026-01-01 08:21:00",
+          "2026-01-01 08:28:00"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "TIMESTAMP",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    }
+  ]
+}

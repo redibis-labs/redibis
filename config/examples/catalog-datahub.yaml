@@ -1,0 +1,19 @@
+# Push ODCS contracts to DataHub.
+# Usage:
+#   export REDIBIS_CONFIG=config/examples/catalog-datahub.yaml
+#   export DATAHUB_GMS_TOKEN='...'
+#   redibis catalog push-file ./telecom.customers.yaml
+
+catalog:
+  backend: datahub
+  push:
+    tags: true
+    glossary: true
+    contract: true
+    masked_samples: false
+  datahub:
+    host: http://localhost:8080
+    token_env: DATAHUB_GMS_TOKEN
+    platform: redibis
+    env: PROD
+    actor: urn:li:corpuser:redibis

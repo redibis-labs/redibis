@@ -1,0 +1,151 @@
+# ============================================================
+# redibis — Local Docker Compose Stack
+#
+# Services:
+#   redibis-lab  — JupyterLab + FastAPI dashboard + full redibis stack
+#   minio        — S3-compatible object storage (contracts bucket)
+#   minio-init   — One-shot bucket initializer
+#   openmetadata — Optional catalog stack (--profile openmetadata)
+#
+# Ports:
+#   8889  JupyterLab (Mapped from 8888)
+#   8080  FastAPI dashboard + REST API (Mapped from 8000)
+#   9000  MinIO S3 API
+#   9001  MinIO Web Console
+#   5432  Postgres + pgvector (column memory)
+#   8585  OpenMetadata API (profile openmetadata)
+#
+# Usage:
+#   docker compose up --build                    # Start redibis + MinIO
+#   docker compose --profile openmetadata up -d  # Include OpenMetadata
+#   docker compose down -v                       # Stop and remove volumes
+# ============================================================
+
+include:
+  - path: docker/openmetadata/docker-compose.yml
+  - path: docker/postgres/docker-compose.yml
+
+services:
+
+  # ----------------------------------------------------------
+  # Core environment: JupyterLab + FastAPI dashboard
+  # ----------------------------------------------------------
+  redibis-lab:
+    build:
+      context: .
+      dockerfile: docker/local/Dockerfile
+    image: redibis:local
+    container_name: redibis-lab
+    ports:
+      - "8889:8888"   # JupyterLab
+      - "8080:8000"   # FastAPI dashboard + REST API
+    volumes:
+      # Mount the full project repo (Jupyter working dir + general hot-reload)
+      - .:/home/jovyan/work
+      # The package is installed editable from /tmp/redibis_pkg in the Dockerfile,
+      # so that is the path `import redibis` resolves to. Overlay it with the live
+      # source tree so edits to templates/static/python are served immediately.
+      - ./redibis:/tmp/redibis_pkg/redibis
+      # Column memory config (embedded Postgres)
+      - ./config/examples/memory-docker.yaml:/config/examples/memory-docker.yaml:ro
+      # NER weights — rw required for dashboard upload; use :ro in prod if upload is disabled
+      - ${REDIBIS_MODELS_DIR:-./models}:/models
+    networks:
+      - default
+      - app_net
+    environment:
+      # Force Python to flush stdout/stderr immediately to the console
+      - PYTHONUNBUFFERED=1
+      # Offline NER — point at a mounted model directory
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+      - REDIBIS_NER_MODEL=${REDIBIS_NER_MODEL:-}
+      - REDIBIS_MODELS_DIR=/models
+      # OpenMetadata catalog (reachable when --profile openmetadata is active)
+      - OM_HOST=http://openmetadata-server:8585
+      # MinIO / S3 credentials (matches the minio service below)
+      - S3_ENDPOINT=http://minio:9000
+      - AWS_ENDPOINT_URL=http://minio:9000
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+      - AWS_DEFAULT_REGION=us-east-1
+      # redibis storage config
+      - REDIBIS_STORE_BUCKET=pii-contracts
+      - REDIBIS_REPORTS_BUCKET=pii-reports
+      # External mapped ports for the entrypoint welcome banner
+      - EXTERNAL_API_PORT=8080
+      - EXTERNAL_JUPYTER_PORT=8889
+      - EXTERNAL_MINIO_CONSOLE_PORT=9001
+      - EXTERNAL_OM_HOST=${EXTERNAL_OM_HOST:-localhost}
+      - EXTERNAL_OM_PORT=8585
+      # Column memory (embedded postgres-memory service)
+      - REDIBIS_MEMORY_DSN=postgresql://redibis:redibis@postgres-memory:5432/redibis_memory
+      - REDIBIS_CONFIG=/config/examples/memory-docker.yaml
+      # Cloud LLM keys (optional — export on host or paste key in Settings → LLM)
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    depends_on:
+      postgres-memory:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8888/api && curl -f http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # ----------------------------------------------------------
+  # MinIO — S3-compatible object store for contract storage
+  # ----------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    container_name: redibis-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # MinIO Web Console
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+      - MINIO_SERVER_URL=http://localhost:9000
+      - MINIO_BROWSER_REDIRECT_URL=http://localhost:9001
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ----------------------------------------------------------
+  # One-shot initializer: creates buckets in MinIO
+  # ----------------------------------------------------------
+  minio-init:
+    image: minio/mc:latest
+    container_name: redibis-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 minioadmin minioadmin;
+        mc mb --ignore-existing local/pii-contracts;
+        mc mb --ignore-existing local/pii-reports;
+        echo 'Buckets pii-contracts and pii-reports ready.';
+      "
+    restart: "no"
+
+  # Expose Postgres on the host for CLI access from outside the stack (optional).
+  # Internal service DNS: postgres-memory:5432
+  postgres-memory:
+    ports:
+      - "5432:5432"
+
+volumes:
+  minio_data:
+    driver: local

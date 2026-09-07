@@ -1,0 +1,495 @@
+{
+  "table_name": "telco_cdr_event",
+  "table_business_name": "Call detail record event",
+  "description": "Synthetic call/SMS/data event table for testing PII detection in CDR-style transactional datasets.",
+  "domain": "telecom_network",
+  "granularity": "One row per call, SMS, or data session event.",
+  "modality": "tabular_column",
+  "test_type": "column_classification",
+  "column_count": 13,
+  "pii_column_count": 12,
+  "non_pii_column_count": 1,
+  "column_evaluations": [
+    {
+      "test_id": "TABULAR_EVAL_05_001",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_network",
+        "test_type": "column_classification",
+        "table_name": "telco_cdr_event",
+        "table_business_name": "Call detail record event",
+        "table_description": "Synthetic call/SMS/data event table for testing PII detection in CDR-style transactional datasets.",
+        "column_business_name": "CDR record identifier",
+        "column_description": "Unique event identifier from mediation or billing.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(40)",
+        "required": true,
+        "primary_key": true,
+        "unique": true
+      },
+      "input_data": {
+        "column_name": "cdr_record_id",
+        "sample_values": [
+          "CDR-00000001",
+          "CDR-00000002",
+          "CDR-00000003",
+          "CDR-00000004",
+          "CDR-00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CDR_RECORD_ID",
+          "is_pii": true,
+          "pii_category": "Linkable Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_05_002",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_network",
+        "test_type": "column_classification",
+        "table_name": "telco_cdr_event",
+        "table_business_name": "Call detail record event",
+        "table_description": "Synthetic call/SMS/data event table for testing PII detection in CDR-style transactional datasets.",
+        "column_business_name": "Event timestamp",
+        "column_description": "Start timestamp for the event.",
+        "logical_type": "timestamp",
+        "physical_type": "TIMESTAMP",
+        "required": true,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "event_timestamp",
+        "sample_values": [
+          "2026-01-01 08:00:00",
+          "2026-01-01 08:07:00",
+          "2026-01-01 08:14:00",
+          "2026-01-01 08:21:00",
+          "2026-01-01 08:28:00"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "TIMESTAMP",
+          "is_pii": false,
+          "pii_category": "Non Pii",
+          "sensitivity_level": "INTERNAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_05_003",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_network",
+        "test_type": "column_classification",
+        "table_name": "telco_cdr_event",
+        "table_business_name": "Call detail record event",
+        "table_description": "Synthetic call/SMS/data event table for testing PII detection in CDR-style transactional datasets.",
+        "column_business_name": "Calling party MSISDN",
+        "column_description": "Originating mobile number.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(16)",
+        "required": true,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "a_party_msisdn",
+        "sample_values": [
+          "+201010000000",
+          "+201110007919",
+          "+201210015838",
+          "+201510023757",
+          "+201010031676"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "MSISDN",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_05_004",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_network",
+        "test_type": "column_classification",
+        "table_name": "telco_cdr_event",
+        "table_business_name": "Call detail record event",
+        "table_description": "Synthetic call/SMS/data event table for testing PII detection in CDR-style transactional datasets.",
+        "column_business_name": "Called party MSISDN",
+        "column_description": "Terminating mobile number.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(16)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "b_party_msisdn",
+        "sample_values": [
+          "+201010000000",
+          "+201110007919",
+          "+201210015838",
+          "+201510023757",
+          "+201010031676"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "MSISDN",
+          "is_pii": true,
+          "pii_category": "Direct Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_05_005",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_network",
+        "test_type": "column_classification",
+        "table_name": "telco_cdr_event",
+        "table_business_name": "Call detail record event",
+        "table_description": "Synthetic call/SMS/data event table for testing PII detection in CDR-style transactional datasets.",
+        "column_business_name": "IMSI",
+        "column_description": "Subscriber IMSI observed in event.",
+        "logical_type": "string",
+        "physical_type": "CHAR(15)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "imsi",
+        "sample_values": [
+          "602011000000000",
+          "602021000000001",
+          "602031000000002",
+          "602041000000003",
+          "602011000000004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "IMSI",
+          "is_pii": true,
+          "pii_category": "Telecom Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_05_006",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_network",
+        "test_type": "column_classification",
+        "table_name": "telco_cdr_event",
+        "table_business_name": "Call detail record event",
+        "table_description": "Synthetic call/SMS/data event table for testing PII detection in CDR-style transactional datasets.",
+        "column_business_name": "IMEI",
+        "column_description": "Device IMEI observed in event.",
+        "logical_type": "string",
+        "physical_type": "CHAR(15)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "imei",
+        "sample_values": [
+          "490154203237000",
+          "490154203237001",
+          "490154203237002",
+          "490154203237003",
+          "490154203237004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "IMEI",
+          "is_pii": true,
+          "pii_category": "Device Identifier",
+          "sensitivity_level": "CRITICAL"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_05_007",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_network",
+        "test_type": "column_classification",
+        "table_name": "telco_cdr_event",
+        "table_business_name": "Call detail record event",
+        "table_description": "Synthetic call/SMS/data event table for testing PII detection in CDR-style transactional datasets.",
+        "column_business_name": "Cell global identity",
+        "column_description": "Serving cell identifier, often linkable to approximate location.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(32)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "cell_global_identity",
+        "sample_values": [
+          "602-01-100-1000",
+          "602-02-101-1001",
+          "602-03-102-1002",
+          "602-04-103-1003",
+          "602-01-104-1004"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "CELL_GLOBAL_IDENTITY",
+          "is_pii": true,
+          "pii_category": "Location Network Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_05_008",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_network",
+        "test_type": "column_classification",
+        "table_name": "telco_cdr_event",
+        "table_business_name": "Call detail record event",
+        "table_description": "Synthetic call/SMS/data event table for testing PII detection in CDR-style transactional datasets.",
+        "column_business_name": "Location area code",
+        "column_description": "Network location area code.",
+        "logical_type": "integer",
+        "physical_type": "INT",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "lac",
+        "sample_values": [
+          "1",
+          "18",
+          "35",
+          "52",
+          "69"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "LAC",
+          "is_pii": true,
+          "pii_category": "Location Network Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_05_009",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_network",
+        "test_type": "column_classification",
+        "table_name": "telco_cdr_event",
+        "table_business_name": "Call detail record event",
+        "table_description": "Synthetic call/SMS/data event table for testing PII detection in CDR-style transactional datasets.",
+        "column_business_name": "Tracking area code",
+        "column_description": "LTE tracking area code.",
+        "logical_type": "integer",
+        "physical_type": "INT",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "tac_lte",
+        "sample_values": [
+          "1",
+          "18",
+          "35",
+          "52",
+          "69"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "TAC_LTE",
+          "is_pii": true,
+          "pii_category": "Location Network Identifier",
+          "sensitivity_level": "RESTRICTED"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_05_010",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_network",
+        "test_type": "column_classification",
+        "table_name": "telco_cdr_event",
+        "table_business_name": "Call detail record event",
+        "table_description": "Synthetic call/SMS/data event table for testing PII detection in CDR-style transactional datasets.",
+        "column_business_name": "Cell latitude",
+        "column_description": "Latitude of serving cell or enriched location.",
+        "logical_type": "number",
+        "physical_type": "DECIMAL(9,6)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "cgi_latitude",
+        "sample_values": [
+          "29.9944",
+          "29.9945",
+          "29.9946",
+          "29.9947",
+          "29.9948"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "GPS_LATITUDE",
+          "is_pii": true,
+          "pii_category": "Location",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_05_011",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_network",
+        "test_type": "column_classification",
+        "table_name": "telco_cdr_event",
+        "table_business_name": "Call detail record event",
+        "table_description": "Synthetic call/SMS/data event table for testing PII detection in CDR-style transactional datasets.",
+        "column_business_name": "Cell longitude",
+        "column_description": "Longitude of serving cell or enriched location.",
+        "logical_type": "number",
+        "physical_type": "DECIMAL(9,6)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "cgi_longitude",
+        "sample_values": [
+          "31.1857",
+          "31.186",
+          "31.1863",
+          "31.1866",
+          "31.1869"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "GPS_LONGITUDE",
+          "is_pii": true,
+          "pii_category": "Location",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_05_012",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_network",
+        "test_type": "column_classification",
+        "table_name": "telco_cdr_event",
+        "table_business_name": "Call detail record event",
+        "table_description": "Synthetic call/SMS/data event table for testing PII detection in CDR-style transactional datasets.",
+        "column_business_name": "Source IP address",
+        "column_description": "Subscriber IP address for data session.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(45)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "source_ip",
+        "sample_values": [
+          "10.0.0.0",
+          "10.1.3.7",
+          "10.2.6.14",
+          "10.3.9.21",
+          "10.4.12.28"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "IP_ADDRESS",
+          "is_pii": true,
+          "pii_category": "Network Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    },
+    {
+      "test_id": "TABULAR_EVAL_05_013",
+      "modality": "tabular_column",
+      "metadata": {
+        "language": "en",
+        "domain": "telecom_network",
+        "test_type": "column_classification",
+        "table_name": "telco_cdr_event",
+        "table_business_name": "Call detail record event",
+        "table_description": "Synthetic call/SMS/data event table for testing PII detection in CDR-style transactional datasets.",
+        "column_business_name": "NAT public IP address",
+        "column_description": "Carrier-grade NAT public IP.",
+        "logical_type": "string",
+        "physical_type": "VARCHAR(45)",
+        "required": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "input_data": {
+        "column_name": "nat_public_ip",
+        "sample_values": [
+          "nat_public_ip_00000001",
+          "nat_public_ip_00000002",
+          "nat_public_ip_00000003",
+          "nat_public_ip_00000004",
+          "nat_public_ip_00000005"
+        ]
+      },
+      "golden_truth": {
+        "column_classification": {
+          "expected_semantic_type": "IPV4_CGNAT",
+          "is_pii": true,
+          "pii_category": "Network Identifier",
+          "sensitivity_level": "HIGH"
+        }
+      }
+    }
+  ]
+}

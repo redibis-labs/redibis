@@ -1,0 +1,1001 @@
+customer_id,full_name_en,full_name_ar,primary_mobile,alternate_phone,email_address,date_of_birth,gender,nationality,marketing_consent_flag,created_at
+CUST-00000001,Ahmed Hassan ElSayed,أحمد حسن السيد,+201010000000,0201000000,ahmed.elsayed0000@example.eg,1965-01-01,M,EGY,False,2026-01-01 08:00:00
+CUST-00000002,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201110007919,01110007919,mohamed.kamel0001@mail.test,1966-08-14,F,SYR,True,2026-01-01 08:07:00
+CUST-00000003,Mahmoud Tarek Fathy,محمود طارق فتحي,+201210015838,01210015838,mahmoud.fathy0002@customer.invalid,1967-03-27,Unspecified,SDN,False,2026-01-01 08:14:00
+CUST-00000004,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201510023757,0501010713,omar.abdelrahman0003@synthetic.local,1968-10-12,M,JOR,True,2026-01-01 08:21:00
+CUST-00000005,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201010031676,01010031676,youssef.nassar0004@example.eg,1969-05-25,F,PSE,False,2026-01-01 08:28:00
+CUST-00000006,Mariam Khaled Gaber,مريم خالد جابر,+201110039595,01110039595,mariam.gaber0005@mail.test,1970-12-10,Unspecified,EGY,True,2026-01-01 08:35:00
+CUST-00000007,Nour Nabil Mahfouz,نور نبيل محفوظ,+201210047514,0881021426,nour.mahfouz0006@customer.invalid,1971-07-23,M,SYR,False,2026-01-01 08:42:00
+CUST-00000008,Salma Ali Darwish,سلمى علي درويش,+201510055433,01510055433,salma.darwish0007@synthetic.local,1972-02-08,F,SDN,True,2026-01-01 08:49:00
+CUST-00000009,Hana Samir Zaki,هنا سمير زكي,+201010063352,01010063352,hana.zaki0008@example.eg,1973-09-21,Unspecified,JOR,False,2026-01-01 08:56:00
+CUST-00000010,Farida Adel Shoukry,فريدة عادل شكري,+201110071271,0301032139,farida.shoukry0009@mail.test,1974-04-06,M,PSE,True,2026-01-01 09:03:00
+CUST-00000011,Ahmed Hassan ElSayed,أحمد حسن السيد,+201210079190,01210079190,ahmed.elsayed0010@customer.invalid,1975-11-19,F,EGY,False,2026-01-01 09:10:00
+CUST-00000012,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201510087109,01510087109,mohamed.kamel0011@synthetic.local,1976-06-04,Unspecified,SYR,True,2026-01-01 09:17:00
+CUST-00000013,Mahmoud Tarek Fathy,محمود طارق فتحي,+201010095028,0551042852,mahmoud.fathy0012@example.eg,1977-01-17,M,SDN,False,2026-01-01 09:24:00
+CUST-00000014,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201110102947,01110102947,omar.abdelrahman0013@mail.test,1978-08-02,F,JOR,True,2026-01-01 09:31:00
+CUST-00000015,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201210110866,01210110866,youssef.nassar0014@customer.invalid,1979-03-15,Unspecified,PSE,False,2026-01-01 09:38:00
+CUST-00000016,Mariam Khaled Gaber,مريم خالد جابر,+201510118785,0971053565,mariam.gaber0015@synthetic.local,1980-10-28,M,EGY,True,2026-01-01 09:45:00
+CUST-00000017,Nour Nabil Mahfouz,نور نبيل محفوظ,+201010126704,01010126704,nour.mahfouz0016@example.eg,1981-05-13,F,SYR,False,2026-01-01 09:52:00
+CUST-00000018,Salma Ali Darwish,سلمى علي درويش,+201110134623,01110134623,salma.darwish0017@mail.test,1982-12-26,Unspecified,SDN,True,2026-01-01 09:59:00
+CUST-00000019,Hana Samir Zaki,هنا سمير زكي,+201210142542,0401064278,hana.zaki0018@customer.invalid,1983-07-11,M,JOR,False,2026-01-01 10:06:00
+CUST-00000020,Farida Adel Shoukry,فريدة عادل شكري,+201510150461,01510150461,farida.shoukry0019@synthetic.local,1984-02-24,F,PSE,True,2026-01-01 10:13:00
+CUST-00000021,Ahmed Hassan ElSayed,أحمد حسن السيد,+201010158380,01010158380,ahmed.elsayed0020@example.eg,1985-09-09,Unspecified,EGY,False,2026-01-01 10:20:00
+CUST-00000022,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201110166299,0641074991,mohamed.kamel0021@mail.test,1986-04-22,M,SYR,True,2026-01-01 10:27:00
+CUST-00000023,Mahmoud Tarek Fathy,محمود طارق فتحي,+201210174218,01210174218,mahmoud.fathy0022@customer.invalid,1987-11-07,F,SDN,False,2026-01-01 10:34:00
+CUST-00000024,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201510182137,01510182137,omar.abdelrahman0023@synthetic.local,1988-06-20,Unspecified,JOR,True,2026-01-01 10:41:00
+CUST-00000025,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201010190056,0201085704,youssef.nassar0024@example.eg,1989-01-05,M,PSE,False,2026-01-01 10:48:00
+CUST-00000026,Mariam Khaled Gaber,مريم خالد جابر,+201110197975,01110197975,mariam.gaber0025@mail.test,1990-08-18,F,EGY,True,2026-01-01 10:55:00
+CUST-00000027,Nour Nabil Mahfouz,نور نبيل محفوظ,+201210205894,01210205894,nour.mahfouz0026@customer.invalid,1991-03-03,Unspecified,SYR,False,2026-01-01 11:02:00
+CUST-00000028,Salma Ali Darwish,سلمى علي درويش,+201510213813,0501096417,salma.darwish0027@synthetic.local,1992-10-16,M,SDN,True,2026-01-01 11:09:00
+CUST-00000029,Hana Samir Zaki,هنا سمير زكي,+201010221732,01010221732,hana.zaki0028@example.eg,1993-05-01,F,JOR,False,2026-01-01 11:16:00
+CUST-00000030,Farida Adel Shoukry,فريدة عادل شكري,+201110229651,01110229651,farida.shoukry0029@mail.test,1994-12-14,Unspecified,PSE,True,2026-01-01 11:23:00
+CUST-00000031,Ahmed Hassan ElSayed,أحمد حسن السيد,+201210237570,0881107130,ahmed.elsayed0030@customer.invalid,1995-07-27,M,EGY,False,2026-01-01 11:30:00
+CUST-00000032,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201510245489,01510245489,mohamed.kamel0031@synthetic.local,1996-02-12,F,SYR,True,2026-01-01 11:37:00
+CUST-00000033,Mahmoud Tarek Fathy,محمود طارق فتحي,+201010253408,01010253408,mahmoud.fathy0032@example.eg,1997-09-25,Unspecified,SDN,False,2026-01-01 11:44:00
+CUST-00000034,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201110261327,0301117843,omar.abdelrahman0033@mail.test,1998-04-10,M,JOR,True,2026-01-01 11:51:00
+CUST-00000035,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201210269246,01210269246,youssef.nassar0034@customer.invalid,1999-11-23,F,PSE,False,2026-01-01 11:58:00
+CUST-00000036,Mariam Khaled Gaber,مريم خالد جابر,+201510277165,01510277165,mariam.gaber0035@synthetic.local,2000-06-08,Unspecified,EGY,True,2026-01-01 12:05:00
+CUST-00000037,Nour Nabil Mahfouz,نور نبيل محفوظ,+201010285084,0551128556,nour.mahfouz0036@example.eg,2001-01-21,M,SYR,False,2026-01-01 12:12:00
+CUST-00000038,Salma Ali Darwish,سلمى علي درويش,+201110293003,01110293003,salma.darwish0037@mail.test,2002-08-06,F,SDN,True,2026-01-01 12:19:00
+CUST-00000039,Hana Samir Zaki,هنا سمير زكي,+201210300922,01210300922,hana.zaki0038@customer.invalid,2003-03-19,Unspecified,JOR,False,2026-01-01 12:26:00
+CUST-00000040,Farida Adel Shoukry,فريدة عادل شكري,+201510308841,0971139269,farida.shoukry0039@synthetic.local,2004-10-04,M,PSE,True,2026-01-01 12:33:00
+CUST-00000041,Ahmed Hassan ElSayed,أحمد حسن السيد,+201010316760,01010316760,ahmed.elsayed0040@example.eg,2005-05-17,F,EGY,False,2026-01-01 12:40:00
+CUST-00000042,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201110324679,01110324679,mohamed.kamel0041@mail.test,2006-12-02,Unspecified,SYR,True,2026-01-01 12:47:00
+CUST-00000043,Mahmoud Tarek Fathy,محمود طارق فتحي,+201210332598,0401149982,mahmoud.fathy0042@customer.invalid,1965-07-15,M,SDN,False,2026-01-01 12:54:00
+CUST-00000044,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201510340517,01510340517,omar.abdelrahman0043@synthetic.local,1966-02-28,F,JOR,True,2026-01-01 13:01:00
+CUST-00000045,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201010348436,01010348436,youssef.nassar0044@example.eg,1967-09-13,Unspecified,PSE,False,2026-01-01 13:08:00
+CUST-00000046,Mariam Khaled Gaber,مريم خالد جابر,+201110356355,0641160695,mariam.gaber0045@mail.test,1968-04-26,M,EGY,True,2026-01-01 13:15:00
+CUST-00000047,Nour Nabil Mahfouz,نور نبيل محفوظ,+201210364274,01210364274,nour.mahfouz0046@customer.invalid,1969-11-11,F,SYR,False,2026-01-01 13:22:00
+CUST-00000048,Salma Ali Darwish,سلمى علي درويش,+201510372193,01510372193,salma.darwish0047@synthetic.local,1970-06-24,Unspecified,SDN,True,2026-01-01 13:29:00
+CUST-00000049,Hana Samir Zaki,هنا سمير زكي,+201010380112,0201171408,hana.zaki0048@example.eg,1971-01-09,M,JOR,False,2026-01-01 13:36:00
+CUST-00000050,Farida Adel Shoukry,فريدة عادل شكري,+201110388031,01110388031,farida.shoukry0049@mail.test,1972-08-22,F,PSE,True,2026-01-01 13:43:00
+CUST-00000051,Ahmed Hassan ElSayed,أحمد حسن السيد,+201210395950,01210395950,ahmed.elsayed0050@customer.invalid,1973-03-07,Unspecified,EGY,False,2026-01-01 13:50:00
+CUST-00000052,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201510403869,0501182121,mohamed.kamel0051@synthetic.local,1974-10-20,M,SYR,True,2026-01-01 13:57:00
+CUST-00000053,Mahmoud Tarek Fathy,محمود طارق فتحي,+201010411788,01010411788,mahmoud.fathy0052@example.eg,1975-05-05,F,SDN,False,2026-01-01 14:04:00
+CUST-00000054,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201110419707,01110419707,omar.abdelrahman0053@mail.test,1976-12-18,Unspecified,JOR,True,2026-01-01 14:11:00
+CUST-00000055,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201210427626,0881192834,youssef.nassar0054@customer.invalid,1977-07-03,M,PSE,False,2026-01-01 14:18:00
+CUST-00000056,Mariam Khaled Gaber,مريم خالد جابر,+201510435545,01510435545,mariam.gaber0055@synthetic.local,1978-02-16,F,EGY,True,2026-01-01 14:25:00
+CUST-00000057,Nour Nabil Mahfouz,نور نبيل محفوظ,+201010443464,01010443464,nour.mahfouz0056@example.eg,1979-09-01,Unspecified,SYR,False,2026-01-01 14:32:00
+CUST-00000058,Salma Ali Darwish,سلمى علي درويش,+201110451383,0301203547,salma.darwish0057@mail.test,1980-04-14,M,SDN,True,2026-01-01 14:39:00
+CUST-00000059,Hana Samir Zaki,هنا سمير زكي,+201210459302,01210459302,hana.zaki0058@customer.invalid,1981-11-27,F,JOR,False,2026-01-01 14:46:00
+CUST-00000060,Farida Adel Shoukry,فريدة عادل شكري,+201510467221,01510467221,farida.shoukry0059@synthetic.local,1982-06-12,Unspecified,PSE,True,2026-01-01 14:53:00
+CUST-00000061,Ahmed Hassan ElSayed,أحمد حسن السيد,+201010475140,0551214260,ahmed.elsayed0060@example.eg,1983-01-25,M,EGY,False,2026-01-01 15:00:00
+CUST-00000062,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201110483059,01110483059,mohamed.kamel0061@mail.test,1984-08-10,F,SYR,True,2026-01-01 15:07:00
+CUST-00000063,Mahmoud Tarek Fathy,محمود طارق فتحي,+201210490978,01210490978,mahmoud.fathy0062@customer.invalid,1985-03-23,Unspecified,SDN,False,2026-01-01 15:14:00
+CUST-00000064,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201510498897,0971224973,omar.abdelrahman0063@synthetic.local,1986-10-08,M,JOR,True,2026-01-01 15:21:00
+CUST-00000065,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201010506816,01010506816,youssef.nassar0064@example.eg,1987-05-21,F,PSE,False,2026-01-01 15:28:00
+CUST-00000066,Mariam Khaled Gaber,مريم خالد جابر,+201110514735,01110514735,mariam.gaber0065@mail.test,1988-12-06,Unspecified,EGY,True,2026-01-01 15:35:00
+CUST-00000067,Nour Nabil Mahfouz,نور نبيل محفوظ,+201210522654,0401235686,nour.mahfouz0066@customer.invalid,1989-07-19,M,SYR,False,2026-01-01 15:42:00
+CUST-00000068,Salma Ali Darwish,سلمى علي درويش,+201510530573,01510530573,salma.darwish0067@synthetic.local,1990-02-04,F,SDN,True,2026-01-01 15:49:00
+CUST-00000069,Hana Samir Zaki,هنا سمير زكي,+201010538492,01010538492,hana.zaki0068@example.eg,1991-09-17,Unspecified,JOR,False,2026-01-01 15:56:00
+CUST-00000070,Farida Adel Shoukry,فريدة عادل شكري,+201110546411,0641246399,farida.shoukry0069@mail.test,1992-04-02,M,PSE,True,2026-01-01 16:03:00
+CUST-00000071,Ahmed Hassan ElSayed,أحمد حسن السيد,+201210554330,01210554330,ahmed.elsayed0070@customer.invalid,1993-11-15,F,EGY,False,2026-01-01 16:10:00
+CUST-00000072,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201510562249,01510562249,mohamed.kamel0071@synthetic.local,1994-06-28,Unspecified,SYR,True,2026-01-01 16:17:00
+CUST-00000073,Mahmoud Tarek Fathy,محمود طارق فتحي,+201010570168,0201257112,mahmoud.fathy0072@example.eg,1995-01-13,M,SDN,False,2026-01-01 16:24:00
+CUST-00000074,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201110578087,01110578087,omar.abdelrahman0073@mail.test,1996-08-26,F,JOR,True,2026-01-01 16:31:00
+CUST-00000075,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201210586006,01210586006,youssef.nassar0074@customer.invalid,1997-03-11,Unspecified,PSE,False,2026-01-01 16:38:00
+CUST-00000076,Mariam Khaled Gaber,مريم خالد جابر,+201510593925,0501267825,mariam.gaber0075@synthetic.local,1998-10-24,M,EGY,True,2026-01-01 16:45:00
+CUST-00000077,Nour Nabil Mahfouz,نور نبيل محفوظ,+201010601844,01010601844,nour.mahfouz0076@example.eg,1999-05-09,F,SYR,False,2026-01-01 16:52:00
+CUST-00000078,Salma Ali Darwish,سلمى علي درويش,+201110609763,01110609763,salma.darwish0077@mail.test,2000-12-22,Unspecified,SDN,True,2026-01-01 16:59:00
+CUST-00000079,Hana Samir Zaki,هنا سمير زكي,+201210617682,0881278538,hana.zaki0078@customer.invalid,2001-07-07,M,JOR,False,2026-01-01 17:06:00
+CUST-00000080,Farida Adel Shoukry,فريدة عادل شكري,+201510625601,01510625601,farida.shoukry0079@synthetic.local,2002-02-20,F,PSE,True,2026-01-01 17:13:00
+CUST-00000081,Ahmed Hassan ElSayed,أحمد حسن السيد,+201010633520,01010633520,ahmed.elsayed0080@example.eg,2003-09-05,Unspecified,EGY,False,2026-01-01 17:20:00
+CUST-00000082,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201110641439,0301289251,mohamed.kamel0081@mail.test,2004-04-18,M,SYR,True,2026-01-01 17:27:00
+CUST-00000083,Mahmoud Tarek Fathy,محمود طارق فتحي,+201210649358,01210649358,mahmoud.fathy0082@customer.invalid,2005-11-03,F,SDN,False,2026-01-01 17:34:00
+CUST-00000084,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201510657277,01510657277,omar.abdelrahman0083@synthetic.local,2006-06-16,Unspecified,JOR,True,2026-01-01 17:41:00
+CUST-00000085,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201010665196,0551299964,youssef.nassar0084@example.eg,1965-01-01,M,PSE,False,2026-01-01 17:48:00
+CUST-00000086,Mariam Khaled Gaber,مريم خالد جابر,+201110673115,01110673115,mariam.gaber0085@mail.test,1966-08-14,F,EGY,True,2026-01-01 17:55:00
+CUST-00000087,Nour Nabil Mahfouz,نور نبيل محفوظ,+201210681034,01210681034,nour.mahfouz0086@customer.invalid,1967-03-27,Unspecified,SYR,False,2026-01-01 18:02:00
+CUST-00000088,Salma Ali Darwish,سلمى علي درويش,+201510688953,0971310677,salma.darwish0087@synthetic.local,1968-10-12,M,SDN,True,2026-01-01 18:09:00
+CUST-00000089,Hana Samir Zaki,هنا سمير زكي,+201010696872,01010696872,hana.zaki0088@example.eg,1969-05-25,F,JOR,False,2026-01-01 18:16:00
+CUST-00000090,Farida Adel Shoukry,فريدة عادل شكري,+201110704791,01110704791,farida.shoukry0089@mail.test,1970-12-10,Unspecified,PSE,True,2026-01-01 18:23:00
+CUST-00000091,Ahmed Hassan ElSayed,أحمد حسن السيد,+201210712710,0401321390,ahmed.elsayed0090@customer.invalid,1971-07-23,M,EGY,False,2026-01-01 18:30:00
+CUST-00000092,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201510720629,01510720629,mohamed.kamel0091@synthetic.local,1972-02-08,F,SYR,True,2026-01-01 18:37:00
+CUST-00000093,Mahmoud Tarek Fathy,محمود طارق فتحي,+201010728548,01010728548,mahmoud.fathy0092@example.eg,1973-09-21,Unspecified,SDN,False,2026-01-01 18:44:00
+CUST-00000094,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201110736467,0641332103,omar.abdelrahman0093@mail.test,1974-04-06,M,JOR,True,2026-01-01 18:51:00
+CUST-00000095,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201210744386,01210744386,youssef.nassar0094@customer.invalid,1975-11-19,F,PSE,False,2026-01-01 18:58:00
+CUST-00000096,Mariam Khaled Gaber,مريم خالد جابر,+201510752305,01510752305,mariam.gaber0095@synthetic.local,1976-06-04,Unspecified,EGY,True,2026-01-01 19:05:00
+CUST-00000097,Nour Nabil Mahfouz,نور نبيل محفوظ,+201010760224,0201342816,nour.mahfouz0096@example.eg,1977-01-17,M,SYR,False,2026-01-01 19:12:00
+CUST-00000098,Salma Ali Darwish,سلمى علي درويش,+201110768143,01110768143,salma.darwish0097@mail.test,1978-08-02,F,SDN,True,2026-01-01 19:19:00
+CUST-00000099,Hana Samir Zaki,هنا سمير زكي,+201210776062,01210776062,hana.zaki0098@customer.invalid,1979-03-15,Unspecified,JOR,False,2026-01-01 19:26:00
+CUST-00000100,Farida Adel Shoukry,فريدة عادل شكري,+201510783981,0501353529,farida.shoukry0099@synthetic.local,1980-10-28,M,PSE,True,2026-01-01 19:33:00
+CUST-00000101,Ahmed Hassan ElSayed,أحمد حسن السيد,+201010791900,01010791900,ahmed.elsayed0100@example.eg,1981-05-13,F,EGY,False,2026-01-01 19:40:00
+CUST-00000102,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201110799819,01110799819,mohamed.kamel0101@mail.test,1982-12-26,Unspecified,SYR,True,2026-01-01 19:47:00
+CUST-00000103,Mahmoud Tarek Fathy,محمود طارق فتحي,+201210807738,0881364242,mahmoud.fathy0102@customer.invalid,1983-07-11,M,SDN,False,2026-01-01 19:54:00
+CUST-00000104,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201510815657,01510815657,omar.abdelrahman0103@synthetic.local,1984-02-24,F,JOR,True,2026-01-01 20:01:00
+CUST-00000105,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201010823576,01010823576,youssef.nassar0104@example.eg,1985-09-09,Unspecified,PSE,False,2026-01-01 20:08:00
+CUST-00000106,Mariam Khaled Gaber,مريم خالد جابر,+201110831495,0301374955,mariam.gaber0105@mail.test,1986-04-22,M,EGY,True,2026-01-01 20:15:00
+CUST-00000107,Nour Nabil Mahfouz,نور نبيل محفوظ,+201210839414,01210839414,nour.mahfouz0106@customer.invalid,1987-11-07,F,SYR,False,2026-01-01 20:22:00
+CUST-00000108,Salma Ali Darwish,سلمى علي درويش,+201510847333,01510847333,salma.darwish0107@synthetic.local,1988-06-20,Unspecified,SDN,True,2026-01-01 20:29:00
+CUST-00000109,Hana Samir Zaki,هنا سمير زكي,+201010855252,0551385668,hana.zaki0108@example.eg,1989-01-05,M,JOR,False,2026-01-01 20:36:00
+CUST-00000110,Farida Adel Shoukry,فريدة عادل شكري,+201110863171,01110863171,farida.shoukry0109@mail.test,1990-08-18,F,PSE,True,2026-01-01 20:43:00
+CUST-00000111,Ahmed Hassan ElSayed,أحمد حسن السيد,+201210871090,01210871090,ahmed.elsayed0110@customer.invalid,1991-03-03,Unspecified,EGY,False,2026-01-01 20:50:00
+CUST-00000112,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201510879009,0971396381,mohamed.kamel0111@synthetic.local,1992-10-16,M,SYR,True,2026-01-01 20:57:00
+CUST-00000113,Mahmoud Tarek Fathy,محمود طارق فتحي,+201010886928,01010886928,mahmoud.fathy0112@example.eg,1993-05-01,F,SDN,False,2026-01-01 21:04:00
+CUST-00000114,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201110894847,01110894847,omar.abdelrahman0113@mail.test,1994-12-14,Unspecified,JOR,True,2026-01-01 21:11:00
+CUST-00000115,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201210902766,0401407094,youssef.nassar0114@customer.invalid,1995-07-27,M,PSE,False,2026-01-01 21:18:00
+CUST-00000116,Mariam Khaled Gaber,مريم خالد جابر,+201510910685,01510910685,mariam.gaber0115@synthetic.local,1996-02-12,F,EGY,True,2026-01-01 21:25:00
+CUST-00000117,Nour Nabil Mahfouz,نور نبيل محفوظ,+201010918604,01010918604,nour.mahfouz0116@example.eg,1997-09-25,Unspecified,SYR,False,2026-01-01 21:32:00
+CUST-00000118,Salma Ali Darwish,سلمى علي درويش,+201110926523,0641417807,salma.darwish0117@mail.test,1998-04-10,M,SDN,True,2026-01-01 21:39:00
+CUST-00000119,Hana Samir Zaki,هنا سمير زكي,+201210934442,01210934442,hana.zaki0118@customer.invalid,1999-11-23,F,JOR,False,2026-01-01 21:46:00
+CUST-00000120,Farida Adel Shoukry,فريدة عادل شكري,+201510942361,01510942361,farida.shoukry0119@synthetic.local,2000-06-08,Unspecified,PSE,True,2026-01-01 21:53:00
+CUST-00000121,Ahmed Hassan ElSayed,أحمد حسن السيد,+201010950280,0201428520,ahmed.elsayed0120@example.eg,2001-01-21,M,EGY,False,2026-01-01 22:00:00
+CUST-00000122,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201110958199,01110958199,mohamed.kamel0121@mail.test,2002-08-06,F,SYR,True,2026-01-01 22:07:00
+CUST-00000123,Mahmoud Tarek Fathy,محمود طارق فتحي,+201210966118,01210966118,mahmoud.fathy0122@customer.invalid,2003-03-19,Unspecified,SDN,False,2026-01-01 22:14:00
+CUST-00000124,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201510974037,0501439233,omar.abdelrahman0123@synthetic.local,2004-10-04,M,JOR,True,2026-01-01 22:21:00
+CUST-00000125,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201010981956,01010981956,youssef.nassar0124@example.eg,2005-05-17,F,PSE,False,2026-01-01 22:28:00
+CUST-00000126,Mariam Khaled Gaber,مريم خالد جابر,+201110989875,01110989875,mariam.gaber0125@mail.test,2006-12-02,Unspecified,EGY,True,2026-01-01 22:35:00
+CUST-00000127,Nour Nabil Mahfouz,نور نبيل محفوظ,+201210997794,0881449946,nour.mahfouz0126@customer.invalid,1965-07-15,M,SYR,False,2026-01-01 22:42:00
+CUST-00000128,Salma Ali Darwish,سلمى علي درويش,+201511005713,01511005713,salma.darwish0127@synthetic.local,1966-02-28,F,SDN,True,2026-01-01 22:49:00
+CUST-00000129,Hana Samir Zaki,هنا سمير زكي,+201011013632,01011013632,hana.zaki0128@example.eg,1967-09-13,Unspecified,JOR,False,2026-01-01 22:56:00
+CUST-00000130,Farida Adel Shoukry,فريدة عادل شكري,+201111021551,0301460659,farida.shoukry0129@mail.test,1968-04-26,M,PSE,True,2026-01-01 23:03:00
+CUST-00000131,Ahmed Hassan ElSayed,أحمد حسن السيد,+201211029470,01211029470,ahmed.elsayed0130@customer.invalid,1969-11-11,F,EGY,False,2026-01-01 23:10:00
+CUST-00000132,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201511037389,01511037389,mohamed.kamel0131@synthetic.local,1970-06-24,Unspecified,SYR,True,2026-01-01 23:17:00
+CUST-00000133,Mahmoud Tarek Fathy,محمود طارق فتحي,+201011045308,0551471372,mahmoud.fathy0132@example.eg,1971-01-09,M,SDN,False,2026-01-01 23:24:00
+CUST-00000134,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201111053227,01111053227,omar.abdelrahman0133@mail.test,1972-08-22,F,JOR,True,2026-01-01 23:31:00
+CUST-00000135,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201211061146,01211061146,youssef.nassar0134@customer.invalid,1973-03-07,Unspecified,PSE,False,2026-01-01 23:38:00
+CUST-00000136,Mariam Khaled Gaber,مريم خالد جابر,+201511069065,0971482085,mariam.gaber0135@synthetic.local,1974-10-20,M,EGY,True,2026-01-01 23:45:00
+CUST-00000137,Nour Nabil Mahfouz,نور نبيل محفوظ,+201011076984,01011076984,nour.mahfouz0136@example.eg,1975-05-05,F,SYR,False,2026-01-01 23:52:00
+CUST-00000138,Salma Ali Darwish,سلمى علي درويش,+201111084903,01111084903,salma.darwish0137@mail.test,1976-12-18,Unspecified,SDN,True,2026-01-01 23:59:00
+CUST-00000139,Hana Samir Zaki,هنا سمير زكي,+201211092822,0401492798,hana.zaki0138@customer.invalid,1977-07-03,M,JOR,False,2026-01-02 00:06:00
+CUST-00000140,Farida Adel Shoukry,فريدة عادل شكري,+201511100741,01511100741,farida.shoukry0139@synthetic.local,1978-02-16,F,PSE,True,2026-01-02 00:13:00
+CUST-00000141,Ahmed Hassan ElSayed,أحمد حسن السيد,+201011108660,01011108660,ahmed.elsayed0140@example.eg,1979-09-01,Unspecified,EGY,False,2026-01-02 00:20:00
+CUST-00000142,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201111116579,0641503511,mohamed.kamel0141@mail.test,1980-04-14,M,SYR,True,2026-01-02 00:27:00
+CUST-00000143,Mahmoud Tarek Fathy,محمود طارق فتحي,+201211124498,01211124498,mahmoud.fathy0142@customer.invalid,1981-11-27,F,SDN,False,2026-01-02 00:34:00
+CUST-00000144,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201511132417,01511132417,omar.abdelrahman0143@synthetic.local,1982-06-12,Unspecified,JOR,True,2026-01-02 00:41:00
+CUST-00000145,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201011140336,0201514224,youssef.nassar0144@example.eg,1983-01-25,M,PSE,False,2026-01-02 00:48:00
+CUST-00000146,Mariam Khaled Gaber,مريم خالد جابر,+201111148255,01111148255,mariam.gaber0145@mail.test,1984-08-10,F,EGY,True,2026-01-02 00:55:00
+CUST-00000147,Nour Nabil Mahfouz,نور نبيل محفوظ,+201211156174,01211156174,nour.mahfouz0146@customer.invalid,1985-03-23,Unspecified,SYR,False,2026-01-02 01:02:00
+CUST-00000148,Salma Ali Darwish,سلمى علي درويش,+201511164093,0501524937,salma.darwish0147@synthetic.local,1986-10-08,M,SDN,True,2026-01-02 01:09:00
+CUST-00000149,Hana Samir Zaki,هنا سمير زكي,+201011172012,01011172012,hana.zaki0148@example.eg,1987-05-21,F,JOR,False,2026-01-02 01:16:00
+CUST-00000150,Farida Adel Shoukry,فريدة عادل شكري,+201111179931,01111179931,farida.shoukry0149@mail.test,1988-12-06,Unspecified,PSE,True,2026-01-02 01:23:00
+CUST-00000151,Ahmed Hassan ElSayed,أحمد حسن السيد,+201211187850,0881535650,ahmed.elsayed0150@customer.invalid,1989-07-19,M,EGY,False,2026-01-02 01:30:00
+CUST-00000152,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201511195769,01511195769,mohamed.kamel0151@synthetic.local,1990-02-04,F,SYR,True,2026-01-02 01:37:00
+CUST-00000153,Mahmoud Tarek Fathy,محمود طارق فتحي,+201011203688,01011203688,mahmoud.fathy0152@example.eg,1991-09-17,Unspecified,SDN,False,2026-01-02 01:44:00
+CUST-00000154,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201111211607,0301546363,omar.abdelrahman0153@mail.test,1992-04-02,M,JOR,True,2026-01-02 01:51:00
+CUST-00000155,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201211219526,01211219526,youssef.nassar0154@customer.invalid,1993-11-15,F,PSE,False,2026-01-02 01:58:00
+CUST-00000156,Mariam Khaled Gaber,مريم خالد جابر,+201511227445,01511227445,mariam.gaber0155@synthetic.local,1994-06-28,Unspecified,EGY,True,2026-01-02 02:05:00
+CUST-00000157,Nour Nabil Mahfouz,نور نبيل محفوظ,+201011235364,0551557076,nour.mahfouz0156@example.eg,1995-01-13,M,SYR,False,2026-01-02 02:12:00
+CUST-00000158,Salma Ali Darwish,سلمى علي درويش,+201111243283,01111243283,salma.darwish0157@mail.test,1996-08-26,F,SDN,True,2026-01-02 02:19:00
+CUST-00000159,Hana Samir Zaki,هنا سمير زكي,+201211251202,01211251202,hana.zaki0158@customer.invalid,1997-03-11,Unspecified,JOR,False,2026-01-02 02:26:00
+CUST-00000160,Farida Adel Shoukry,فريدة عادل شكري,+201511259121,0971567789,farida.shoukry0159@synthetic.local,1998-10-24,M,PSE,True,2026-01-02 02:33:00
+CUST-00000161,Ahmed Hassan ElSayed,أحمد حسن السيد,+201011267040,01011267040,ahmed.elsayed0160@example.eg,1999-05-09,F,EGY,False,2026-01-02 02:40:00
+CUST-00000162,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201111274959,01111274959,mohamed.kamel0161@mail.test,2000-12-22,Unspecified,SYR,True,2026-01-02 02:47:00
+CUST-00000163,Mahmoud Tarek Fathy,محمود طارق فتحي,+201211282878,0401578502,mahmoud.fathy0162@customer.invalid,2001-07-07,M,SDN,False,2026-01-02 02:54:00
+CUST-00000164,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201511290797,01511290797,omar.abdelrahman0163@synthetic.local,2002-02-20,F,JOR,True,2026-01-02 03:01:00
+CUST-00000165,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201011298716,01011298716,youssef.nassar0164@example.eg,2003-09-05,Unspecified,PSE,False,2026-01-02 03:08:00
+CUST-00000166,Mariam Khaled Gaber,مريم خالد جابر,+201111306635,0641589215,mariam.gaber0165@mail.test,2004-04-18,M,EGY,True,2026-01-02 03:15:00
+CUST-00000167,Nour Nabil Mahfouz,نور نبيل محفوظ,+201211314554,01211314554,nour.mahfouz0166@customer.invalid,2005-11-03,F,SYR,False,2026-01-02 03:22:00
+CUST-00000168,Salma Ali Darwish,سلمى علي درويش,+201511322473,01511322473,salma.darwish0167@synthetic.local,2006-06-16,Unspecified,SDN,True,2026-01-02 03:29:00
+CUST-00000169,Hana Samir Zaki,هنا سمير زكي,+201011330392,0201599928,hana.zaki0168@example.eg,1965-01-01,M,JOR,False,2026-01-02 03:36:00
+CUST-00000170,Farida Adel Shoukry,فريدة عادل شكري,+201111338311,01111338311,farida.shoukry0169@mail.test,1966-08-14,F,PSE,True,2026-01-02 03:43:00
+CUST-00000171,Ahmed Hassan ElSayed,أحمد حسن السيد,+201211346230,01211346230,ahmed.elsayed0170@customer.invalid,1967-03-27,Unspecified,EGY,False,2026-01-02 03:50:00
+CUST-00000172,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201511354149,0501610641,mohamed.kamel0171@synthetic.local,1968-10-12,M,SYR,True,2026-01-02 03:57:00
+CUST-00000173,Mahmoud Tarek Fathy,محمود طارق فتحي,+201011362068,01011362068,mahmoud.fathy0172@example.eg,1969-05-25,F,SDN,False,2026-01-02 04:04:00
+CUST-00000174,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201111369987,01111369987,omar.abdelrahman0173@mail.test,1970-12-10,Unspecified,JOR,True,2026-01-02 04:11:00
+CUST-00000175,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201211377906,0881621354,youssef.nassar0174@customer.invalid,1971-07-23,M,PSE,False,2026-01-02 04:18:00
+CUST-00000176,Mariam Khaled Gaber,مريم خالد جابر,+201511385825,01511385825,mariam.gaber0175@synthetic.local,1972-02-08,F,EGY,True,2026-01-02 04:25:00
+CUST-00000177,Nour Nabil Mahfouz,نور نبيل محفوظ,+201011393744,01011393744,nour.mahfouz0176@example.eg,1973-09-21,Unspecified,SYR,False,2026-01-02 04:32:00
+CUST-00000178,Salma Ali Darwish,سلمى علي درويش,+201111401663,0301632067,salma.darwish0177@mail.test,1974-04-06,M,SDN,True,2026-01-02 04:39:00
+CUST-00000179,Hana Samir Zaki,هنا سمير زكي,+201211409582,01211409582,hana.zaki0178@customer.invalid,1975-11-19,F,JOR,False,2026-01-02 04:46:00
+CUST-00000180,Farida Adel Shoukry,فريدة عادل شكري,+201511417501,01511417501,farida.shoukry0179@synthetic.local,1976-06-04,Unspecified,PSE,True,2026-01-02 04:53:00
+CUST-00000181,Ahmed Hassan ElSayed,أحمد حسن السيد,+201011425420,0551642780,ahmed.elsayed0180@example.eg,1977-01-17,M,EGY,False,2026-01-02 05:00:00
+CUST-00000182,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201111433339,01111433339,mohamed.kamel0181@mail.test,1978-08-02,F,SYR,True,2026-01-02 05:07:00
+CUST-00000183,Mahmoud Tarek Fathy,محمود طارق فتحي,+201211441258,01211441258,mahmoud.fathy0182@customer.invalid,1979-03-15,Unspecified,SDN,False,2026-01-02 05:14:00
+CUST-00000184,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201511449177,0971653493,omar.abdelrahman0183@synthetic.local,1980-10-28,M,JOR,True,2026-01-02 05:21:00
+CUST-00000185,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201011457096,01011457096,youssef.nassar0184@example.eg,1981-05-13,F,PSE,False,2026-01-02 05:28:00
+CUST-00000186,Mariam Khaled Gaber,مريم خالد جابر,+201111465015,01111465015,mariam.gaber0185@mail.test,1982-12-26,Unspecified,EGY,True,2026-01-02 05:35:00
+CUST-00000187,Nour Nabil Mahfouz,نور نبيل محفوظ,+201211472934,0401664206,nour.mahfouz0186@customer.invalid,1983-07-11,M,SYR,False,2026-01-02 05:42:00
+CUST-00000188,Salma Ali Darwish,سلمى علي درويش,+201511480853,01511480853,salma.darwish0187@synthetic.local,1984-02-24,F,SDN,True,2026-01-02 05:49:00
+CUST-00000189,Hana Samir Zaki,هنا سمير زكي,+201011488772,01011488772,hana.zaki0188@example.eg,1985-09-09,Unspecified,JOR,False,2026-01-02 05:56:00
+CUST-00000190,Farida Adel Shoukry,فريدة عادل شكري,+201111496691,0641674919,farida.shoukry0189@mail.test,1986-04-22,M,PSE,True,2026-01-02 06:03:00
+CUST-00000191,Ahmed Hassan ElSayed,أحمد حسن السيد,+201211504610,01211504610,ahmed.elsayed0190@customer.invalid,1987-11-07,F,EGY,False,2026-01-02 06:10:00
+CUST-00000192,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201511512529,01511512529,mohamed.kamel0191@synthetic.local,1988-06-20,Unspecified,SYR,True,2026-01-02 06:17:00
+CUST-00000193,Mahmoud Tarek Fathy,محمود طارق فتحي,+201011520448,0201685632,mahmoud.fathy0192@example.eg,1989-01-05,M,SDN,False,2026-01-02 06:24:00
+CUST-00000194,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201111528367,01111528367,omar.abdelrahman0193@mail.test,1990-08-18,F,JOR,True,2026-01-02 06:31:00
+CUST-00000195,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201211536286,01211536286,youssef.nassar0194@customer.invalid,1991-03-03,Unspecified,PSE,False,2026-01-02 06:38:00
+CUST-00000196,Mariam Khaled Gaber,مريم خالد جابر,+201511544205,0501696345,mariam.gaber0195@synthetic.local,1992-10-16,M,EGY,True,2026-01-02 06:45:00
+CUST-00000197,Nour Nabil Mahfouz,نور نبيل محفوظ,+201011552124,01011552124,nour.mahfouz0196@example.eg,1993-05-01,F,SYR,False,2026-01-02 06:52:00
+CUST-00000198,Salma Ali Darwish,سلمى علي درويش,+201111560043,01111560043,salma.darwish0197@mail.test,1994-12-14,Unspecified,SDN,True,2026-01-02 06:59:00
+CUST-00000199,Hana Samir Zaki,هنا سمير زكي,+201211567962,0881707058,hana.zaki0198@customer.invalid,1995-07-27,M,JOR,False,2026-01-02 07:06:00
+CUST-00000200,Farida Adel Shoukry,فريدة عادل شكري,+201511575881,01511575881,farida.shoukry0199@synthetic.local,1996-02-12,F,PSE,True,2026-01-02 07:13:00
+CUST-00000201,Ahmed Hassan ElSayed,أحمد حسن السيد,+201011583800,01011583800,ahmed.elsayed0200@example.eg,1997-09-25,Unspecified,EGY,False,2026-01-02 07:20:00
+CUST-00000202,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201111591719,0301717771,mohamed.kamel0201@mail.test,1998-04-10,M,SYR,True,2026-01-02 07:27:00
+CUST-00000203,Mahmoud Tarek Fathy,محمود طارق فتحي,+201211599638,01211599638,mahmoud.fathy0202@customer.invalid,1999-11-23,F,SDN,False,2026-01-02 07:34:00
+CUST-00000204,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201511607557,01511607557,omar.abdelrahman0203@synthetic.local,2000-06-08,Unspecified,JOR,True,2026-01-02 07:41:00
+CUST-00000205,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201011615476,0551728484,youssef.nassar0204@example.eg,2001-01-21,M,PSE,False,2026-01-02 07:48:00
+CUST-00000206,Mariam Khaled Gaber,مريم خالد جابر,+201111623395,01111623395,mariam.gaber0205@mail.test,2002-08-06,F,EGY,True,2026-01-02 07:55:00
+CUST-00000207,Nour Nabil Mahfouz,نور نبيل محفوظ,+201211631314,01211631314,nour.mahfouz0206@customer.invalid,2003-03-19,Unspecified,SYR,False,2026-01-02 08:02:00
+CUST-00000208,Salma Ali Darwish,سلمى علي درويش,+201511639233,0971739197,salma.darwish0207@synthetic.local,2004-10-04,M,SDN,True,2026-01-02 08:09:00
+CUST-00000209,Hana Samir Zaki,هنا سمير زكي,+201011647152,01011647152,hana.zaki0208@example.eg,2005-05-17,F,JOR,False,2026-01-02 08:16:00
+CUST-00000210,Farida Adel Shoukry,فريدة عادل شكري,+201111655071,01111655071,farida.shoukry0209@mail.test,2006-12-02,Unspecified,PSE,True,2026-01-02 08:23:00
+CUST-00000211,Ahmed Hassan ElSayed,أحمد حسن السيد,+201211662990,0401749910,ahmed.elsayed0210@customer.invalid,1965-07-15,M,EGY,False,2026-01-02 08:30:00
+CUST-00000212,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201511670909,01511670909,mohamed.kamel0211@synthetic.local,1966-02-28,F,SYR,True,2026-01-02 08:37:00
+CUST-00000213,Mahmoud Tarek Fathy,محمود طارق فتحي,+201011678828,01011678828,mahmoud.fathy0212@example.eg,1967-09-13,Unspecified,SDN,False,2026-01-02 08:44:00
+CUST-00000214,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201111686747,0641760623,omar.abdelrahman0213@mail.test,1968-04-26,M,JOR,True,2026-01-02 08:51:00
+CUST-00000215,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201211694666,01211694666,youssef.nassar0214@customer.invalid,1969-11-11,F,PSE,False,2026-01-02 08:58:00
+CUST-00000216,Mariam Khaled Gaber,مريم خالد جابر,+201511702585,01511702585,mariam.gaber0215@synthetic.local,1970-06-24,Unspecified,EGY,True,2026-01-02 09:05:00
+CUST-00000217,Nour Nabil Mahfouz,نور نبيل محفوظ,+201011710504,0201771336,nour.mahfouz0216@example.eg,1971-01-09,M,SYR,False,2026-01-02 09:12:00
+CUST-00000218,Salma Ali Darwish,سلمى علي درويش,+201111718423,01111718423,salma.darwish0217@mail.test,1972-08-22,F,SDN,True,2026-01-02 09:19:00
+CUST-00000219,Hana Samir Zaki,هنا سمير زكي,+201211726342,01211726342,hana.zaki0218@customer.invalid,1973-03-07,Unspecified,JOR,False,2026-01-02 09:26:00
+CUST-00000220,Farida Adel Shoukry,فريدة عادل شكري,+201511734261,0501782049,farida.shoukry0219@synthetic.local,1974-10-20,M,PSE,True,2026-01-02 09:33:00
+CUST-00000221,Ahmed Hassan ElSayed,أحمد حسن السيد,+201011742180,01011742180,ahmed.elsayed0220@example.eg,1975-05-05,F,EGY,False,2026-01-02 09:40:00
+CUST-00000222,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201111750099,01111750099,mohamed.kamel0221@mail.test,1976-12-18,Unspecified,SYR,True,2026-01-02 09:47:00
+CUST-00000223,Mahmoud Tarek Fathy,محمود طارق فتحي,+201211758018,0881792762,mahmoud.fathy0222@customer.invalid,1977-07-03,M,SDN,False,2026-01-02 09:54:00
+CUST-00000224,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201511765937,01511765937,omar.abdelrahman0223@synthetic.local,1978-02-16,F,JOR,True,2026-01-02 10:01:00
+CUST-00000225,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201011773856,01011773856,youssef.nassar0224@example.eg,1979-09-01,Unspecified,PSE,False,2026-01-02 10:08:00
+CUST-00000226,Mariam Khaled Gaber,مريم خالد جابر,+201111781775,0301803475,mariam.gaber0225@mail.test,1980-04-14,M,EGY,True,2026-01-02 10:15:00
+CUST-00000227,Nour Nabil Mahfouz,نور نبيل محفوظ,+201211789694,01211789694,nour.mahfouz0226@customer.invalid,1981-11-27,F,SYR,False,2026-01-02 10:22:00
+CUST-00000228,Salma Ali Darwish,سلمى علي درويش,+201511797613,01511797613,salma.darwish0227@synthetic.local,1982-06-12,Unspecified,SDN,True,2026-01-02 10:29:00
+CUST-00000229,Hana Samir Zaki,هنا سمير زكي,+201011805532,0551814188,hana.zaki0228@example.eg,1983-01-25,M,JOR,False,2026-01-02 10:36:00
+CUST-00000230,Farida Adel Shoukry,فريدة عادل شكري,+201111813451,01111813451,farida.shoukry0229@mail.test,1984-08-10,F,PSE,True,2026-01-02 10:43:00
+CUST-00000231,Ahmed Hassan ElSayed,أحمد حسن السيد,+201211821370,01211821370,ahmed.elsayed0230@customer.invalid,1985-03-23,Unspecified,EGY,False,2026-01-02 10:50:00
+CUST-00000232,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201511829289,0971824901,mohamed.kamel0231@synthetic.local,1986-10-08,M,SYR,True,2026-01-02 10:57:00
+CUST-00000233,Mahmoud Tarek Fathy,محمود طارق فتحي,+201011837208,01011837208,mahmoud.fathy0232@example.eg,1987-05-21,F,SDN,False,2026-01-02 11:04:00
+CUST-00000234,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201111845127,01111845127,omar.abdelrahman0233@mail.test,1988-12-06,Unspecified,JOR,True,2026-01-02 11:11:00
+CUST-00000235,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201211853046,0401835614,youssef.nassar0234@customer.invalid,1989-07-19,M,PSE,False,2026-01-02 11:18:00
+CUST-00000236,Mariam Khaled Gaber,مريم خالد جابر,+201511860965,01511860965,mariam.gaber0235@synthetic.local,1990-02-04,F,EGY,True,2026-01-02 11:25:00
+CUST-00000237,Nour Nabil Mahfouz,نور نبيل محفوظ,+201011868884,01011868884,nour.mahfouz0236@example.eg,1991-09-17,Unspecified,SYR,False,2026-01-02 11:32:00
+CUST-00000238,Salma Ali Darwish,سلمى علي درويش,+201111876803,0641846327,salma.darwish0237@mail.test,1992-04-02,M,SDN,True,2026-01-02 11:39:00
+CUST-00000239,Hana Samir Zaki,هنا سمير زكي,+201211884722,01211884722,hana.zaki0238@customer.invalid,1993-11-15,F,JOR,False,2026-01-02 11:46:00
+CUST-00000240,Farida Adel Shoukry,فريدة عادل شكري,+201511892641,01511892641,farida.shoukry0239@synthetic.local,1994-06-28,Unspecified,PSE,True,2026-01-02 11:53:00
+CUST-00000241,Ahmed Hassan ElSayed,أحمد حسن السيد,+201011900560,0201857040,ahmed.elsayed0240@example.eg,1995-01-13,M,EGY,False,2026-01-02 12:00:00
+CUST-00000242,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201111908479,01111908479,mohamed.kamel0241@mail.test,1996-08-26,F,SYR,True,2026-01-02 12:07:00
+CUST-00000243,Mahmoud Tarek Fathy,محمود طارق فتحي,+201211916398,01211916398,mahmoud.fathy0242@customer.invalid,1997-03-11,Unspecified,SDN,False,2026-01-02 12:14:00
+CUST-00000244,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201511924317,0501867753,omar.abdelrahman0243@synthetic.local,1998-10-24,M,JOR,True,2026-01-02 12:21:00
+CUST-00000245,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201011932236,01011932236,youssef.nassar0244@example.eg,1999-05-09,F,PSE,False,2026-01-02 12:28:00
+CUST-00000246,Mariam Khaled Gaber,مريم خالد جابر,+201111940155,01111940155,mariam.gaber0245@mail.test,2000-12-22,Unspecified,EGY,True,2026-01-02 12:35:00
+CUST-00000247,Nour Nabil Mahfouz,نور نبيل محفوظ,+201211948074,0881878466,nour.mahfouz0246@customer.invalid,2001-07-07,M,SYR,False,2026-01-02 12:42:00
+CUST-00000248,Salma Ali Darwish,سلمى علي درويش,+201511955993,01511955993,salma.darwish0247@synthetic.local,2002-02-20,F,SDN,True,2026-01-02 12:49:00
+CUST-00000249,Hana Samir Zaki,هنا سمير زكي,+201011963912,01011963912,hana.zaki0248@example.eg,2003-09-05,Unspecified,JOR,False,2026-01-02 12:56:00
+CUST-00000250,Farida Adel Shoukry,فريدة عادل شكري,+201111971831,0301889179,farida.shoukry0249@mail.test,2004-04-18,M,PSE,True,2026-01-02 13:03:00
+CUST-00000251,Ahmed Hassan ElSayed,أحمد حسن السيد,+201211979750,01211979750,ahmed.elsayed0250@customer.invalid,2005-11-03,F,EGY,False,2026-01-02 13:10:00
+CUST-00000252,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201511987669,01511987669,mohamed.kamel0251@synthetic.local,2006-06-16,Unspecified,SYR,True,2026-01-02 13:17:00
+CUST-00000253,Mahmoud Tarek Fathy,محمود طارق فتحي,+201011995588,0551899892,mahmoud.fathy0252@example.eg,1965-01-01,M,SDN,False,2026-01-02 13:24:00
+CUST-00000254,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201112003507,01112003507,omar.abdelrahman0253@mail.test,1966-08-14,F,JOR,True,2026-01-02 13:31:00
+CUST-00000255,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201212011426,01212011426,youssef.nassar0254@customer.invalid,1967-03-27,Unspecified,PSE,False,2026-01-02 13:38:00
+CUST-00000256,Mariam Khaled Gaber,مريم خالد جابر,+201512019345,0971910605,mariam.gaber0255@synthetic.local,1968-10-12,M,EGY,True,2026-01-02 13:45:00
+CUST-00000257,Nour Nabil Mahfouz,نور نبيل محفوظ,+201012027264,01012027264,nour.mahfouz0256@example.eg,1969-05-25,F,SYR,False,2026-01-02 13:52:00
+CUST-00000258,Salma Ali Darwish,سلمى علي درويش,+201112035183,01112035183,salma.darwish0257@mail.test,1970-12-10,Unspecified,SDN,True,2026-01-02 13:59:00
+CUST-00000259,Hana Samir Zaki,هنا سمير زكي,+201212043102,0401921318,hana.zaki0258@customer.invalid,1971-07-23,M,JOR,False,2026-01-02 14:06:00
+CUST-00000260,Farida Adel Shoukry,فريدة عادل شكري,+201512051021,01512051021,farida.shoukry0259@synthetic.local,1972-02-08,F,PSE,True,2026-01-02 14:13:00
+CUST-00000261,Ahmed Hassan ElSayed,أحمد حسن السيد,+201012058940,01012058940,ahmed.elsayed0260@example.eg,1973-09-21,Unspecified,EGY,False,2026-01-02 14:20:00
+CUST-00000262,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201112066859,0641932031,mohamed.kamel0261@mail.test,1974-04-06,M,SYR,True,2026-01-02 14:27:00
+CUST-00000263,Mahmoud Tarek Fathy,محمود طارق فتحي,+201212074778,01212074778,mahmoud.fathy0262@customer.invalid,1975-11-19,F,SDN,False,2026-01-02 14:34:00
+CUST-00000264,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201512082697,01512082697,omar.abdelrahman0263@synthetic.local,1976-06-04,Unspecified,JOR,True,2026-01-02 14:41:00
+CUST-00000265,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201012090616,0201942744,youssef.nassar0264@example.eg,1977-01-17,M,PSE,False,2026-01-02 14:48:00
+CUST-00000266,Mariam Khaled Gaber,مريم خالد جابر,+201112098535,01112098535,mariam.gaber0265@mail.test,1978-08-02,F,EGY,True,2026-01-02 14:55:00
+CUST-00000267,Nour Nabil Mahfouz,نور نبيل محفوظ,+201212106454,01212106454,nour.mahfouz0266@customer.invalid,1979-03-15,Unspecified,SYR,False,2026-01-02 15:02:00
+CUST-00000268,Salma Ali Darwish,سلمى علي درويش,+201512114373,0501953457,salma.darwish0267@synthetic.local,1980-10-28,M,SDN,True,2026-01-02 15:09:00
+CUST-00000269,Hana Samir Zaki,هنا سمير زكي,+201012122292,01012122292,hana.zaki0268@example.eg,1981-05-13,F,JOR,False,2026-01-02 15:16:00
+CUST-00000270,Farida Adel Shoukry,فريدة عادل شكري,+201112130211,01112130211,farida.shoukry0269@mail.test,1982-12-26,Unspecified,PSE,True,2026-01-02 15:23:00
+CUST-00000271,Ahmed Hassan ElSayed,أحمد حسن السيد,+201212138130,0881964170,ahmed.elsayed0270@customer.invalid,1983-07-11,M,EGY,False,2026-01-02 15:30:00
+CUST-00000272,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201512146049,01512146049,mohamed.kamel0271@synthetic.local,1984-02-24,F,SYR,True,2026-01-02 15:37:00
+CUST-00000273,Mahmoud Tarek Fathy,محمود طارق فتحي,+201012153968,01012153968,mahmoud.fathy0272@example.eg,1985-09-09,Unspecified,SDN,False,2026-01-02 15:44:00
+CUST-00000274,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201112161887,0301974883,omar.abdelrahman0273@mail.test,1986-04-22,M,JOR,True,2026-01-02 15:51:00
+CUST-00000275,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201212169806,01212169806,youssef.nassar0274@customer.invalid,1987-11-07,F,PSE,False,2026-01-02 15:58:00
+CUST-00000276,Mariam Khaled Gaber,مريم خالد جابر,+201512177725,01512177725,mariam.gaber0275@synthetic.local,1988-06-20,Unspecified,EGY,True,2026-01-02 16:05:00
+CUST-00000277,Nour Nabil Mahfouz,نور نبيل محفوظ,+201012185644,0551985596,nour.mahfouz0276@example.eg,1989-01-05,M,SYR,False,2026-01-02 16:12:00
+CUST-00000278,Salma Ali Darwish,سلمى علي درويش,+201112193563,01112193563,salma.darwish0277@mail.test,1990-08-18,F,SDN,True,2026-01-02 16:19:00
+CUST-00000279,Hana Samir Zaki,هنا سمير زكي,+201212201482,01212201482,hana.zaki0278@customer.invalid,1991-03-03,Unspecified,JOR,False,2026-01-02 16:26:00
+CUST-00000280,Farida Adel Shoukry,فريدة عادل شكري,+201512209401,0971996309,farida.shoukry0279@synthetic.local,1992-10-16,M,PSE,True,2026-01-02 16:33:00
+CUST-00000281,Ahmed Hassan ElSayed,أحمد حسن السيد,+201012217320,01012217320,ahmed.elsayed0280@example.eg,1993-05-01,F,EGY,False,2026-01-02 16:40:00
+CUST-00000282,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201112225239,01112225239,mohamed.kamel0281@mail.test,1994-12-14,Unspecified,SYR,True,2026-01-02 16:47:00
+CUST-00000283,Mahmoud Tarek Fathy,محمود طارق فتحي,+201212233158,0402007022,mahmoud.fathy0282@customer.invalid,1995-07-27,M,SDN,False,2026-01-02 16:54:00
+CUST-00000284,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201512241077,01512241077,omar.abdelrahman0283@synthetic.local,1996-02-12,F,JOR,True,2026-01-02 17:01:00
+CUST-00000285,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201012248996,01012248996,youssef.nassar0284@example.eg,1997-09-25,Unspecified,PSE,False,2026-01-02 17:08:00
+CUST-00000286,Mariam Khaled Gaber,مريم خالد جابر,+201112256915,0642017735,mariam.gaber0285@mail.test,1998-04-10,M,EGY,True,2026-01-02 17:15:00
+CUST-00000287,Nour Nabil Mahfouz,نور نبيل محفوظ,+201212264834,01212264834,nour.mahfouz0286@customer.invalid,1999-11-23,F,SYR,False,2026-01-02 17:22:00
+CUST-00000288,Salma Ali Darwish,سلمى علي درويش,+201512272753,01512272753,salma.darwish0287@synthetic.local,2000-06-08,Unspecified,SDN,True,2026-01-02 17:29:00
+CUST-00000289,Hana Samir Zaki,هنا سمير زكي,+201012280672,0202028448,hana.zaki0288@example.eg,2001-01-21,M,JOR,False,2026-01-02 17:36:00
+CUST-00000290,Farida Adel Shoukry,فريدة عادل شكري,+201112288591,01112288591,farida.shoukry0289@mail.test,2002-08-06,F,PSE,True,2026-01-02 17:43:00
+CUST-00000291,Ahmed Hassan ElSayed,أحمد حسن السيد,+201212296510,01212296510,ahmed.elsayed0290@customer.invalid,2003-03-19,Unspecified,EGY,False,2026-01-02 17:50:00
+CUST-00000292,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201512304429,0502039161,mohamed.kamel0291@synthetic.local,2004-10-04,M,SYR,True,2026-01-02 17:57:00
+CUST-00000293,Mahmoud Tarek Fathy,محمود طارق فتحي,+201012312348,01012312348,mahmoud.fathy0292@example.eg,2005-05-17,F,SDN,False,2026-01-02 18:04:00
+CUST-00000294,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201112320267,01112320267,omar.abdelrahman0293@mail.test,2006-12-02,Unspecified,JOR,True,2026-01-02 18:11:00
+CUST-00000295,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201212328186,0882049874,youssef.nassar0294@customer.invalid,1965-07-15,M,PSE,False,2026-01-02 18:18:00
+CUST-00000296,Mariam Khaled Gaber,مريم خالد جابر,+201512336105,01512336105,mariam.gaber0295@synthetic.local,1966-02-28,F,EGY,True,2026-01-02 18:25:00
+CUST-00000297,Nour Nabil Mahfouz,نور نبيل محفوظ,+201012344024,01012344024,nour.mahfouz0296@example.eg,1967-09-13,Unspecified,SYR,False,2026-01-02 18:32:00
+CUST-00000298,Salma Ali Darwish,سلمى علي درويش,+201112351943,0302060587,salma.darwish0297@mail.test,1968-04-26,M,SDN,True,2026-01-02 18:39:00
+CUST-00000299,Hana Samir Zaki,هنا سمير زكي,+201212359862,01212359862,hana.zaki0298@customer.invalid,1969-11-11,F,JOR,False,2026-01-02 18:46:00
+CUST-00000300,Farida Adel Shoukry,فريدة عادل شكري,+201512367781,01512367781,farida.shoukry0299@synthetic.local,1970-06-24,Unspecified,PSE,True,2026-01-02 18:53:00
+CUST-00000301,Ahmed Hassan ElSayed,أحمد حسن السيد,+201012375700,0552071300,ahmed.elsayed0300@example.eg,1971-01-09,M,EGY,False,2026-01-02 19:00:00
+CUST-00000302,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201112383619,01112383619,mohamed.kamel0301@mail.test,1972-08-22,F,SYR,True,2026-01-02 19:07:00
+CUST-00000303,Mahmoud Tarek Fathy,محمود طارق فتحي,+201212391538,01212391538,mahmoud.fathy0302@customer.invalid,1973-03-07,Unspecified,SDN,False,2026-01-02 19:14:00
+CUST-00000304,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201512399457,0972082013,omar.abdelrahman0303@synthetic.local,1974-10-20,M,JOR,True,2026-01-02 19:21:00
+CUST-00000305,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201012407376,01012407376,youssef.nassar0304@example.eg,1975-05-05,F,PSE,False,2026-01-02 19:28:00
+CUST-00000306,Mariam Khaled Gaber,مريم خالد جابر,+201112415295,01112415295,mariam.gaber0305@mail.test,1976-12-18,Unspecified,EGY,True,2026-01-02 19:35:00
+CUST-00000307,Nour Nabil Mahfouz,نور نبيل محفوظ,+201212423214,0402092726,nour.mahfouz0306@customer.invalid,1977-07-03,M,SYR,False,2026-01-02 19:42:00
+CUST-00000308,Salma Ali Darwish,سلمى علي درويش,+201512431133,01512431133,salma.darwish0307@synthetic.local,1978-02-16,F,SDN,True,2026-01-02 19:49:00
+CUST-00000309,Hana Samir Zaki,هنا سمير زكي,+201012439052,01012439052,hana.zaki0308@example.eg,1979-09-01,Unspecified,JOR,False,2026-01-02 19:56:00
+CUST-00000310,Farida Adel Shoukry,فريدة عادل شكري,+201112446971,0642103439,farida.shoukry0309@mail.test,1980-04-14,M,PSE,True,2026-01-02 20:03:00
+CUST-00000311,Ahmed Hassan ElSayed,أحمد حسن السيد,+201212454890,01212454890,ahmed.elsayed0310@customer.invalid,1981-11-27,F,EGY,False,2026-01-02 20:10:00
+CUST-00000312,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201512462809,01512462809,mohamed.kamel0311@synthetic.local,1982-06-12,Unspecified,SYR,True,2026-01-02 20:17:00
+CUST-00000313,Mahmoud Tarek Fathy,محمود طارق فتحي,+201012470728,0202114152,mahmoud.fathy0312@example.eg,1983-01-25,M,SDN,False,2026-01-02 20:24:00
+CUST-00000314,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201112478647,01112478647,omar.abdelrahman0313@mail.test,1984-08-10,F,JOR,True,2026-01-02 20:31:00
+CUST-00000315,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201212486566,01212486566,youssef.nassar0314@customer.invalid,1985-03-23,Unspecified,PSE,False,2026-01-02 20:38:00
+CUST-00000316,Mariam Khaled Gaber,مريم خالد جابر,+201512494485,0502124865,mariam.gaber0315@synthetic.local,1986-10-08,M,EGY,True,2026-01-02 20:45:00
+CUST-00000317,Nour Nabil Mahfouz,نور نبيل محفوظ,+201012502404,01012502404,nour.mahfouz0316@example.eg,1987-05-21,F,SYR,False,2026-01-02 20:52:00
+CUST-00000318,Salma Ali Darwish,سلمى علي درويش,+201112510323,01112510323,salma.darwish0317@mail.test,1988-12-06,Unspecified,SDN,True,2026-01-02 20:59:00
+CUST-00000319,Hana Samir Zaki,هنا سمير زكي,+201212518242,0882135578,hana.zaki0318@customer.invalid,1989-07-19,M,JOR,False,2026-01-02 21:06:00
+CUST-00000320,Farida Adel Shoukry,فريدة عادل شكري,+201512526161,01512526161,farida.shoukry0319@synthetic.local,1990-02-04,F,PSE,True,2026-01-02 21:13:00
+CUST-00000321,Ahmed Hassan ElSayed,أحمد حسن السيد,+201012534080,01012534080,ahmed.elsayed0320@example.eg,1991-09-17,Unspecified,EGY,False,2026-01-02 21:20:00
+CUST-00000322,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201112541999,0302146291,mohamed.kamel0321@mail.test,1992-04-02,M,SYR,True,2026-01-02 21:27:00
+CUST-00000323,Mahmoud Tarek Fathy,محمود طارق فتحي,+201212549918,01212549918,mahmoud.fathy0322@customer.invalid,1993-11-15,F,SDN,False,2026-01-02 21:34:00
+CUST-00000324,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201512557837,01512557837,omar.abdelrahman0323@synthetic.local,1994-06-28,Unspecified,JOR,True,2026-01-02 21:41:00
+CUST-00000325,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201012565756,0552157004,youssef.nassar0324@example.eg,1995-01-13,M,PSE,False,2026-01-02 21:48:00
+CUST-00000326,Mariam Khaled Gaber,مريم خالد جابر,+201112573675,01112573675,mariam.gaber0325@mail.test,1996-08-26,F,EGY,True,2026-01-02 21:55:00
+CUST-00000327,Nour Nabil Mahfouz,نور نبيل محفوظ,+201212581594,01212581594,nour.mahfouz0326@customer.invalid,1997-03-11,Unspecified,SYR,False,2026-01-02 22:02:00
+CUST-00000328,Salma Ali Darwish,سلمى علي درويش,+201512589513,0972167717,salma.darwish0327@synthetic.local,1998-10-24,M,SDN,True,2026-01-02 22:09:00
+CUST-00000329,Hana Samir Zaki,هنا سمير زكي,+201012597432,01012597432,hana.zaki0328@example.eg,1999-05-09,F,JOR,False,2026-01-02 22:16:00
+CUST-00000330,Farida Adel Shoukry,فريدة عادل شكري,+201112605351,01112605351,farida.shoukry0329@mail.test,2000-12-22,Unspecified,PSE,True,2026-01-02 22:23:00
+CUST-00000331,Ahmed Hassan ElSayed,أحمد حسن السيد,+201212613270,0402178430,ahmed.elsayed0330@customer.invalid,2001-07-07,M,EGY,False,2026-01-02 22:30:00
+CUST-00000332,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201512621189,01512621189,mohamed.kamel0331@synthetic.local,2002-02-20,F,SYR,True,2026-01-02 22:37:00
+CUST-00000333,Mahmoud Tarek Fathy,محمود طارق فتحي,+201012629108,01012629108,mahmoud.fathy0332@example.eg,2003-09-05,Unspecified,SDN,False,2026-01-02 22:44:00
+CUST-00000334,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201112637027,0642189143,omar.abdelrahman0333@mail.test,2004-04-18,M,JOR,True,2026-01-02 22:51:00
+CUST-00000335,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201212644946,01212644946,youssef.nassar0334@customer.invalid,2005-11-03,F,PSE,False,2026-01-02 22:58:00
+CUST-00000336,Mariam Khaled Gaber,مريم خالد جابر,+201512652865,01512652865,mariam.gaber0335@synthetic.local,2006-06-16,Unspecified,EGY,True,2026-01-02 23:05:00
+CUST-00000337,Nour Nabil Mahfouz,نور نبيل محفوظ,+201012660784,0202199856,nour.mahfouz0336@example.eg,1965-01-01,M,SYR,False,2026-01-02 23:12:00
+CUST-00000338,Salma Ali Darwish,سلمى علي درويش,+201112668703,01112668703,salma.darwish0337@mail.test,1966-08-14,F,SDN,True,2026-01-02 23:19:00
+CUST-00000339,Hana Samir Zaki,هنا سمير زكي,+201212676622,01212676622,hana.zaki0338@customer.invalid,1967-03-27,Unspecified,JOR,False,2026-01-02 23:26:00
+CUST-00000340,Farida Adel Shoukry,فريدة عادل شكري,+201512684541,0502210569,farida.shoukry0339@synthetic.local,1968-10-12,M,PSE,True,2026-01-02 23:33:00
+CUST-00000341,Ahmed Hassan ElSayed,أحمد حسن السيد,+201012692460,01012692460,ahmed.elsayed0340@example.eg,1969-05-25,F,EGY,False,2026-01-02 23:40:00
+CUST-00000342,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201112700379,01112700379,mohamed.kamel0341@mail.test,1970-12-10,Unspecified,SYR,True,2026-01-02 23:47:00
+CUST-00000343,Mahmoud Tarek Fathy,محمود طارق فتحي,+201212708298,0882221282,mahmoud.fathy0342@customer.invalid,1971-07-23,M,SDN,False,2026-01-02 23:54:00
+CUST-00000344,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201512716217,01512716217,omar.abdelrahman0343@synthetic.local,1972-02-08,F,JOR,True,2026-01-03 00:01:00
+CUST-00000345,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201012724136,01012724136,youssef.nassar0344@example.eg,1973-09-21,Unspecified,PSE,False,2026-01-03 00:08:00
+CUST-00000346,Mariam Khaled Gaber,مريم خالد جابر,+201112732055,0302231995,mariam.gaber0345@mail.test,1974-04-06,M,EGY,True,2026-01-03 00:15:00
+CUST-00000347,Nour Nabil Mahfouz,نور نبيل محفوظ,+201212739974,01212739974,nour.mahfouz0346@customer.invalid,1975-11-19,F,SYR,False,2026-01-03 00:22:00
+CUST-00000348,Salma Ali Darwish,سلمى علي درويش,+201512747893,01512747893,salma.darwish0347@synthetic.local,1976-06-04,Unspecified,SDN,True,2026-01-03 00:29:00
+CUST-00000349,Hana Samir Zaki,هنا سمير زكي,+201012755812,0552242708,hana.zaki0348@example.eg,1977-01-17,M,JOR,False,2026-01-03 00:36:00
+CUST-00000350,Farida Adel Shoukry,فريدة عادل شكري,+201112763731,01112763731,farida.shoukry0349@mail.test,1978-08-02,F,PSE,True,2026-01-03 00:43:00
+CUST-00000351,Ahmed Hassan ElSayed,أحمد حسن السيد,+201212771650,01212771650,ahmed.elsayed0350@customer.invalid,1979-03-15,Unspecified,EGY,False,2026-01-03 00:50:00
+CUST-00000352,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201512779569,0972253421,mohamed.kamel0351@synthetic.local,1980-10-28,M,SYR,True,2026-01-03 00:57:00
+CUST-00000353,Mahmoud Tarek Fathy,محمود طارق فتحي,+201012787488,01012787488,mahmoud.fathy0352@example.eg,1981-05-13,F,SDN,False,2026-01-03 01:04:00
+CUST-00000354,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201112795407,01112795407,omar.abdelrahman0353@mail.test,1982-12-26,Unspecified,JOR,True,2026-01-03 01:11:00
+CUST-00000355,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201212803326,0402264134,youssef.nassar0354@customer.invalid,1983-07-11,M,PSE,False,2026-01-03 01:18:00
+CUST-00000356,Mariam Khaled Gaber,مريم خالد جابر,+201512811245,01512811245,mariam.gaber0355@synthetic.local,1984-02-24,F,EGY,True,2026-01-03 01:25:00
+CUST-00000357,Nour Nabil Mahfouz,نور نبيل محفوظ,+201012819164,01012819164,nour.mahfouz0356@example.eg,1985-09-09,Unspecified,SYR,False,2026-01-03 01:32:00
+CUST-00000358,Salma Ali Darwish,سلمى علي درويش,+201112827083,0642274847,salma.darwish0357@mail.test,1986-04-22,M,SDN,True,2026-01-03 01:39:00
+CUST-00000359,Hana Samir Zaki,هنا سمير زكي,+201212835002,01212835002,hana.zaki0358@customer.invalid,1987-11-07,F,JOR,False,2026-01-03 01:46:00
+CUST-00000360,Farida Adel Shoukry,فريدة عادل شكري,+201512842921,01512842921,farida.shoukry0359@synthetic.local,1988-06-20,Unspecified,PSE,True,2026-01-03 01:53:00
+CUST-00000361,Ahmed Hassan ElSayed,أحمد حسن السيد,+201012850840,0202285560,ahmed.elsayed0360@example.eg,1989-01-05,M,EGY,False,2026-01-03 02:00:00
+CUST-00000362,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201112858759,01112858759,mohamed.kamel0361@mail.test,1990-08-18,F,SYR,True,2026-01-03 02:07:00
+CUST-00000363,Mahmoud Tarek Fathy,محمود طارق فتحي,+201212866678,01212866678,mahmoud.fathy0362@customer.invalid,1991-03-03,Unspecified,SDN,False,2026-01-03 02:14:00
+CUST-00000364,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201512874597,0502296273,omar.abdelrahman0363@synthetic.local,1992-10-16,M,JOR,True,2026-01-03 02:21:00
+CUST-00000365,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201012882516,01012882516,youssef.nassar0364@example.eg,1993-05-01,F,PSE,False,2026-01-03 02:28:00
+CUST-00000366,Mariam Khaled Gaber,مريم خالد جابر,+201112890435,01112890435,mariam.gaber0365@mail.test,1994-12-14,Unspecified,EGY,True,2026-01-03 02:35:00
+CUST-00000367,Nour Nabil Mahfouz,نور نبيل محفوظ,+201212898354,0882306986,nour.mahfouz0366@customer.invalid,1995-07-27,M,SYR,False,2026-01-03 02:42:00
+CUST-00000368,Salma Ali Darwish,سلمى علي درويش,+201512906273,01512906273,salma.darwish0367@synthetic.local,1996-02-12,F,SDN,True,2026-01-03 02:49:00
+CUST-00000369,Hana Samir Zaki,هنا سمير زكي,+201012914192,01012914192,hana.zaki0368@example.eg,1997-09-25,Unspecified,JOR,False,2026-01-03 02:56:00
+CUST-00000370,Farida Adel Shoukry,فريدة عادل شكري,+201112922111,0302317699,farida.shoukry0369@mail.test,1998-04-10,M,PSE,True,2026-01-03 03:03:00
+CUST-00000371,Ahmed Hassan ElSayed,أحمد حسن السيد,+201212930030,01212930030,ahmed.elsayed0370@customer.invalid,1999-11-23,F,EGY,False,2026-01-03 03:10:00
+CUST-00000372,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201512937949,01512937949,mohamed.kamel0371@synthetic.local,2000-06-08,Unspecified,SYR,True,2026-01-03 03:17:00
+CUST-00000373,Mahmoud Tarek Fathy,محمود طارق فتحي,+201012945868,0552328412,mahmoud.fathy0372@example.eg,2001-01-21,M,SDN,False,2026-01-03 03:24:00
+CUST-00000374,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201112953787,01112953787,omar.abdelrahman0373@mail.test,2002-08-06,F,JOR,True,2026-01-03 03:31:00
+CUST-00000375,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201212961706,01212961706,youssef.nassar0374@customer.invalid,2003-03-19,Unspecified,PSE,False,2026-01-03 03:38:00
+CUST-00000376,Mariam Khaled Gaber,مريم خالد جابر,+201512969625,0972339125,mariam.gaber0375@synthetic.local,2004-10-04,M,EGY,True,2026-01-03 03:45:00
+CUST-00000377,Nour Nabil Mahfouz,نور نبيل محفوظ,+201012977544,01012977544,nour.mahfouz0376@example.eg,2005-05-17,F,SYR,False,2026-01-03 03:52:00
+CUST-00000378,Salma Ali Darwish,سلمى علي درويش,+201112985463,01112985463,salma.darwish0377@mail.test,2006-12-02,Unspecified,SDN,True,2026-01-03 03:59:00
+CUST-00000379,Hana Samir Zaki,هنا سمير زكي,+201212993382,0402349838,hana.zaki0378@customer.invalid,1965-07-15,M,JOR,False,2026-01-03 04:06:00
+CUST-00000380,Farida Adel Shoukry,فريدة عادل شكري,+201513001301,01513001301,farida.shoukry0379@synthetic.local,1966-02-28,F,PSE,True,2026-01-03 04:13:00
+CUST-00000381,Ahmed Hassan ElSayed,أحمد حسن السيد,+201013009220,01013009220,ahmed.elsayed0380@example.eg,1967-09-13,Unspecified,EGY,False,2026-01-03 04:20:00
+CUST-00000382,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201113017139,0642360551,mohamed.kamel0381@mail.test,1968-04-26,M,SYR,True,2026-01-03 04:27:00
+CUST-00000383,Mahmoud Tarek Fathy,محمود طارق فتحي,+201213025058,01213025058,mahmoud.fathy0382@customer.invalid,1969-11-11,F,SDN,False,2026-01-03 04:34:00
+CUST-00000384,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201513032977,01513032977,omar.abdelrahman0383@synthetic.local,1970-06-24,Unspecified,JOR,True,2026-01-03 04:41:00
+CUST-00000385,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201013040896,0202371264,youssef.nassar0384@example.eg,1971-01-09,M,PSE,False,2026-01-03 04:48:00
+CUST-00000386,Mariam Khaled Gaber,مريم خالد جابر,+201113048815,01113048815,mariam.gaber0385@mail.test,1972-08-22,F,EGY,True,2026-01-03 04:55:00
+CUST-00000387,Nour Nabil Mahfouz,نور نبيل محفوظ,+201213056734,01213056734,nour.mahfouz0386@customer.invalid,1973-03-07,Unspecified,SYR,False,2026-01-03 05:02:00
+CUST-00000388,Salma Ali Darwish,سلمى علي درويش,+201513064653,0502381977,salma.darwish0387@synthetic.local,1974-10-20,M,SDN,True,2026-01-03 05:09:00
+CUST-00000389,Hana Samir Zaki,هنا سمير زكي,+201013072572,01013072572,hana.zaki0388@example.eg,1975-05-05,F,JOR,False,2026-01-03 05:16:00
+CUST-00000390,Farida Adel Shoukry,فريدة عادل شكري,+201113080491,01113080491,farida.shoukry0389@mail.test,1976-12-18,Unspecified,PSE,True,2026-01-03 05:23:00
+CUST-00000391,Ahmed Hassan ElSayed,أحمد حسن السيد,+201213088410,0882392690,ahmed.elsayed0390@customer.invalid,1977-07-03,M,EGY,False,2026-01-03 05:30:00
+CUST-00000392,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201513096329,01513096329,mohamed.kamel0391@synthetic.local,1978-02-16,F,SYR,True,2026-01-03 05:37:00
+CUST-00000393,Mahmoud Tarek Fathy,محمود طارق فتحي,+201013104248,01013104248,mahmoud.fathy0392@example.eg,1979-09-01,Unspecified,SDN,False,2026-01-03 05:44:00
+CUST-00000394,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201113112167,0302403403,omar.abdelrahman0393@mail.test,1980-04-14,M,JOR,True,2026-01-03 05:51:00
+CUST-00000395,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201213120086,01213120086,youssef.nassar0394@customer.invalid,1981-11-27,F,PSE,False,2026-01-03 05:58:00
+CUST-00000396,Mariam Khaled Gaber,مريم خالد جابر,+201513128005,01513128005,mariam.gaber0395@synthetic.local,1982-06-12,Unspecified,EGY,True,2026-01-03 06:05:00
+CUST-00000397,Nour Nabil Mahfouz,نور نبيل محفوظ,+201013135924,0552414116,nour.mahfouz0396@example.eg,1983-01-25,M,SYR,False,2026-01-03 06:12:00
+CUST-00000398,Salma Ali Darwish,سلمى علي درويش,+201113143843,01113143843,salma.darwish0397@mail.test,1984-08-10,F,SDN,True,2026-01-03 06:19:00
+CUST-00000399,Hana Samir Zaki,هنا سمير زكي,+201213151762,01213151762,hana.zaki0398@customer.invalid,1985-03-23,Unspecified,JOR,False,2026-01-03 06:26:00
+CUST-00000400,Farida Adel Shoukry,فريدة عادل شكري,+201513159681,0972424829,farida.shoukry0399@synthetic.local,1986-10-08,M,PSE,True,2026-01-03 06:33:00
+CUST-00000401,Ahmed Hassan ElSayed,أحمد حسن السيد,+201013167600,01013167600,ahmed.elsayed0400@example.eg,1987-05-21,F,EGY,False,2026-01-03 06:40:00
+CUST-00000402,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201113175519,01113175519,mohamed.kamel0401@mail.test,1988-12-06,Unspecified,SYR,True,2026-01-03 06:47:00
+CUST-00000403,Mahmoud Tarek Fathy,محمود طارق فتحي,+201213183438,0402435542,mahmoud.fathy0402@customer.invalid,1989-07-19,M,SDN,False,2026-01-03 06:54:00
+CUST-00000404,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201513191357,01513191357,omar.abdelrahman0403@synthetic.local,1990-02-04,F,JOR,True,2026-01-03 07:01:00
+CUST-00000405,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201013199276,01013199276,youssef.nassar0404@example.eg,1991-09-17,Unspecified,PSE,False,2026-01-03 07:08:00
+CUST-00000406,Mariam Khaled Gaber,مريم خالد جابر,+201113207195,0642446255,mariam.gaber0405@mail.test,1992-04-02,M,EGY,True,2026-01-03 07:15:00
+CUST-00000407,Nour Nabil Mahfouz,نور نبيل محفوظ,+201213215114,01213215114,nour.mahfouz0406@customer.invalid,1993-11-15,F,SYR,False,2026-01-03 07:22:00
+CUST-00000408,Salma Ali Darwish,سلمى علي درويش,+201513223033,01513223033,salma.darwish0407@synthetic.local,1994-06-28,Unspecified,SDN,True,2026-01-03 07:29:00
+CUST-00000409,Hana Samir Zaki,هنا سمير زكي,+201013230952,0202456968,hana.zaki0408@example.eg,1995-01-13,M,JOR,False,2026-01-03 07:36:00
+CUST-00000410,Farida Adel Shoukry,فريدة عادل شكري,+201113238871,01113238871,farida.shoukry0409@mail.test,1996-08-26,F,PSE,True,2026-01-03 07:43:00
+CUST-00000411,Ahmed Hassan ElSayed,أحمد حسن السيد,+201213246790,01213246790,ahmed.elsayed0410@customer.invalid,1997-03-11,Unspecified,EGY,False,2026-01-03 07:50:00
+CUST-00000412,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201513254709,0502467681,mohamed.kamel0411@synthetic.local,1998-10-24,M,SYR,True,2026-01-03 07:57:00
+CUST-00000413,Mahmoud Tarek Fathy,محمود طارق فتحي,+201013262628,01013262628,mahmoud.fathy0412@example.eg,1999-05-09,F,SDN,False,2026-01-03 08:04:00
+CUST-00000414,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201113270547,01113270547,omar.abdelrahman0413@mail.test,2000-12-22,Unspecified,JOR,True,2026-01-03 08:11:00
+CUST-00000415,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201213278466,0882478394,youssef.nassar0414@customer.invalid,2001-07-07,M,PSE,False,2026-01-03 08:18:00
+CUST-00000416,Mariam Khaled Gaber,مريم خالد جابر,+201513286385,01513286385,mariam.gaber0415@synthetic.local,2002-02-20,F,EGY,True,2026-01-03 08:25:00
+CUST-00000417,Nour Nabil Mahfouz,نور نبيل محفوظ,+201013294304,01013294304,nour.mahfouz0416@example.eg,2003-09-05,Unspecified,SYR,False,2026-01-03 08:32:00
+CUST-00000418,Salma Ali Darwish,سلمى علي درويش,+201113302223,0302489107,salma.darwish0417@mail.test,2004-04-18,M,SDN,True,2026-01-03 08:39:00
+CUST-00000419,Hana Samir Zaki,هنا سمير زكي,+201213310142,01213310142,hana.zaki0418@customer.invalid,2005-11-03,F,JOR,False,2026-01-03 08:46:00
+CUST-00000420,Farida Adel Shoukry,فريدة عادل شكري,+201513318061,01513318061,farida.shoukry0419@synthetic.local,2006-06-16,Unspecified,PSE,True,2026-01-03 08:53:00
+CUST-00000421,Ahmed Hassan ElSayed,أحمد حسن السيد,+201013325980,0552499820,ahmed.elsayed0420@example.eg,1965-01-01,M,EGY,False,2026-01-03 09:00:00
+CUST-00000422,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201113333899,01113333899,mohamed.kamel0421@mail.test,1966-08-14,F,SYR,True,2026-01-03 09:07:00
+CUST-00000423,Mahmoud Tarek Fathy,محمود طارق فتحي,+201213341818,01213341818,mahmoud.fathy0422@customer.invalid,1967-03-27,Unspecified,SDN,False,2026-01-03 09:14:00
+CUST-00000424,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201513349737,0972510533,omar.abdelrahman0423@synthetic.local,1968-10-12,M,JOR,True,2026-01-03 09:21:00
+CUST-00000425,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201013357656,01013357656,youssef.nassar0424@example.eg,1969-05-25,F,PSE,False,2026-01-03 09:28:00
+CUST-00000426,Mariam Khaled Gaber,مريم خالد جابر,+201113365575,01113365575,mariam.gaber0425@mail.test,1970-12-10,Unspecified,EGY,True,2026-01-03 09:35:00
+CUST-00000427,Nour Nabil Mahfouz,نور نبيل محفوظ,+201213373494,0402521246,nour.mahfouz0426@customer.invalid,1971-07-23,M,SYR,False,2026-01-03 09:42:00
+CUST-00000428,Salma Ali Darwish,سلمى علي درويش,+201513381413,01513381413,salma.darwish0427@synthetic.local,1972-02-08,F,SDN,True,2026-01-03 09:49:00
+CUST-00000429,Hana Samir Zaki,هنا سمير زكي,+201013389332,01013389332,hana.zaki0428@example.eg,1973-09-21,Unspecified,JOR,False,2026-01-03 09:56:00
+CUST-00000430,Farida Adel Shoukry,فريدة عادل شكري,+201113397251,0642531959,farida.shoukry0429@mail.test,1974-04-06,M,PSE,True,2026-01-03 10:03:00
+CUST-00000431,Ahmed Hassan ElSayed,أحمد حسن السيد,+201213405170,01213405170,ahmed.elsayed0430@customer.invalid,1975-11-19,F,EGY,False,2026-01-03 10:10:00
+CUST-00000432,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201513413089,01513413089,mohamed.kamel0431@synthetic.local,1976-06-04,Unspecified,SYR,True,2026-01-03 10:17:00
+CUST-00000433,Mahmoud Tarek Fathy,محمود طارق فتحي,+201013421008,0202542672,mahmoud.fathy0432@example.eg,1977-01-17,M,SDN,False,2026-01-03 10:24:00
+CUST-00000434,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201113428927,01113428927,omar.abdelrahman0433@mail.test,1978-08-02,F,JOR,True,2026-01-03 10:31:00
+CUST-00000435,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201213436846,01213436846,youssef.nassar0434@customer.invalid,1979-03-15,Unspecified,PSE,False,2026-01-03 10:38:00
+CUST-00000436,Mariam Khaled Gaber,مريم خالد جابر,+201513444765,0502553385,mariam.gaber0435@synthetic.local,1980-10-28,M,EGY,True,2026-01-03 10:45:00
+CUST-00000437,Nour Nabil Mahfouz,نور نبيل محفوظ,+201013452684,01013452684,nour.mahfouz0436@example.eg,1981-05-13,F,SYR,False,2026-01-03 10:52:00
+CUST-00000438,Salma Ali Darwish,سلمى علي درويش,+201113460603,01113460603,salma.darwish0437@mail.test,1982-12-26,Unspecified,SDN,True,2026-01-03 10:59:00
+CUST-00000439,Hana Samir Zaki,هنا سمير زكي,+201213468522,0882564098,hana.zaki0438@customer.invalid,1983-07-11,M,JOR,False,2026-01-03 11:06:00
+CUST-00000440,Farida Adel Shoukry,فريدة عادل شكري,+201513476441,01513476441,farida.shoukry0439@synthetic.local,1984-02-24,F,PSE,True,2026-01-03 11:13:00
+CUST-00000441,Ahmed Hassan ElSayed,أحمد حسن السيد,+201013484360,01013484360,ahmed.elsayed0440@example.eg,1985-09-09,Unspecified,EGY,False,2026-01-03 11:20:00
+CUST-00000442,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201113492279,0302574811,mohamed.kamel0441@mail.test,1986-04-22,M,SYR,True,2026-01-03 11:27:00
+CUST-00000443,Mahmoud Tarek Fathy,محمود طارق فتحي,+201213500198,01213500198,mahmoud.fathy0442@customer.invalid,1987-11-07,F,SDN,False,2026-01-03 11:34:00
+CUST-00000444,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201513508117,01513508117,omar.abdelrahman0443@synthetic.local,1988-06-20,Unspecified,JOR,True,2026-01-03 11:41:00
+CUST-00000445,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201013516036,0552585524,youssef.nassar0444@example.eg,1989-01-05,M,PSE,False,2026-01-03 11:48:00
+CUST-00000446,Mariam Khaled Gaber,مريم خالد جابر,+201113523955,01113523955,mariam.gaber0445@mail.test,1990-08-18,F,EGY,True,2026-01-03 11:55:00
+CUST-00000447,Nour Nabil Mahfouz,نور نبيل محفوظ,+201213531874,01213531874,nour.mahfouz0446@customer.invalid,1991-03-03,Unspecified,SYR,False,2026-01-03 12:02:00
+CUST-00000448,Salma Ali Darwish,سلمى علي درويش,+201513539793,0972596237,salma.darwish0447@synthetic.local,1992-10-16,M,SDN,True,2026-01-03 12:09:00
+CUST-00000449,Hana Samir Zaki,هنا سمير زكي,+201013547712,01013547712,hana.zaki0448@example.eg,1993-05-01,F,JOR,False,2026-01-03 12:16:00
+CUST-00000450,Farida Adel Shoukry,فريدة عادل شكري,+201113555631,01113555631,farida.shoukry0449@mail.test,1994-12-14,Unspecified,PSE,True,2026-01-03 12:23:00
+CUST-00000451,Ahmed Hassan ElSayed,أحمد حسن السيد,+201213563550,0402606950,ahmed.elsayed0450@customer.invalid,1995-07-27,M,EGY,False,2026-01-03 12:30:00
+CUST-00000452,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201513571469,01513571469,mohamed.kamel0451@synthetic.local,1996-02-12,F,SYR,True,2026-01-03 12:37:00
+CUST-00000453,Mahmoud Tarek Fathy,محمود طارق فتحي,+201013579388,01013579388,mahmoud.fathy0452@example.eg,1997-09-25,Unspecified,SDN,False,2026-01-03 12:44:00
+CUST-00000454,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201113587307,0642617663,omar.abdelrahman0453@mail.test,1998-04-10,M,JOR,True,2026-01-03 12:51:00
+CUST-00000455,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201213595226,01213595226,youssef.nassar0454@customer.invalid,1999-11-23,F,PSE,False,2026-01-03 12:58:00
+CUST-00000456,Mariam Khaled Gaber,مريم خالد جابر,+201513603145,01513603145,mariam.gaber0455@synthetic.local,2000-06-08,Unspecified,EGY,True,2026-01-03 13:05:00
+CUST-00000457,Nour Nabil Mahfouz,نور نبيل محفوظ,+201013611064,0202628376,nour.mahfouz0456@example.eg,2001-01-21,M,SYR,False,2026-01-03 13:12:00
+CUST-00000458,Salma Ali Darwish,سلمى علي درويش,+201113618983,01113618983,salma.darwish0457@mail.test,2002-08-06,F,SDN,True,2026-01-03 13:19:00
+CUST-00000459,Hana Samir Zaki,هنا سمير زكي,+201213626902,01213626902,hana.zaki0458@customer.invalid,2003-03-19,Unspecified,JOR,False,2026-01-03 13:26:00
+CUST-00000460,Farida Adel Shoukry,فريدة عادل شكري,+201513634821,0502639089,farida.shoukry0459@synthetic.local,2004-10-04,M,PSE,True,2026-01-03 13:33:00
+CUST-00000461,Ahmed Hassan ElSayed,أحمد حسن السيد,+201013642740,01013642740,ahmed.elsayed0460@example.eg,2005-05-17,F,EGY,False,2026-01-03 13:40:00
+CUST-00000462,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201113650659,01113650659,mohamed.kamel0461@mail.test,2006-12-02,Unspecified,SYR,True,2026-01-03 13:47:00
+CUST-00000463,Mahmoud Tarek Fathy,محمود طارق فتحي,+201213658578,0882649802,mahmoud.fathy0462@customer.invalid,1965-07-15,M,SDN,False,2026-01-03 13:54:00
+CUST-00000464,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201513666497,01513666497,omar.abdelrahman0463@synthetic.local,1966-02-28,F,JOR,True,2026-01-03 14:01:00
+CUST-00000465,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201013674416,01013674416,youssef.nassar0464@example.eg,1967-09-13,Unspecified,PSE,False,2026-01-03 14:08:00
+CUST-00000466,Mariam Khaled Gaber,مريم خالد جابر,+201113682335,0302660515,mariam.gaber0465@mail.test,1968-04-26,M,EGY,True,2026-01-03 14:15:00
+CUST-00000467,Nour Nabil Mahfouz,نور نبيل محفوظ,+201213690254,01213690254,nour.mahfouz0466@customer.invalid,1969-11-11,F,SYR,False,2026-01-03 14:22:00
+CUST-00000468,Salma Ali Darwish,سلمى علي درويش,+201513698173,01513698173,salma.darwish0467@synthetic.local,1970-06-24,Unspecified,SDN,True,2026-01-03 14:29:00
+CUST-00000469,Hana Samir Zaki,هنا سمير زكي,+201013706092,0552671228,hana.zaki0468@example.eg,1971-01-09,M,JOR,False,2026-01-03 14:36:00
+CUST-00000470,Farida Adel Shoukry,فريدة عادل شكري,+201113714011,01113714011,farida.shoukry0469@mail.test,1972-08-22,F,PSE,True,2026-01-03 14:43:00
+CUST-00000471,Ahmed Hassan ElSayed,أحمد حسن السيد,+201213721930,01213721930,ahmed.elsayed0470@customer.invalid,1973-03-07,Unspecified,EGY,False,2026-01-03 14:50:00
+CUST-00000472,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201513729849,0972681941,mohamed.kamel0471@synthetic.local,1974-10-20,M,SYR,True,2026-01-03 14:57:00
+CUST-00000473,Mahmoud Tarek Fathy,محمود طارق فتحي,+201013737768,01013737768,mahmoud.fathy0472@example.eg,1975-05-05,F,SDN,False,2026-01-03 15:04:00
+CUST-00000474,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201113745687,01113745687,omar.abdelrahman0473@mail.test,1976-12-18,Unspecified,JOR,True,2026-01-03 15:11:00
+CUST-00000475,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201213753606,0402692654,youssef.nassar0474@customer.invalid,1977-07-03,M,PSE,False,2026-01-03 15:18:00
+CUST-00000476,Mariam Khaled Gaber,مريم خالد جابر,+201513761525,01513761525,mariam.gaber0475@synthetic.local,1978-02-16,F,EGY,True,2026-01-03 15:25:00
+CUST-00000477,Nour Nabil Mahfouz,نور نبيل محفوظ,+201013769444,01013769444,nour.mahfouz0476@example.eg,1979-09-01,Unspecified,SYR,False,2026-01-03 15:32:00
+CUST-00000478,Salma Ali Darwish,سلمى علي درويش,+201113777363,0642703367,salma.darwish0477@mail.test,1980-04-14,M,SDN,True,2026-01-03 15:39:00
+CUST-00000479,Hana Samir Zaki,هنا سمير زكي,+201213785282,01213785282,hana.zaki0478@customer.invalid,1981-11-27,F,JOR,False,2026-01-03 15:46:00
+CUST-00000480,Farida Adel Shoukry,فريدة عادل شكري,+201513793201,01513793201,farida.shoukry0479@synthetic.local,1982-06-12,Unspecified,PSE,True,2026-01-03 15:53:00
+CUST-00000481,Ahmed Hassan ElSayed,أحمد حسن السيد,+201013801120,0202714080,ahmed.elsayed0480@example.eg,1983-01-25,M,EGY,False,2026-01-03 16:00:00
+CUST-00000482,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201113809039,01113809039,mohamed.kamel0481@mail.test,1984-08-10,F,SYR,True,2026-01-03 16:07:00
+CUST-00000483,Mahmoud Tarek Fathy,محمود طارق فتحي,+201213816958,01213816958,mahmoud.fathy0482@customer.invalid,1985-03-23,Unspecified,SDN,False,2026-01-03 16:14:00
+CUST-00000484,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201513824877,0502724793,omar.abdelrahman0483@synthetic.local,1986-10-08,M,JOR,True,2026-01-03 16:21:00
+CUST-00000485,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201013832796,01013832796,youssef.nassar0484@example.eg,1987-05-21,F,PSE,False,2026-01-03 16:28:00
+CUST-00000486,Mariam Khaled Gaber,مريم خالد جابر,+201113840715,01113840715,mariam.gaber0485@mail.test,1988-12-06,Unspecified,EGY,True,2026-01-03 16:35:00
+CUST-00000487,Nour Nabil Mahfouz,نور نبيل محفوظ,+201213848634,0882735506,nour.mahfouz0486@customer.invalid,1989-07-19,M,SYR,False,2026-01-03 16:42:00
+CUST-00000488,Salma Ali Darwish,سلمى علي درويش,+201513856553,01513856553,salma.darwish0487@synthetic.local,1990-02-04,F,SDN,True,2026-01-03 16:49:00
+CUST-00000489,Hana Samir Zaki,هنا سمير زكي,+201013864472,01013864472,hana.zaki0488@example.eg,1991-09-17,Unspecified,JOR,False,2026-01-03 16:56:00
+CUST-00000490,Farida Adel Shoukry,فريدة عادل شكري,+201113872391,0302746219,farida.shoukry0489@mail.test,1992-04-02,M,PSE,True,2026-01-03 17:03:00
+CUST-00000491,Ahmed Hassan ElSayed,أحمد حسن السيد,+201213880310,01213880310,ahmed.elsayed0490@customer.invalid,1993-11-15,F,EGY,False,2026-01-03 17:10:00
+CUST-00000492,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201513888229,01513888229,mohamed.kamel0491@synthetic.local,1994-06-28,Unspecified,SYR,True,2026-01-03 17:17:00
+CUST-00000493,Mahmoud Tarek Fathy,محمود طارق فتحي,+201013896148,0552756932,mahmoud.fathy0492@example.eg,1995-01-13,M,SDN,False,2026-01-03 17:24:00
+CUST-00000494,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201113904067,01113904067,omar.abdelrahman0493@mail.test,1996-08-26,F,JOR,True,2026-01-03 17:31:00
+CUST-00000495,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201213911986,01213911986,youssef.nassar0494@customer.invalid,1997-03-11,Unspecified,PSE,False,2026-01-03 17:38:00
+CUST-00000496,Mariam Khaled Gaber,مريم خالد جابر,+201513919905,0972767645,mariam.gaber0495@synthetic.local,1998-10-24,M,EGY,True,2026-01-03 17:45:00
+CUST-00000497,Nour Nabil Mahfouz,نور نبيل محفوظ,+201013927824,01013927824,nour.mahfouz0496@example.eg,1999-05-09,F,SYR,False,2026-01-03 17:52:00
+CUST-00000498,Salma Ali Darwish,سلمى علي درويش,+201113935743,01113935743,salma.darwish0497@mail.test,2000-12-22,Unspecified,SDN,True,2026-01-03 17:59:00
+CUST-00000499,Hana Samir Zaki,هنا سمير زكي,+201213943662,0402778358,hana.zaki0498@customer.invalid,2001-07-07,M,JOR,False,2026-01-03 18:06:00
+CUST-00000500,Farida Adel Shoukry,فريدة عادل شكري,+201513951581,01513951581,farida.shoukry0499@synthetic.local,2002-02-20,F,PSE,True,2026-01-03 18:13:00
+CUST-00000501,Ahmed Hassan ElSayed,أحمد حسن السيد,+201013959500,01013959500,ahmed.elsayed0500@example.eg,2003-09-05,Unspecified,EGY,False,2026-01-03 18:20:00
+CUST-00000502,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201113967419,0642789071,mohamed.kamel0501@mail.test,2004-04-18,M,SYR,True,2026-01-03 18:27:00
+CUST-00000503,Mahmoud Tarek Fathy,محمود طارق فتحي,+201213975338,01213975338,mahmoud.fathy0502@customer.invalid,2005-11-03,F,SDN,False,2026-01-03 18:34:00
+CUST-00000504,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201513983257,01513983257,omar.abdelrahman0503@synthetic.local,2006-06-16,Unspecified,JOR,True,2026-01-03 18:41:00
+CUST-00000505,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201013991176,0202799784,youssef.nassar0504@example.eg,1965-01-01,M,PSE,False,2026-01-03 18:48:00
+CUST-00000506,Mariam Khaled Gaber,مريم خالد جابر,+201113999095,01113999095,mariam.gaber0505@mail.test,1966-08-14,F,EGY,True,2026-01-03 18:55:00
+CUST-00000507,Nour Nabil Mahfouz,نور نبيل محفوظ,+201214007014,01214007014,nour.mahfouz0506@customer.invalid,1967-03-27,Unspecified,SYR,False,2026-01-03 19:02:00
+CUST-00000508,Salma Ali Darwish,سلمى علي درويش,+201514014933,0502810497,salma.darwish0507@synthetic.local,1968-10-12,M,SDN,True,2026-01-03 19:09:00
+CUST-00000509,Hana Samir Zaki,هنا سمير زكي,+201014022852,01014022852,hana.zaki0508@example.eg,1969-05-25,F,JOR,False,2026-01-03 19:16:00
+CUST-00000510,Farida Adel Shoukry,فريدة عادل شكري,+201114030771,01114030771,farida.shoukry0509@mail.test,1970-12-10,Unspecified,PSE,True,2026-01-03 19:23:00
+CUST-00000511,Ahmed Hassan ElSayed,أحمد حسن السيد,+201214038690,0882821210,ahmed.elsayed0510@customer.invalid,1971-07-23,M,EGY,False,2026-01-03 19:30:00
+CUST-00000512,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201514046609,01514046609,mohamed.kamel0511@synthetic.local,1972-02-08,F,SYR,True,2026-01-03 19:37:00
+CUST-00000513,Mahmoud Tarek Fathy,محمود طارق فتحي,+201014054528,01014054528,mahmoud.fathy0512@example.eg,1973-09-21,Unspecified,SDN,False,2026-01-03 19:44:00
+CUST-00000514,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201114062447,0302831923,omar.abdelrahman0513@mail.test,1974-04-06,M,JOR,True,2026-01-03 19:51:00
+CUST-00000515,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201214070366,01214070366,youssef.nassar0514@customer.invalid,1975-11-19,F,PSE,False,2026-01-03 19:58:00
+CUST-00000516,Mariam Khaled Gaber,مريم خالد جابر,+201514078285,01514078285,mariam.gaber0515@synthetic.local,1976-06-04,Unspecified,EGY,True,2026-01-03 20:05:00
+CUST-00000517,Nour Nabil Mahfouz,نور نبيل محفوظ,+201014086204,0552842636,nour.mahfouz0516@example.eg,1977-01-17,M,SYR,False,2026-01-03 20:12:00
+CUST-00000518,Salma Ali Darwish,سلمى علي درويش,+201114094123,01114094123,salma.darwish0517@mail.test,1978-08-02,F,SDN,True,2026-01-03 20:19:00
+CUST-00000519,Hana Samir Zaki,هنا سمير زكي,+201214102042,01214102042,hana.zaki0518@customer.invalid,1979-03-15,Unspecified,JOR,False,2026-01-03 20:26:00
+CUST-00000520,Farida Adel Shoukry,فريدة عادل شكري,+201514109961,0972853349,farida.shoukry0519@synthetic.local,1980-10-28,M,PSE,True,2026-01-03 20:33:00
+CUST-00000521,Ahmed Hassan ElSayed,أحمد حسن السيد,+201014117880,01014117880,ahmed.elsayed0520@example.eg,1981-05-13,F,EGY,False,2026-01-03 20:40:00
+CUST-00000522,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201114125799,01114125799,mohamed.kamel0521@mail.test,1982-12-26,Unspecified,SYR,True,2026-01-03 20:47:00
+CUST-00000523,Mahmoud Tarek Fathy,محمود طارق فتحي,+201214133718,0402864062,mahmoud.fathy0522@customer.invalid,1983-07-11,M,SDN,False,2026-01-03 20:54:00
+CUST-00000524,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201514141637,01514141637,omar.abdelrahman0523@synthetic.local,1984-02-24,F,JOR,True,2026-01-03 21:01:00
+CUST-00000525,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201014149556,01014149556,youssef.nassar0524@example.eg,1985-09-09,Unspecified,PSE,False,2026-01-03 21:08:00
+CUST-00000526,Mariam Khaled Gaber,مريم خالد جابر,+201114157475,0642874775,mariam.gaber0525@mail.test,1986-04-22,M,EGY,True,2026-01-03 21:15:00
+CUST-00000527,Nour Nabil Mahfouz,نور نبيل محفوظ,+201214165394,01214165394,nour.mahfouz0526@customer.invalid,1987-11-07,F,SYR,False,2026-01-03 21:22:00
+CUST-00000528,Salma Ali Darwish,سلمى علي درويش,+201514173313,01514173313,salma.darwish0527@synthetic.local,1988-06-20,Unspecified,SDN,True,2026-01-03 21:29:00
+CUST-00000529,Hana Samir Zaki,هنا سمير زكي,+201014181232,0202885488,hana.zaki0528@example.eg,1989-01-05,M,JOR,False,2026-01-03 21:36:00
+CUST-00000530,Farida Adel Shoukry,فريدة عادل شكري,+201114189151,01114189151,farida.shoukry0529@mail.test,1990-08-18,F,PSE,True,2026-01-03 21:43:00
+CUST-00000531,Ahmed Hassan ElSayed,أحمد حسن السيد,+201214197070,01214197070,ahmed.elsayed0530@customer.invalid,1991-03-03,Unspecified,EGY,False,2026-01-03 21:50:00
+CUST-00000532,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201514204989,0502896201,mohamed.kamel0531@synthetic.local,1992-10-16,M,SYR,True,2026-01-03 21:57:00
+CUST-00000533,Mahmoud Tarek Fathy,محمود طارق فتحي,+201014212908,01014212908,mahmoud.fathy0532@example.eg,1993-05-01,F,SDN,False,2026-01-03 22:04:00
+CUST-00000534,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201114220827,01114220827,omar.abdelrahman0533@mail.test,1994-12-14,Unspecified,JOR,True,2026-01-03 22:11:00
+CUST-00000535,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201214228746,0882906914,youssef.nassar0534@customer.invalid,1995-07-27,M,PSE,False,2026-01-03 22:18:00
+CUST-00000536,Mariam Khaled Gaber,مريم خالد جابر,+201514236665,01514236665,mariam.gaber0535@synthetic.local,1996-02-12,F,EGY,True,2026-01-03 22:25:00
+CUST-00000537,Nour Nabil Mahfouz,نور نبيل محفوظ,+201014244584,01014244584,nour.mahfouz0536@example.eg,1997-09-25,Unspecified,SYR,False,2026-01-03 22:32:00
+CUST-00000538,Salma Ali Darwish,سلمى علي درويش,+201114252503,0302917627,salma.darwish0537@mail.test,1998-04-10,M,SDN,True,2026-01-03 22:39:00
+CUST-00000539,Hana Samir Zaki,هنا سمير زكي,+201214260422,01214260422,hana.zaki0538@customer.invalid,1999-11-23,F,JOR,False,2026-01-03 22:46:00
+CUST-00000540,Farida Adel Shoukry,فريدة عادل شكري,+201514268341,01514268341,farida.shoukry0539@synthetic.local,2000-06-08,Unspecified,PSE,True,2026-01-03 22:53:00
+CUST-00000541,Ahmed Hassan ElSayed,أحمد حسن السيد,+201014276260,0552928340,ahmed.elsayed0540@example.eg,2001-01-21,M,EGY,False,2026-01-03 23:00:00
+CUST-00000542,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201114284179,01114284179,mohamed.kamel0541@mail.test,2002-08-06,F,SYR,True,2026-01-03 23:07:00
+CUST-00000543,Mahmoud Tarek Fathy,محمود طارق فتحي,+201214292098,01214292098,mahmoud.fathy0542@customer.invalid,2003-03-19,Unspecified,SDN,False,2026-01-03 23:14:00
+CUST-00000544,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201514300017,0972939053,omar.abdelrahman0543@synthetic.local,2004-10-04,M,JOR,True,2026-01-03 23:21:00
+CUST-00000545,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201014307936,01014307936,youssef.nassar0544@example.eg,2005-05-17,F,PSE,False,2026-01-03 23:28:00
+CUST-00000546,Mariam Khaled Gaber,مريم خالد جابر,+201114315855,01114315855,mariam.gaber0545@mail.test,2006-12-02,Unspecified,EGY,True,2026-01-03 23:35:00
+CUST-00000547,Nour Nabil Mahfouz,نور نبيل محفوظ,+201214323774,0402949766,nour.mahfouz0546@customer.invalid,1965-07-15,M,SYR,False,2026-01-03 23:42:00
+CUST-00000548,Salma Ali Darwish,سلمى علي درويش,+201514331693,01514331693,salma.darwish0547@synthetic.local,1966-02-28,F,SDN,True,2026-01-03 23:49:00
+CUST-00000549,Hana Samir Zaki,هنا سمير زكي,+201014339612,01014339612,hana.zaki0548@example.eg,1967-09-13,Unspecified,JOR,False,2026-01-03 23:56:00
+CUST-00000550,Farida Adel Shoukry,فريدة عادل شكري,+201114347531,0642960479,farida.shoukry0549@mail.test,1968-04-26,M,PSE,True,2026-01-04 00:03:00
+CUST-00000551,Ahmed Hassan ElSayed,أحمد حسن السيد,+201214355450,01214355450,ahmed.elsayed0550@customer.invalid,1969-11-11,F,EGY,False,2026-01-04 00:10:00
+CUST-00000552,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201514363369,01514363369,mohamed.kamel0551@synthetic.local,1970-06-24,Unspecified,SYR,True,2026-01-04 00:17:00
+CUST-00000553,Mahmoud Tarek Fathy,محمود طارق فتحي,+201014371288,0202971192,mahmoud.fathy0552@example.eg,1971-01-09,M,SDN,False,2026-01-04 00:24:00
+CUST-00000554,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201114379207,01114379207,omar.abdelrahman0553@mail.test,1972-08-22,F,JOR,True,2026-01-04 00:31:00
+CUST-00000555,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201214387126,01214387126,youssef.nassar0554@customer.invalid,1973-03-07,Unspecified,PSE,False,2026-01-04 00:38:00
+CUST-00000556,Mariam Khaled Gaber,مريم خالد جابر,+201514395045,0502981905,mariam.gaber0555@synthetic.local,1974-10-20,M,EGY,True,2026-01-04 00:45:00
+CUST-00000557,Nour Nabil Mahfouz,نور نبيل محفوظ,+201014402964,01014402964,nour.mahfouz0556@example.eg,1975-05-05,F,SYR,False,2026-01-04 00:52:00
+CUST-00000558,Salma Ali Darwish,سلمى علي درويش,+201114410883,01114410883,salma.darwish0557@mail.test,1976-12-18,Unspecified,SDN,True,2026-01-04 00:59:00
+CUST-00000559,Hana Samir Zaki,هنا سمير زكي,+201214418802,0882992618,hana.zaki0558@customer.invalid,1977-07-03,M,JOR,False,2026-01-04 01:06:00
+CUST-00000560,Farida Adel Shoukry,فريدة عادل شكري,+201514426721,01514426721,farida.shoukry0559@synthetic.local,1978-02-16,F,PSE,True,2026-01-04 01:13:00
+CUST-00000561,Ahmed Hassan ElSayed,أحمد حسن السيد,+201014434640,01014434640,ahmed.elsayed0560@example.eg,1979-09-01,Unspecified,EGY,False,2026-01-04 01:20:00
+CUST-00000562,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201114442559,0303003331,mohamed.kamel0561@mail.test,1980-04-14,M,SYR,True,2026-01-04 01:27:00
+CUST-00000563,Mahmoud Tarek Fathy,محمود طارق فتحي,+201214450478,01214450478,mahmoud.fathy0562@customer.invalid,1981-11-27,F,SDN,False,2026-01-04 01:34:00
+CUST-00000564,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201514458397,01514458397,omar.abdelrahman0563@synthetic.local,1982-06-12,Unspecified,JOR,True,2026-01-04 01:41:00
+CUST-00000565,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201014466316,0553014044,youssef.nassar0564@example.eg,1983-01-25,M,PSE,False,2026-01-04 01:48:00
+CUST-00000566,Mariam Khaled Gaber,مريم خالد جابر,+201114474235,01114474235,mariam.gaber0565@mail.test,1984-08-10,F,EGY,True,2026-01-04 01:55:00
+CUST-00000567,Nour Nabil Mahfouz,نور نبيل محفوظ,+201214482154,01214482154,nour.mahfouz0566@customer.invalid,1985-03-23,Unspecified,SYR,False,2026-01-04 02:02:00
+CUST-00000568,Salma Ali Darwish,سلمى علي درويش,+201514490073,0973024757,salma.darwish0567@synthetic.local,1986-10-08,M,SDN,True,2026-01-04 02:09:00
+CUST-00000569,Hana Samir Zaki,هنا سمير زكي,+201014497992,01014497992,hana.zaki0568@example.eg,1987-05-21,F,JOR,False,2026-01-04 02:16:00
+CUST-00000570,Farida Adel Shoukry,فريدة عادل شكري,+201114505911,01114505911,farida.shoukry0569@mail.test,1988-12-06,Unspecified,PSE,True,2026-01-04 02:23:00
+CUST-00000571,Ahmed Hassan ElSayed,أحمد حسن السيد,+201214513830,0403035470,ahmed.elsayed0570@customer.invalid,1989-07-19,M,EGY,False,2026-01-04 02:30:00
+CUST-00000572,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201514521749,01514521749,mohamed.kamel0571@synthetic.local,1990-02-04,F,SYR,True,2026-01-04 02:37:00
+CUST-00000573,Mahmoud Tarek Fathy,محمود طارق فتحي,+201014529668,01014529668,mahmoud.fathy0572@example.eg,1991-09-17,Unspecified,SDN,False,2026-01-04 02:44:00
+CUST-00000574,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201114537587,0643046183,omar.abdelrahman0573@mail.test,1992-04-02,M,JOR,True,2026-01-04 02:51:00
+CUST-00000575,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201214545506,01214545506,youssef.nassar0574@customer.invalid,1993-11-15,F,PSE,False,2026-01-04 02:58:00
+CUST-00000576,Mariam Khaled Gaber,مريم خالد جابر,+201514553425,01514553425,mariam.gaber0575@synthetic.local,1994-06-28,Unspecified,EGY,True,2026-01-04 03:05:00
+CUST-00000577,Nour Nabil Mahfouz,نور نبيل محفوظ,+201014561344,0203056896,nour.mahfouz0576@example.eg,1995-01-13,M,SYR,False,2026-01-04 03:12:00
+CUST-00000578,Salma Ali Darwish,سلمى علي درويش,+201114569263,01114569263,salma.darwish0577@mail.test,1996-08-26,F,SDN,True,2026-01-04 03:19:00
+CUST-00000579,Hana Samir Zaki,هنا سمير زكي,+201214577182,01214577182,hana.zaki0578@customer.invalid,1997-03-11,Unspecified,JOR,False,2026-01-04 03:26:00
+CUST-00000580,Farida Adel Shoukry,فريدة عادل شكري,+201514585101,0503067609,farida.shoukry0579@synthetic.local,1998-10-24,M,PSE,True,2026-01-04 03:33:00
+CUST-00000581,Ahmed Hassan ElSayed,أحمد حسن السيد,+201014593020,01014593020,ahmed.elsayed0580@example.eg,1999-05-09,F,EGY,False,2026-01-04 03:40:00
+CUST-00000582,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201114600939,01114600939,mohamed.kamel0581@mail.test,2000-12-22,Unspecified,SYR,True,2026-01-04 03:47:00
+CUST-00000583,Mahmoud Tarek Fathy,محمود طارق فتحي,+201214608858,0883078322,mahmoud.fathy0582@customer.invalid,2001-07-07,M,SDN,False,2026-01-04 03:54:00
+CUST-00000584,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201514616777,01514616777,omar.abdelrahman0583@synthetic.local,2002-02-20,F,JOR,True,2026-01-04 04:01:00
+CUST-00000585,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201014624696,01014624696,youssef.nassar0584@example.eg,2003-09-05,Unspecified,PSE,False,2026-01-04 04:08:00
+CUST-00000586,Mariam Khaled Gaber,مريم خالد جابر,+201114632615,0303089035,mariam.gaber0585@mail.test,2004-04-18,M,EGY,True,2026-01-04 04:15:00
+CUST-00000587,Nour Nabil Mahfouz,نور نبيل محفوظ,+201214640534,01214640534,nour.mahfouz0586@customer.invalid,2005-11-03,F,SYR,False,2026-01-04 04:22:00
+CUST-00000588,Salma Ali Darwish,سلمى علي درويش,+201514648453,01514648453,salma.darwish0587@synthetic.local,2006-06-16,Unspecified,SDN,True,2026-01-04 04:29:00
+CUST-00000589,Hana Samir Zaki,هنا سمير زكي,+201014656372,0553099748,hana.zaki0588@example.eg,1965-01-01,M,JOR,False,2026-01-04 04:36:00
+CUST-00000590,Farida Adel Shoukry,فريدة عادل شكري,+201114664291,01114664291,farida.shoukry0589@mail.test,1966-08-14,F,PSE,True,2026-01-04 04:43:00
+CUST-00000591,Ahmed Hassan ElSayed,أحمد حسن السيد,+201214672210,01214672210,ahmed.elsayed0590@customer.invalid,1967-03-27,Unspecified,EGY,False,2026-01-04 04:50:00
+CUST-00000592,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201514680129,0973110461,mohamed.kamel0591@synthetic.local,1968-10-12,M,SYR,True,2026-01-04 04:57:00
+CUST-00000593,Mahmoud Tarek Fathy,محمود طارق فتحي,+201014688048,01014688048,mahmoud.fathy0592@example.eg,1969-05-25,F,SDN,False,2026-01-04 05:04:00
+CUST-00000594,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201114695967,01114695967,omar.abdelrahman0593@mail.test,1970-12-10,Unspecified,JOR,True,2026-01-04 05:11:00
+CUST-00000595,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201214703886,0403121174,youssef.nassar0594@customer.invalid,1971-07-23,M,PSE,False,2026-01-04 05:18:00
+CUST-00000596,Mariam Khaled Gaber,مريم خالد جابر,+201514711805,01514711805,mariam.gaber0595@synthetic.local,1972-02-08,F,EGY,True,2026-01-04 05:25:00
+CUST-00000597,Nour Nabil Mahfouz,نور نبيل محفوظ,+201014719724,01014719724,nour.mahfouz0596@example.eg,1973-09-21,Unspecified,SYR,False,2026-01-04 05:32:00
+CUST-00000598,Salma Ali Darwish,سلمى علي درويش,+201114727643,0643131887,salma.darwish0597@mail.test,1974-04-06,M,SDN,True,2026-01-04 05:39:00
+CUST-00000599,Hana Samir Zaki,هنا سمير زكي,+201214735562,01214735562,hana.zaki0598@customer.invalid,1975-11-19,F,JOR,False,2026-01-04 05:46:00
+CUST-00000600,Farida Adel Shoukry,فريدة عادل شكري,+201514743481,01514743481,farida.shoukry0599@synthetic.local,1976-06-04,Unspecified,PSE,True,2026-01-04 05:53:00
+CUST-00000601,Ahmed Hassan ElSayed,أحمد حسن السيد,+201014751400,0203142600,ahmed.elsayed0600@example.eg,1977-01-17,M,EGY,False,2026-01-04 06:00:00
+CUST-00000602,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201114759319,01114759319,mohamed.kamel0601@mail.test,1978-08-02,F,SYR,True,2026-01-04 06:07:00
+CUST-00000603,Mahmoud Tarek Fathy,محمود طارق فتحي,+201214767238,01214767238,mahmoud.fathy0602@customer.invalid,1979-03-15,Unspecified,SDN,False,2026-01-04 06:14:00
+CUST-00000604,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201514775157,0503153313,omar.abdelrahman0603@synthetic.local,1980-10-28,M,JOR,True,2026-01-04 06:21:00
+CUST-00000605,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201014783076,01014783076,youssef.nassar0604@example.eg,1981-05-13,F,PSE,False,2026-01-04 06:28:00
+CUST-00000606,Mariam Khaled Gaber,مريم خالد جابر,+201114790995,01114790995,mariam.gaber0605@mail.test,1982-12-26,Unspecified,EGY,True,2026-01-04 06:35:00
+CUST-00000607,Nour Nabil Mahfouz,نور نبيل محفوظ,+201214798914,0883164026,nour.mahfouz0606@customer.invalid,1983-07-11,M,SYR,False,2026-01-04 06:42:00
+CUST-00000608,Salma Ali Darwish,سلمى علي درويش,+201514806833,01514806833,salma.darwish0607@synthetic.local,1984-02-24,F,SDN,True,2026-01-04 06:49:00
+CUST-00000609,Hana Samir Zaki,هنا سمير زكي,+201014814752,01014814752,hana.zaki0608@example.eg,1985-09-09,Unspecified,JOR,False,2026-01-04 06:56:00
+CUST-00000610,Farida Adel Shoukry,فريدة عادل شكري,+201114822671,0303174739,farida.shoukry0609@mail.test,1986-04-22,M,PSE,True,2026-01-04 07:03:00
+CUST-00000611,Ahmed Hassan ElSayed,أحمد حسن السيد,+201214830590,01214830590,ahmed.elsayed0610@customer.invalid,1987-11-07,F,EGY,False,2026-01-04 07:10:00
+CUST-00000612,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201514838509,01514838509,mohamed.kamel0611@synthetic.local,1988-06-20,Unspecified,SYR,True,2026-01-04 07:17:00
+CUST-00000613,Mahmoud Tarek Fathy,محمود طارق فتحي,+201014846428,0553185452,mahmoud.fathy0612@example.eg,1989-01-05,M,SDN,False,2026-01-04 07:24:00
+CUST-00000614,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201114854347,01114854347,omar.abdelrahman0613@mail.test,1990-08-18,F,JOR,True,2026-01-04 07:31:00
+CUST-00000615,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201214862266,01214862266,youssef.nassar0614@customer.invalid,1991-03-03,Unspecified,PSE,False,2026-01-04 07:38:00
+CUST-00000616,Mariam Khaled Gaber,مريم خالد جابر,+201514870185,0973196165,mariam.gaber0615@synthetic.local,1992-10-16,M,EGY,True,2026-01-04 07:45:00
+CUST-00000617,Nour Nabil Mahfouz,نور نبيل محفوظ,+201014878104,01014878104,nour.mahfouz0616@example.eg,1993-05-01,F,SYR,False,2026-01-04 07:52:00
+CUST-00000618,Salma Ali Darwish,سلمى علي درويش,+201114886023,01114886023,salma.darwish0617@mail.test,1994-12-14,Unspecified,SDN,True,2026-01-04 07:59:00
+CUST-00000619,Hana Samir Zaki,هنا سمير زكي,+201214893942,0403206878,hana.zaki0618@customer.invalid,1995-07-27,M,JOR,False,2026-01-04 08:06:00
+CUST-00000620,Farida Adel Shoukry,فريدة عادل شكري,+201514901861,01514901861,farida.shoukry0619@synthetic.local,1996-02-12,F,PSE,True,2026-01-04 08:13:00
+CUST-00000621,Ahmed Hassan ElSayed,أحمد حسن السيد,+201014909780,01014909780,ahmed.elsayed0620@example.eg,1997-09-25,Unspecified,EGY,False,2026-01-04 08:20:00
+CUST-00000622,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201114917699,0643217591,mohamed.kamel0621@mail.test,1998-04-10,M,SYR,True,2026-01-04 08:27:00
+CUST-00000623,Mahmoud Tarek Fathy,محمود طارق فتحي,+201214925618,01214925618,mahmoud.fathy0622@customer.invalid,1999-11-23,F,SDN,False,2026-01-04 08:34:00
+CUST-00000624,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201514933537,01514933537,omar.abdelrahman0623@synthetic.local,2000-06-08,Unspecified,JOR,True,2026-01-04 08:41:00
+CUST-00000625,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201014941456,0203228304,youssef.nassar0624@example.eg,2001-01-21,M,PSE,False,2026-01-04 08:48:00
+CUST-00000626,Mariam Khaled Gaber,مريم خالد جابر,+201114949375,01114949375,mariam.gaber0625@mail.test,2002-08-06,F,EGY,True,2026-01-04 08:55:00
+CUST-00000627,Nour Nabil Mahfouz,نور نبيل محفوظ,+201214957294,01214957294,nour.mahfouz0626@customer.invalid,2003-03-19,Unspecified,SYR,False,2026-01-04 09:02:00
+CUST-00000628,Salma Ali Darwish,سلمى علي درويش,+201514965213,0503239017,salma.darwish0627@synthetic.local,2004-10-04,M,SDN,True,2026-01-04 09:09:00
+CUST-00000629,Hana Samir Zaki,هنا سمير زكي,+201014973132,01014973132,hana.zaki0628@example.eg,2005-05-17,F,JOR,False,2026-01-04 09:16:00
+CUST-00000630,Farida Adel Shoukry,فريدة عادل شكري,+201114981051,01114981051,farida.shoukry0629@mail.test,2006-12-02,Unspecified,PSE,True,2026-01-04 09:23:00
+CUST-00000631,Ahmed Hassan ElSayed,أحمد حسن السيد,+201214988970,0883249730,ahmed.elsayed0630@customer.invalid,1965-07-15,M,EGY,False,2026-01-04 09:30:00
+CUST-00000632,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201514996889,01514996889,mohamed.kamel0631@synthetic.local,1966-02-28,F,SYR,True,2026-01-04 09:37:00
+CUST-00000633,Mahmoud Tarek Fathy,محمود طارق فتحي,+201015004808,01015004808,mahmoud.fathy0632@example.eg,1967-09-13,Unspecified,SDN,False,2026-01-04 09:44:00
+CUST-00000634,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201115012727,0303260443,omar.abdelrahman0633@mail.test,1968-04-26,M,JOR,True,2026-01-04 09:51:00
+CUST-00000635,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201215020646,01215020646,youssef.nassar0634@customer.invalid,1969-11-11,F,PSE,False,2026-01-04 09:58:00
+CUST-00000636,Mariam Khaled Gaber,مريم خالد جابر,+201515028565,01515028565,mariam.gaber0635@synthetic.local,1970-06-24,Unspecified,EGY,True,2026-01-04 10:05:00
+CUST-00000637,Nour Nabil Mahfouz,نور نبيل محفوظ,+201015036484,0553271156,nour.mahfouz0636@example.eg,1971-01-09,M,SYR,False,2026-01-04 10:12:00
+CUST-00000638,Salma Ali Darwish,سلمى علي درويش,+201115044403,01115044403,salma.darwish0637@mail.test,1972-08-22,F,SDN,True,2026-01-04 10:19:00
+CUST-00000639,Hana Samir Zaki,هنا سمير زكي,+201215052322,01215052322,hana.zaki0638@customer.invalid,1973-03-07,Unspecified,JOR,False,2026-01-04 10:26:00
+CUST-00000640,Farida Adel Shoukry,فريدة عادل شكري,+201515060241,0973281869,farida.shoukry0639@synthetic.local,1974-10-20,M,PSE,True,2026-01-04 10:33:00
+CUST-00000641,Ahmed Hassan ElSayed,أحمد حسن السيد,+201015068160,01015068160,ahmed.elsayed0640@example.eg,1975-05-05,F,EGY,False,2026-01-04 10:40:00
+CUST-00000642,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201115076079,01115076079,mohamed.kamel0641@mail.test,1976-12-18,Unspecified,SYR,True,2026-01-04 10:47:00
+CUST-00000643,Mahmoud Tarek Fathy,محمود طارق فتحي,+201215083998,0403292582,mahmoud.fathy0642@customer.invalid,1977-07-03,M,SDN,False,2026-01-04 10:54:00
+CUST-00000644,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201515091917,01515091917,omar.abdelrahman0643@synthetic.local,1978-02-16,F,JOR,True,2026-01-04 11:01:00
+CUST-00000645,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201015099836,01015099836,youssef.nassar0644@example.eg,1979-09-01,Unspecified,PSE,False,2026-01-04 11:08:00
+CUST-00000646,Mariam Khaled Gaber,مريم خالد جابر,+201115107755,0643303295,mariam.gaber0645@mail.test,1980-04-14,M,EGY,True,2026-01-04 11:15:00
+CUST-00000647,Nour Nabil Mahfouz,نور نبيل محفوظ,+201215115674,01215115674,nour.mahfouz0646@customer.invalid,1981-11-27,F,SYR,False,2026-01-04 11:22:00
+CUST-00000648,Salma Ali Darwish,سلمى علي درويش,+201515123593,01515123593,salma.darwish0647@synthetic.local,1982-06-12,Unspecified,SDN,True,2026-01-04 11:29:00
+CUST-00000649,Hana Samir Zaki,هنا سمير زكي,+201015131512,0203314008,hana.zaki0648@example.eg,1983-01-25,M,JOR,False,2026-01-04 11:36:00
+CUST-00000650,Farida Adel Shoukry,فريدة عادل شكري,+201115139431,01115139431,farida.shoukry0649@mail.test,1984-08-10,F,PSE,True,2026-01-04 11:43:00
+CUST-00000651,Ahmed Hassan ElSayed,أحمد حسن السيد,+201215147350,01215147350,ahmed.elsayed0650@customer.invalid,1985-03-23,Unspecified,EGY,False,2026-01-04 11:50:00
+CUST-00000652,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201515155269,0503324721,mohamed.kamel0651@synthetic.local,1986-10-08,M,SYR,True,2026-01-04 11:57:00
+CUST-00000653,Mahmoud Tarek Fathy,محمود طارق فتحي,+201015163188,01015163188,mahmoud.fathy0652@example.eg,1987-05-21,F,SDN,False,2026-01-04 12:04:00
+CUST-00000654,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201115171107,01115171107,omar.abdelrahman0653@mail.test,1988-12-06,Unspecified,JOR,True,2026-01-04 12:11:00
+CUST-00000655,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201215179026,0883335434,youssef.nassar0654@customer.invalid,1989-07-19,M,PSE,False,2026-01-04 12:18:00
+CUST-00000656,Mariam Khaled Gaber,مريم خالد جابر,+201515186945,01515186945,mariam.gaber0655@synthetic.local,1990-02-04,F,EGY,True,2026-01-04 12:25:00
+CUST-00000657,Nour Nabil Mahfouz,نور نبيل محفوظ,+201015194864,01015194864,nour.mahfouz0656@example.eg,1991-09-17,Unspecified,SYR,False,2026-01-04 12:32:00
+CUST-00000658,Salma Ali Darwish,سلمى علي درويش,+201115202783,0303346147,salma.darwish0657@mail.test,1992-04-02,M,SDN,True,2026-01-04 12:39:00
+CUST-00000659,Hana Samir Zaki,هنا سمير زكي,+201215210702,01215210702,hana.zaki0658@customer.invalid,1993-11-15,F,JOR,False,2026-01-04 12:46:00
+CUST-00000660,Farida Adel Shoukry,فريدة عادل شكري,+201515218621,01515218621,farida.shoukry0659@synthetic.local,1994-06-28,Unspecified,PSE,True,2026-01-04 12:53:00
+CUST-00000661,Ahmed Hassan ElSayed,أحمد حسن السيد,+201015226540,0553356860,ahmed.elsayed0660@example.eg,1995-01-13,M,EGY,False,2026-01-04 13:00:00
+CUST-00000662,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201115234459,01115234459,mohamed.kamel0661@mail.test,1996-08-26,F,SYR,True,2026-01-04 13:07:00
+CUST-00000663,Mahmoud Tarek Fathy,محمود طارق فتحي,+201215242378,01215242378,mahmoud.fathy0662@customer.invalid,1997-03-11,Unspecified,SDN,False,2026-01-04 13:14:00
+CUST-00000664,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201515250297,0973367573,omar.abdelrahman0663@synthetic.local,1998-10-24,M,JOR,True,2026-01-04 13:21:00
+CUST-00000665,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201015258216,01015258216,youssef.nassar0664@example.eg,1999-05-09,F,PSE,False,2026-01-04 13:28:00
+CUST-00000666,Mariam Khaled Gaber,مريم خالد جابر,+201115266135,01115266135,mariam.gaber0665@mail.test,2000-12-22,Unspecified,EGY,True,2026-01-04 13:35:00
+CUST-00000667,Nour Nabil Mahfouz,نور نبيل محفوظ,+201215274054,0403378286,nour.mahfouz0666@customer.invalid,2001-07-07,M,SYR,False,2026-01-04 13:42:00
+CUST-00000668,Salma Ali Darwish,سلمى علي درويش,+201515281973,01515281973,salma.darwish0667@synthetic.local,2002-02-20,F,SDN,True,2026-01-04 13:49:00
+CUST-00000669,Hana Samir Zaki,هنا سمير زكي,+201015289892,01015289892,hana.zaki0668@example.eg,2003-09-05,Unspecified,JOR,False,2026-01-04 13:56:00
+CUST-00000670,Farida Adel Shoukry,فريدة عادل شكري,+201115297811,0643388999,farida.shoukry0669@mail.test,2004-04-18,M,PSE,True,2026-01-04 14:03:00
+CUST-00000671,Ahmed Hassan ElSayed,أحمد حسن السيد,+201215305730,01215305730,ahmed.elsayed0670@customer.invalid,2005-11-03,F,EGY,False,2026-01-04 14:10:00
+CUST-00000672,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201515313649,01515313649,mohamed.kamel0671@synthetic.local,2006-06-16,Unspecified,SYR,True,2026-01-04 14:17:00
+CUST-00000673,Mahmoud Tarek Fathy,محمود طارق فتحي,+201015321568,0203399712,mahmoud.fathy0672@example.eg,1965-01-01,M,SDN,False,2026-01-04 14:24:00
+CUST-00000674,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201115329487,01115329487,omar.abdelrahman0673@mail.test,1966-08-14,F,JOR,True,2026-01-04 14:31:00
+CUST-00000675,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201215337406,01215337406,youssef.nassar0674@customer.invalid,1967-03-27,Unspecified,PSE,False,2026-01-04 14:38:00
+CUST-00000676,Mariam Khaled Gaber,مريم خالد جابر,+201515345325,0503410425,mariam.gaber0675@synthetic.local,1968-10-12,M,EGY,True,2026-01-04 14:45:00
+CUST-00000677,Nour Nabil Mahfouz,نور نبيل محفوظ,+201015353244,01015353244,nour.mahfouz0676@example.eg,1969-05-25,F,SYR,False,2026-01-04 14:52:00
+CUST-00000678,Salma Ali Darwish,سلمى علي درويش,+201115361163,01115361163,salma.darwish0677@mail.test,1970-12-10,Unspecified,SDN,True,2026-01-04 14:59:00
+CUST-00000679,Hana Samir Zaki,هنا سمير زكي,+201215369082,0883421138,hana.zaki0678@customer.invalid,1971-07-23,M,JOR,False,2026-01-04 15:06:00
+CUST-00000680,Farida Adel Shoukry,فريدة عادل شكري,+201515377001,01515377001,farida.shoukry0679@synthetic.local,1972-02-08,F,PSE,True,2026-01-04 15:13:00
+CUST-00000681,Ahmed Hassan ElSayed,أحمد حسن السيد,+201015384920,01015384920,ahmed.elsayed0680@example.eg,1973-09-21,Unspecified,EGY,False,2026-01-04 15:20:00
+CUST-00000682,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201115392839,0303431851,mohamed.kamel0681@mail.test,1974-04-06,M,SYR,True,2026-01-04 15:27:00
+CUST-00000683,Mahmoud Tarek Fathy,محمود طارق فتحي,+201215400758,01215400758,mahmoud.fathy0682@customer.invalid,1975-11-19,F,SDN,False,2026-01-04 15:34:00
+CUST-00000684,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201515408677,01515408677,omar.abdelrahman0683@synthetic.local,1976-06-04,Unspecified,JOR,True,2026-01-04 15:41:00
+CUST-00000685,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201015416596,0553442564,youssef.nassar0684@example.eg,1977-01-17,M,PSE,False,2026-01-04 15:48:00
+CUST-00000686,Mariam Khaled Gaber,مريم خالد جابر,+201115424515,01115424515,mariam.gaber0685@mail.test,1978-08-02,F,EGY,True,2026-01-04 15:55:00
+CUST-00000687,Nour Nabil Mahfouz,نور نبيل محفوظ,+201215432434,01215432434,nour.mahfouz0686@customer.invalid,1979-03-15,Unspecified,SYR,False,2026-01-04 16:02:00
+CUST-00000688,Salma Ali Darwish,سلمى علي درويش,+201515440353,0973453277,salma.darwish0687@synthetic.local,1980-10-28,M,SDN,True,2026-01-04 16:09:00
+CUST-00000689,Hana Samir Zaki,هنا سمير زكي,+201015448272,01015448272,hana.zaki0688@example.eg,1981-05-13,F,JOR,False,2026-01-04 16:16:00
+CUST-00000690,Farida Adel Shoukry,فريدة عادل شكري,+201115456191,01115456191,farida.shoukry0689@mail.test,1982-12-26,Unspecified,PSE,True,2026-01-04 16:23:00
+CUST-00000691,Ahmed Hassan ElSayed,أحمد حسن السيد,+201215464110,0403463990,ahmed.elsayed0690@customer.invalid,1983-07-11,M,EGY,False,2026-01-04 16:30:00
+CUST-00000692,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201515472029,01515472029,mohamed.kamel0691@synthetic.local,1984-02-24,F,SYR,True,2026-01-04 16:37:00
+CUST-00000693,Mahmoud Tarek Fathy,محمود طارق فتحي,+201015479948,01015479948,mahmoud.fathy0692@example.eg,1985-09-09,Unspecified,SDN,False,2026-01-04 16:44:00
+CUST-00000694,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201115487867,0643474703,omar.abdelrahman0693@mail.test,1986-04-22,M,JOR,True,2026-01-04 16:51:00
+CUST-00000695,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201215495786,01215495786,youssef.nassar0694@customer.invalid,1987-11-07,F,PSE,False,2026-01-04 16:58:00
+CUST-00000696,Mariam Khaled Gaber,مريم خالد جابر,+201515503705,01515503705,mariam.gaber0695@synthetic.local,1988-06-20,Unspecified,EGY,True,2026-01-04 17:05:00
+CUST-00000697,Nour Nabil Mahfouz,نور نبيل محفوظ,+201015511624,0203485416,nour.mahfouz0696@example.eg,1989-01-05,M,SYR,False,2026-01-04 17:12:00
+CUST-00000698,Salma Ali Darwish,سلمى علي درويش,+201115519543,01115519543,salma.darwish0697@mail.test,1990-08-18,F,SDN,True,2026-01-04 17:19:00
+CUST-00000699,Hana Samir Zaki,هنا سمير زكي,+201215527462,01215527462,hana.zaki0698@customer.invalid,1991-03-03,Unspecified,JOR,False,2026-01-04 17:26:00
+CUST-00000700,Farida Adel Shoukry,فريدة عادل شكري,+201515535381,0503496129,farida.shoukry0699@synthetic.local,1992-10-16,M,PSE,True,2026-01-04 17:33:00
+CUST-00000701,Ahmed Hassan ElSayed,أحمد حسن السيد,+201015543300,01015543300,ahmed.elsayed0700@example.eg,1993-05-01,F,EGY,False,2026-01-04 17:40:00
+CUST-00000702,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201115551219,01115551219,mohamed.kamel0701@mail.test,1994-12-14,Unspecified,SYR,True,2026-01-04 17:47:00
+CUST-00000703,Mahmoud Tarek Fathy,محمود طارق فتحي,+201215559138,0883506842,mahmoud.fathy0702@customer.invalid,1995-07-27,M,SDN,False,2026-01-04 17:54:00
+CUST-00000704,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201515567057,01515567057,omar.abdelrahman0703@synthetic.local,1996-02-12,F,JOR,True,2026-01-04 18:01:00
+CUST-00000705,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201015574976,01015574976,youssef.nassar0704@example.eg,1997-09-25,Unspecified,PSE,False,2026-01-04 18:08:00
+CUST-00000706,Mariam Khaled Gaber,مريم خالد جابر,+201115582895,0303517555,mariam.gaber0705@mail.test,1998-04-10,M,EGY,True,2026-01-04 18:15:00
+CUST-00000707,Nour Nabil Mahfouz,نور نبيل محفوظ,+201215590814,01215590814,nour.mahfouz0706@customer.invalid,1999-11-23,F,SYR,False,2026-01-04 18:22:00
+CUST-00000708,Salma Ali Darwish,سلمى علي درويش,+201515598733,01515598733,salma.darwish0707@synthetic.local,2000-06-08,Unspecified,SDN,True,2026-01-04 18:29:00
+CUST-00000709,Hana Samir Zaki,هنا سمير زكي,+201015606652,0553528268,hana.zaki0708@example.eg,2001-01-21,M,JOR,False,2026-01-04 18:36:00
+CUST-00000710,Farida Adel Shoukry,فريدة عادل شكري,+201115614571,01115614571,farida.shoukry0709@mail.test,2002-08-06,F,PSE,True,2026-01-04 18:43:00
+CUST-00000711,Ahmed Hassan ElSayed,أحمد حسن السيد,+201215622490,01215622490,ahmed.elsayed0710@customer.invalid,2003-03-19,Unspecified,EGY,False,2026-01-04 18:50:00
+CUST-00000712,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201515630409,0973538981,mohamed.kamel0711@synthetic.local,2004-10-04,M,SYR,True,2026-01-04 18:57:00
+CUST-00000713,Mahmoud Tarek Fathy,محمود طارق فتحي,+201015638328,01015638328,mahmoud.fathy0712@example.eg,2005-05-17,F,SDN,False,2026-01-04 19:04:00
+CUST-00000714,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201115646247,01115646247,omar.abdelrahman0713@mail.test,2006-12-02,Unspecified,JOR,True,2026-01-04 19:11:00
+CUST-00000715,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201215654166,0403549694,youssef.nassar0714@customer.invalid,1965-07-15,M,PSE,False,2026-01-04 19:18:00
+CUST-00000716,Mariam Khaled Gaber,مريم خالد جابر,+201515662085,01515662085,mariam.gaber0715@synthetic.local,1966-02-28,F,EGY,True,2026-01-04 19:25:00
+CUST-00000717,Nour Nabil Mahfouz,نور نبيل محفوظ,+201015670004,01015670004,nour.mahfouz0716@example.eg,1967-09-13,Unspecified,SYR,False,2026-01-04 19:32:00
+CUST-00000718,Salma Ali Darwish,سلمى علي درويش,+201115677923,0643560407,salma.darwish0717@mail.test,1968-04-26,M,SDN,True,2026-01-04 19:39:00
+CUST-00000719,Hana Samir Zaki,هنا سمير زكي,+201215685842,01215685842,hana.zaki0718@customer.invalid,1969-11-11,F,JOR,False,2026-01-04 19:46:00
+CUST-00000720,Farida Adel Shoukry,فريدة عادل شكري,+201515693761,01515693761,farida.shoukry0719@synthetic.local,1970-06-24,Unspecified,PSE,True,2026-01-04 19:53:00
+CUST-00000721,Ahmed Hassan ElSayed,أحمد حسن السيد,+201015701680,0203571120,ahmed.elsayed0720@example.eg,1971-01-09,M,EGY,False,2026-01-04 20:00:00
+CUST-00000722,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201115709599,01115709599,mohamed.kamel0721@mail.test,1972-08-22,F,SYR,True,2026-01-04 20:07:00
+CUST-00000723,Mahmoud Tarek Fathy,محمود طارق فتحي,+201215717518,01215717518,mahmoud.fathy0722@customer.invalid,1973-03-07,Unspecified,SDN,False,2026-01-04 20:14:00
+CUST-00000724,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201515725437,0503581833,omar.abdelrahman0723@synthetic.local,1974-10-20,M,JOR,True,2026-01-04 20:21:00
+CUST-00000725,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201015733356,01015733356,youssef.nassar0724@example.eg,1975-05-05,F,PSE,False,2026-01-04 20:28:00
+CUST-00000726,Mariam Khaled Gaber,مريم خالد جابر,+201115741275,01115741275,mariam.gaber0725@mail.test,1976-12-18,Unspecified,EGY,True,2026-01-04 20:35:00
+CUST-00000727,Nour Nabil Mahfouz,نور نبيل محفوظ,+201215749194,0883592546,nour.mahfouz0726@customer.invalid,1977-07-03,M,SYR,False,2026-01-04 20:42:00
+CUST-00000728,Salma Ali Darwish,سلمى علي درويش,+201515757113,01515757113,salma.darwish0727@synthetic.local,1978-02-16,F,SDN,True,2026-01-04 20:49:00
+CUST-00000729,Hana Samir Zaki,هنا سمير زكي,+201015765032,01015765032,hana.zaki0728@example.eg,1979-09-01,Unspecified,JOR,False,2026-01-04 20:56:00
+CUST-00000730,Farida Adel Shoukry,فريدة عادل شكري,+201115772951,0303603259,farida.shoukry0729@mail.test,1980-04-14,M,PSE,True,2026-01-04 21:03:00
+CUST-00000731,Ahmed Hassan ElSayed,أحمد حسن السيد,+201215780870,01215780870,ahmed.elsayed0730@customer.invalid,1981-11-27,F,EGY,False,2026-01-04 21:10:00
+CUST-00000732,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201515788789,01515788789,mohamed.kamel0731@synthetic.local,1982-06-12,Unspecified,SYR,True,2026-01-04 21:17:00
+CUST-00000733,Mahmoud Tarek Fathy,محمود طارق فتحي,+201015796708,0553613972,mahmoud.fathy0732@example.eg,1983-01-25,M,SDN,False,2026-01-04 21:24:00
+CUST-00000734,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201115804627,01115804627,omar.abdelrahman0733@mail.test,1984-08-10,F,JOR,True,2026-01-04 21:31:00
+CUST-00000735,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201215812546,01215812546,youssef.nassar0734@customer.invalid,1985-03-23,Unspecified,PSE,False,2026-01-04 21:38:00
+CUST-00000736,Mariam Khaled Gaber,مريم خالد جابر,+201515820465,0973624685,mariam.gaber0735@synthetic.local,1986-10-08,M,EGY,True,2026-01-04 21:45:00
+CUST-00000737,Nour Nabil Mahfouz,نور نبيل محفوظ,+201015828384,01015828384,nour.mahfouz0736@example.eg,1987-05-21,F,SYR,False,2026-01-04 21:52:00
+CUST-00000738,Salma Ali Darwish,سلمى علي درويش,+201115836303,01115836303,salma.darwish0737@mail.test,1988-12-06,Unspecified,SDN,True,2026-01-04 21:59:00
+CUST-00000739,Hana Samir Zaki,هنا سمير زكي,+201215844222,0403635398,hana.zaki0738@customer.invalid,1989-07-19,M,JOR,False,2026-01-04 22:06:00
+CUST-00000740,Farida Adel Shoukry,فريدة عادل شكري,+201515852141,01515852141,farida.shoukry0739@synthetic.local,1990-02-04,F,PSE,True,2026-01-04 22:13:00
+CUST-00000741,Ahmed Hassan ElSayed,أحمد حسن السيد,+201015860060,01015860060,ahmed.elsayed0740@example.eg,1991-09-17,Unspecified,EGY,False,2026-01-04 22:20:00
+CUST-00000742,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201115867979,0643646111,mohamed.kamel0741@mail.test,1992-04-02,M,SYR,True,2026-01-04 22:27:00
+CUST-00000743,Mahmoud Tarek Fathy,محمود طارق فتحي,+201215875898,01215875898,mahmoud.fathy0742@customer.invalid,1993-11-15,F,SDN,False,2026-01-04 22:34:00
+CUST-00000744,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201515883817,01515883817,omar.abdelrahman0743@synthetic.local,1994-06-28,Unspecified,JOR,True,2026-01-04 22:41:00
+CUST-00000745,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201015891736,0203656824,youssef.nassar0744@example.eg,1995-01-13,M,PSE,False,2026-01-04 22:48:00
+CUST-00000746,Mariam Khaled Gaber,مريم خالد جابر,+201115899655,01115899655,mariam.gaber0745@mail.test,1996-08-26,F,EGY,True,2026-01-04 22:55:00
+CUST-00000747,Nour Nabil Mahfouz,نور نبيل محفوظ,+201215907574,01215907574,nour.mahfouz0746@customer.invalid,1997-03-11,Unspecified,SYR,False,2026-01-04 23:02:00
+CUST-00000748,Salma Ali Darwish,سلمى علي درويش,+201515915493,0503667537,salma.darwish0747@synthetic.local,1998-10-24,M,SDN,True,2026-01-04 23:09:00
+CUST-00000749,Hana Samir Zaki,هنا سمير زكي,+201015923412,01015923412,hana.zaki0748@example.eg,1999-05-09,F,JOR,False,2026-01-04 23:16:00
+CUST-00000750,Farida Adel Shoukry,فريدة عادل شكري,+201115931331,01115931331,farida.shoukry0749@mail.test,2000-12-22,Unspecified,PSE,True,2026-01-04 23:23:00
+CUST-00000751,Ahmed Hassan ElSayed,أحمد حسن السيد,+201215939250,0883678250,ahmed.elsayed0750@customer.invalid,2001-07-07,M,EGY,False,2026-01-04 23:30:00
+CUST-00000752,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201515947169,01515947169,mohamed.kamel0751@synthetic.local,2002-02-20,F,SYR,True,2026-01-04 23:37:00
+CUST-00000753,Mahmoud Tarek Fathy,محمود طارق فتحي,+201015955088,01015955088,mahmoud.fathy0752@example.eg,2003-09-05,Unspecified,SDN,False,2026-01-04 23:44:00
+CUST-00000754,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201115963007,0303688963,omar.abdelrahman0753@mail.test,2004-04-18,M,JOR,True,2026-01-04 23:51:00
+CUST-00000755,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201215970926,01215970926,youssef.nassar0754@customer.invalid,2005-11-03,F,PSE,False,2026-01-04 23:58:00
+CUST-00000756,Mariam Khaled Gaber,مريم خالد جابر,+201515978845,01515978845,mariam.gaber0755@synthetic.local,2006-06-16,Unspecified,EGY,True,2026-01-05 00:05:00
+CUST-00000757,Nour Nabil Mahfouz,نور نبيل محفوظ,+201015986764,0553699676,nour.mahfouz0756@example.eg,1965-01-01,M,SYR,False,2026-01-05 00:12:00
+CUST-00000758,Salma Ali Darwish,سلمى علي درويش,+201115994683,01115994683,salma.darwish0757@mail.test,1966-08-14,F,SDN,True,2026-01-05 00:19:00
+CUST-00000759,Hana Samir Zaki,هنا سمير زكي,+201216002602,01216002602,hana.zaki0758@customer.invalid,1967-03-27,Unspecified,JOR,False,2026-01-05 00:26:00
+CUST-00000760,Farida Adel Shoukry,فريدة عادل شكري,+201516010521,0973710389,farida.shoukry0759@synthetic.local,1968-10-12,M,PSE,True,2026-01-05 00:33:00
+CUST-00000761,Ahmed Hassan ElSayed,أحمد حسن السيد,+201016018440,01016018440,ahmed.elsayed0760@example.eg,1969-05-25,F,EGY,False,2026-01-05 00:40:00
+CUST-00000762,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201116026359,01116026359,mohamed.kamel0761@mail.test,1970-12-10,Unspecified,SYR,True,2026-01-05 00:47:00
+CUST-00000763,Mahmoud Tarek Fathy,محمود طارق فتحي,+201216034278,0403721102,mahmoud.fathy0762@customer.invalid,1971-07-23,M,SDN,False,2026-01-05 00:54:00
+CUST-00000764,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201516042197,01516042197,omar.abdelrahman0763@synthetic.local,1972-02-08,F,JOR,True,2026-01-05 01:01:00
+CUST-00000765,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201016050116,01016050116,youssef.nassar0764@example.eg,1973-09-21,Unspecified,PSE,False,2026-01-05 01:08:00
+CUST-00000766,Mariam Khaled Gaber,مريم خالد جابر,+201116058035,0643731815,mariam.gaber0765@mail.test,1974-04-06,M,EGY,True,2026-01-05 01:15:00
+CUST-00000767,Nour Nabil Mahfouz,نور نبيل محفوظ,+201216065954,01216065954,nour.mahfouz0766@customer.invalid,1975-11-19,F,SYR,False,2026-01-05 01:22:00
+CUST-00000768,Salma Ali Darwish,سلمى علي درويش,+201516073873,01516073873,salma.darwish0767@synthetic.local,1976-06-04,Unspecified,SDN,True,2026-01-05 01:29:00
+CUST-00000769,Hana Samir Zaki,هنا سمير زكي,+201016081792,0203742528,hana.zaki0768@example.eg,1977-01-17,M,JOR,False,2026-01-05 01:36:00
+CUST-00000770,Farida Adel Shoukry,فريدة عادل شكري,+201116089711,01116089711,farida.shoukry0769@mail.test,1978-08-02,F,PSE,True,2026-01-05 01:43:00
+CUST-00000771,Ahmed Hassan ElSayed,أحمد حسن السيد,+201216097630,01216097630,ahmed.elsayed0770@customer.invalid,1979-03-15,Unspecified,EGY,False,2026-01-05 01:50:00
+CUST-00000772,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201516105549,0503753241,mohamed.kamel0771@synthetic.local,1980-10-28,M,SYR,True,2026-01-05 01:57:00
+CUST-00000773,Mahmoud Tarek Fathy,محمود طارق فتحي,+201016113468,01016113468,mahmoud.fathy0772@example.eg,1981-05-13,F,SDN,False,2026-01-05 02:04:00
+CUST-00000774,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201116121387,01116121387,omar.abdelrahman0773@mail.test,1982-12-26,Unspecified,JOR,True,2026-01-05 02:11:00
+CUST-00000775,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201216129306,0883763954,youssef.nassar0774@customer.invalid,1983-07-11,M,PSE,False,2026-01-05 02:18:00
+CUST-00000776,Mariam Khaled Gaber,مريم خالد جابر,+201516137225,01516137225,mariam.gaber0775@synthetic.local,1984-02-24,F,EGY,True,2026-01-05 02:25:00
+CUST-00000777,Nour Nabil Mahfouz,نور نبيل محفوظ,+201016145144,01016145144,nour.mahfouz0776@example.eg,1985-09-09,Unspecified,SYR,False,2026-01-05 02:32:00
+CUST-00000778,Salma Ali Darwish,سلمى علي درويش,+201116153063,0303774667,salma.darwish0777@mail.test,1986-04-22,M,SDN,True,2026-01-05 02:39:00
+CUST-00000779,Hana Samir Zaki,هنا سمير زكي,+201216160982,01216160982,hana.zaki0778@customer.invalid,1987-11-07,F,JOR,False,2026-01-05 02:46:00
+CUST-00000780,Farida Adel Shoukry,فريدة عادل شكري,+201516168901,01516168901,farida.shoukry0779@synthetic.local,1988-06-20,Unspecified,PSE,True,2026-01-05 02:53:00
+CUST-00000781,Ahmed Hassan ElSayed,أحمد حسن السيد,+201016176820,0553785380,ahmed.elsayed0780@example.eg,1989-01-05,M,EGY,False,2026-01-05 03:00:00
+CUST-00000782,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201116184739,01116184739,mohamed.kamel0781@mail.test,1990-08-18,F,SYR,True,2026-01-05 03:07:00
+CUST-00000783,Mahmoud Tarek Fathy,محمود طارق فتحي,+201216192658,01216192658,mahmoud.fathy0782@customer.invalid,1991-03-03,Unspecified,SDN,False,2026-01-05 03:14:00
+CUST-00000784,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201516200577,0973796093,omar.abdelrahman0783@synthetic.local,1992-10-16,M,JOR,True,2026-01-05 03:21:00
+CUST-00000785,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201016208496,01016208496,youssef.nassar0784@example.eg,1993-05-01,F,PSE,False,2026-01-05 03:28:00
+CUST-00000786,Mariam Khaled Gaber,مريم خالد جابر,+201116216415,01116216415,mariam.gaber0785@mail.test,1994-12-14,Unspecified,EGY,True,2026-01-05 03:35:00
+CUST-00000787,Nour Nabil Mahfouz,نور نبيل محفوظ,+201216224334,0403806806,nour.mahfouz0786@customer.invalid,1995-07-27,M,SYR,False,2026-01-05 03:42:00
+CUST-00000788,Salma Ali Darwish,سلمى علي درويش,+201516232253,01516232253,salma.darwish0787@synthetic.local,1996-02-12,F,SDN,True,2026-01-05 03:49:00
+CUST-00000789,Hana Samir Zaki,هنا سمير زكي,+201016240172,01016240172,hana.zaki0788@example.eg,1997-09-25,Unspecified,JOR,False,2026-01-05 03:56:00
+CUST-00000790,Farida Adel Shoukry,فريدة عادل شكري,+201116248091,0643817519,farida.shoukry0789@mail.test,1998-04-10,M,PSE,True,2026-01-05 04:03:00
+CUST-00000791,Ahmed Hassan ElSayed,أحمد حسن السيد,+201216256010,01216256010,ahmed.elsayed0790@customer.invalid,1999-11-23,F,EGY,False,2026-01-05 04:10:00
+CUST-00000792,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201516263929,01516263929,mohamed.kamel0791@synthetic.local,2000-06-08,Unspecified,SYR,True,2026-01-05 04:17:00
+CUST-00000793,Mahmoud Tarek Fathy,محمود طارق فتحي,+201016271848,0203828232,mahmoud.fathy0792@example.eg,2001-01-21,M,SDN,False,2026-01-05 04:24:00
+CUST-00000794,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201116279767,01116279767,omar.abdelrahman0793@mail.test,2002-08-06,F,JOR,True,2026-01-05 04:31:00
+CUST-00000795,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201216287686,01216287686,youssef.nassar0794@customer.invalid,2003-03-19,Unspecified,PSE,False,2026-01-05 04:38:00
+CUST-00000796,Mariam Khaled Gaber,مريم خالد جابر,+201516295605,0503838945,mariam.gaber0795@synthetic.local,2004-10-04,M,EGY,True,2026-01-05 04:45:00
+CUST-00000797,Nour Nabil Mahfouz,نور نبيل محفوظ,+201016303524,01016303524,nour.mahfouz0796@example.eg,2005-05-17,F,SYR,False,2026-01-05 04:52:00
+CUST-00000798,Salma Ali Darwish,سلمى علي درويش,+201116311443,01116311443,salma.darwish0797@mail.test,2006-12-02,Unspecified,SDN,True,2026-01-05 04:59:00
+CUST-00000799,Hana Samir Zaki,هنا سمير زكي,+201216319362,0883849658,hana.zaki0798@customer.invalid,1965-07-15,M,JOR,False,2026-01-05 05:06:00
+CUST-00000800,Farida Adel Shoukry,فريدة عادل شكري,+201516327281,01516327281,farida.shoukry0799@synthetic.local,1966-02-28,F,PSE,True,2026-01-05 05:13:00
+CUST-00000801,Ahmed Hassan ElSayed,أحمد حسن السيد,+201016335200,01016335200,ahmed.elsayed0800@example.eg,1967-09-13,Unspecified,EGY,False,2026-01-05 05:20:00
+CUST-00000802,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201116343119,0303860371,mohamed.kamel0801@mail.test,1968-04-26,M,SYR,True,2026-01-05 05:27:00
+CUST-00000803,Mahmoud Tarek Fathy,محمود طارق فتحي,+201216351038,01216351038,mahmoud.fathy0802@customer.invalid,1969-11-11,F,SDN,False,2026-01-05 05:34:00
+CUST-00000804,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201516358957,01516358957,omar.abdelrahman0803@synthetic.local,1970-06-24,Unspecified,JOR,True,2026-01-05 05:41:00
+CUST-00000805,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201016366876,0553871084,youssef.nassar0804@example.eg,1971-01-09,M,PSE,False,2026-01-05 05:48:00
+CUST-00000806,Mariam Khaled Gaber,مريم خالد جابر,+201116374795,01116374795,mariam.gaber0805@mail.test,1972-08-22,F,EGY,True,2026-01-05 05:55:00
+CUST-00000807,Nour Nabil Mahfouz,نور نبيل محفوظ,+201216382714,01216382714,nour.mahfouz0806@customer.invalid,1973-03-07,Unspecified,SYR,False,2026-01-05 06:02:00
+CUST-00000808,Salma Ali Darwish,سلمى علي درويش,+201516390633,0973881797,salma.darwish0807@synthetic.local,1974-10-20,M,SDN,True,2026-01-05 06:09:00
+CUST-00000809,Hana Samir Zaki,هنا سمير زكي,+201016398552,01016398552,hana.zaki0808@example.eg,1975-05-05,F,JOR,False,2026-01-05 06:16:00
+CUST-00000810,Farida Adel Shoukry,فريدة عادل شكري,+201116406471,01116406471,farida.shoukry0809@mail.test,1976-12-18,Unspecified,PSE,True,2026-01-05 06:23:00
+CUST-00000811,Ahmed Hassan ElSayed,أحمد حسن السيد,+201216414390,0403892510,ahmed.elsayed0810@customer.invalid,1977-07-03,M,EGY,False,2026-01-05 06:30:00
+CUST-00000812,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201516422309,01516422309,mohamed.kamel0811@synthetic.local,1978-02-16,F,SYR,True,2026-01-05 06:37:00
+CUST-00000813,Mahmoud Tarek Fathy,محمود طارق فتحي,+201016430228,01016430228,mahmoud.fathy0812@example.eg,1979-09-01,Unspecified,SDN,False,2026-01-05 06:44:00
+CUST-00000814,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201116438147,0643903223,omar.abdelrahman0813@mail.test,1980-04-14,M,JOR,True,2026-01-05 06:51:00
+CUST-00000815,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201216446066,01216446066,youssef.nassar0814@customer.invalid,1981-11-27,F,PSE,False,2026-01-05 06:58:00
+CUST-00000816,Mariam Khaled Gaber,مريم خالد جابر,+201516453985,01516453985,mariam.gaber0815@synthetic.local,1982-06-12,Unspecified,EGY,True,2026-01-05 07:05:00
+CUST-00000817,Nour Nabil Mahfouz,نور نبيل محفوظ,+201016461904,0203913936,nour.mahfouz0816@example.eg,1983-01-25,M,SYR,False,2026-01-05 07:12:00
+CUST-00000818,Salma Ali Darwish,سلمى علي درويش,+201116469823,01116469823,salma.darwish0817@mail.test,1984-08-10,F,SDN,True,2026-01-05 07:19:00
+CUST-00000819,Hana Samir Zaki,هنا سمير زكي,+201216477742,01216477742,hana.zaki0818@customer.invalid,1985-03-23,Unspecified,JOR,False,2026-01-05 07:26:00
+CUST-00000820,Farida Adel Shoukry,فريدة عادل شكري,+201516485661,0503924649,farida.shoukry0819@synthetic.local,1986-10-08,M,PSE,True,2026-01-05 07:33:00
+CUST-00000821,Ahmed Hassan ElSayed,أحمد حسن السيد,+201016493580,01016493580,ahmed.elsayed0820@example.eg,1987-05-21,F,EGY,False,2026-01-05 07:40:00
+CUST-00000822,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201116501499,01116501499,mohamed.kamel0821@mail.test,1988-12-06,Unspecified,SYR,True,2026-01-05 07:47:00
+CUST-00000823,Mahmoud Tarek Fathy,محمود طارق فتحي,+201216509418,0883935362,mahmoud.fathy0822@customer.invalid,1989-07-19,M,SDN,False,2026-01-05 07:54:00
+CUST-00000824,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201516517337,01516517337,omar.abdelrahman0823@synthetic.local,1990-02-04,F,JOR,True,2026-01-05 08:01:00
+CUST-00000825,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201016525256,01016525256,youssef.nassar0824@example.eg,1991-09-17,Unspecified,PSE,False,2026-01-05 08:08:00
+CUST-00000826,Mariam Khaled Gaber,مريم خالد جابر,+201116533175,0303946075,mariam.gaber0825@mail.test,1992-04-02,M,EGY,True,2026-01-05 08:15:00
+CUST-00000827,Nour Nabil Mahfouz,نور نبيل محفوظ,+201216541094,01216541094,nour.mahfouz0826@customer.invalid,1993-11-15,F,SYR,False,2026-01-05 08:22:00
+CUST-00000828,Salma Ali Darwish,سلمى علي درويش,+201516549013,01516549013,salma.darwish0827@synthetic.local,1994-06-28,Unspecified,SDN,True,2026-01-05 08:29:00
+CUST-00000829,Hana Samir Zaki,هنا سمير زكي,+201016556932,0553956788,hana.zaki0828@example.eg,1995-01-13,M,JOR,False,2026-01-05 08:36:00
+CUST-00000830,Farida Adel Shoukry,فريدة عادل شكري,+201116564851,01116564851,farida.shoukry0829@mail.test,1996-08-26,F,PSE,True,2026-01-05 08:43:00
+CUST-00000831,Ahmed Hassan ElSayed,أحمد حسن السيد,+201216572770,01216572770,ahmed.elsayed0830@customer.invalid,1997-03-11,Unspecified,EGY,False,2026-01-05 08:50:00
+CUST-00000832,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201516580689,0973967501,mohamed.kamel0831@synthetic.local,1998-10-24,M,SYR,True,2026-01-05 08:57:00
+CUST-00000833,Mahmoud Tarek Fathy,محمود طارق فتحي,+201016588608,01016588608,mahmoud.fathy0832@example.eg,1999-05-09,F,SDN,False,2026-01-05 09:04:00
+CUST-00000834,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201116596527,01116596527,omar.abdelrahman0833@mail.test,2000-12-22,Unspecified,JOR,True,2026-01-05 09:11:00
+CUST-00000835,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201216604446,0403978214,youssef.nassar0834@customer.invalid,2001-07-07,M,PSE,False,2026-01-05 09:18:00
+CUST-00000836,Mariam Khaled Gaber,مريم خالد جابر,+201516612365,01516612365,mariam.gaber0835@synthetic.local,2002-02-20,F,EGY,True,2026-01-05 09:25:00
+CUST-00000837,Nour Nabil Mahfouz,نور نبيل محفوظ,+201016620284,01016620284,nour.mahfouz0836@example.eg,2003-09-05,Unspecified,SYR,False,2026-01-05 09:32:00
+CUST-00000838,Salma Ali Darwish,سلمى علي درويش,+201116628203,0643988927,salma.darwish0837@mail.test,2004-04-18,M,SDN,True,2026-01-05 09:39:00
+CUST-00000839,Hana Samir Zaki,هنا سمير زكي,+201216636122,01216636122,hana.zaki0838@customer.invalid,2005-11-03,F,JOR,False,2026-01-05 09:46:00
+CUST-00000840,Farida Adel Shoukry,فريدة عادل شكري,+201516644041,01516644041,farida.shoukry0839@synthetic.local,2006-06-16,Unspecified,PSE,True,2026-01-05 09:53:00
+CUST-00000841,Ahmed Hassan ElSayed,أحمد حسن السيد,+201016651960,0203999640,ahmed.elsayed0840@example.eg,1965-01-01,M,EGY,False,2026-01-05 10:00:00
+CUST-00000842,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201116659879,01116659879,mohamed.kamel0841@mail.test,1966-08-14,F,SYR,True,2026-01-05 10:07:00
+CUST-00000843,Mahmoud Tarek Fathy,محمود طارق فتحي,+201216667798,01216667798,mahmoud.fathy0842@customer.invalid,1967-03-27,Unspecified,SDN,False,2026-01-05 10:14:00
+CUST-00000844,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201516675717,0504010353,omar.abdelrahman0843@synthetic.local,1968-10-12,M,JOR,True,2026-01-05 10:21:00
+CUST-00000845,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201016683636,01016683636,youssef.nassar0844@example.eg,1969-05-25,F,PSE,False,2026-01-05 10:28:00
+CUST-00000846,Mariam Khaled Gaber,مريم خالد جابر,+201116691555,01116691555,mariam.gaber0845@mail.test,1970-12-10,Unspecified,EGY,True,2026-01-05 10:35:00
+CUST-00000847,Nour Nabil Mahfouz,نور نبيل محفوظ,+201216699474,0884021066,nour.mahfouz0846@customer.invalid,1971-07-23,M,SYR,False,2026-01-05 10:42:00
+CUST-00000848,Salma Ali Darwish,سلمى علي درويش,+201516707393,01516707393,salma.darwish0847@synthetic.local,1972-02-08,F,SDN,True,2026-01-05 10:49:00
+CUST-00000849,Hana Samir Zaki,هنا سمير زكي,+201016715312,01016715312,hana.zaki0848@example.eg,1973-09-21,Unspecified,JOR,False,2026-01-05 10:56:00
+CUST-00000850,Farida Adel Shoukry,فريدة عادل شكري,+201116723231,0304031779,farida.shoukry0849@mail.test,1974-04-06,M,PSE,True,2026-01-05 11:03:00
+CUST-00000851,Ahmed Hassan ElSayed,أحمد حسن السيد,+201216731150,01216731150,ahmed.elsayed0850@customer.invalid,1975-11-19,F,EGY,False,2026-01-05 11:10:00
+CUST-00000852,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201516739069,01516739069,mohamed.kamel0851@synthetic.local,1976-06-04,Unspecified,SYR,True,2026-01-05 11:17:00
+CUST-00000853,Mahmoud Tarek Fathy,محمود طارق فتحي,+201016746988,0554042492,mahmoud.fathy0852@example.eg,1977-01-17,M,SDN,False,2026-01-05 11:24:00
+CUST-00000854,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201116754907,01116754907,omar.abdelrahman0853@mail.test,1978-08-02,F,JOR,True,2026-01-05 11:31:00
+CUST-00000855,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201216762826,01216762826,youssef.nassar0854@customer.invalid,1979-03-15,Unspecified,PSE,False,2026-01-05 11:38:00
+CUST-00000856,Mariam Khaled Gaber,مريم خالد جابر,+201516770745,0974053205,mariam.gaber0855@synthetic.local,1980-10-28,M,EGY,True,2026-01-05 11:45:00
+CUST-00000857,Nour Nabil Mahfouz,نور نبيل محفوظ,+201016778664,01016778664,nour.mahfouz0856@example.eg,1981-05-13,F,SYR,False,2026-01-05 11:52:00
+CUST-00000858,Salma Ali Darwish,سلمى علي درويش,+201116786583,01116786583,salma.darwish0857@mail.test,1982-12-26,Unspecified,SDN,True,2026-01-05 11:59:00
+CUST-00000859,Hana Samir Zaki,هنا سمير زكي,+201216794502,0404063918,hana.zaki0858@customer.invalid,1983-07-11,M,JOR,False,2026-01-05 12:06:00
+CUST-00000860,Farida Adel Shoukry,فريدة عادل شكري,+201516802421,01516802421,farida.shoukry0859@synthetic.local,1984-02-24,F,PSE,True,2026-01-05 12:13:00
+CUST-00000861,Ahmed Hassan ElSayed,أحمد حسن السيد,+201016810340,01016810340,ahmed.elsayed0860@example.eg,1985-09-09,Unspecified,EGY,False,2026-01-05 12:20:00
+CUST-00000862,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201116818259,0644074631,mohamed.kamel0861@mail.test,1986-04-22,M,SYR,True,2026-01-05 12:27:00
+CUST-00000863,Mahmoud Tarek Fathy,محمود طارق فتحي,+201216826178,01216826178,mahmoud.fathy0862@customer.invalid,1987-11-07,F,SDN,False,2026-01-05 12:34:00
+CUST-00000864,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201516834097,01516834097,omar.abdelrahman0863@synthetic.local,1988-06-20,Unspecified,JOR,True,2026-01-05 12:41:00
+CUST-00000865,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201016842016,0204085344,youssef.nassar0864@example.eg,1989-01-05,M,PSE,False,2026-01-05 12:48:00
+CUST-00000866,Mariam Khaled Gaber,مريم خالد جابر,+201116849935,01116849935,mariam.gaber0865@mail.test,1990-08-18,F,EGY,True,2026-01-05 12:55:00
+CUST-00000867,Nour Nabil Mahfouz,نور نبيل محفوظ,+201216857854,01216857854,nour.mahfouz0866@customer.invalid,1991-03-03,Unspecified,SYR,False,2026-01-05 13:02:00
+CUST-00000868,Salma Ali Darwish,سلمى علي درويش,+201516865773,0504096057,salma.darwish0867@synthetic.local,1992-10-16,M,SDN,True,2026-01-05 13:09:00
+CUST-00000869,Hana Samir Zaki,هنا سمير زكي,+201016873692,01016873692,hana.zaki0868@example.eg,1993-05-01,F,JOR,False,2026-01-05 13:16:00
+CUST-00000870,Farida Adel Shoukry,فريدة عادل شكري,+201116881611,01116881611,farida.shoukry0869@mail.test,1994-12-14,Unspecified,PSE,True,2026-01-05 13:23:00
+CUST-00000871,Ahmed Hassan ElSayed,أحمد حسن السيد,+201216889530,0884106770,ahmed.elsayed0870@customer.invalid,1995-07-27,M,EGY,False,2026-01-05 13:30:00
+CUST-00000872,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201516897449,01516897449,mohamed.kamel0871@synthetic.local,1996-02-12,F,SYR,True,2026-01-05 13:37:00
+CUST-00000873,Mahmoud Tarek Fathy,محمود طارق فتحي,+201016905368,01016905368,mahmoud.fathy0872@example.eg,1997-09-25,Unspecified,SDN,False,2026-01-05 13:44:00
+CUST-00000874,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201116913287,0304117483,omar.abdelrahman0873@mail.test,1998-04-10,M,JOR,True,2026-01-05 13:51:00
+CUST-00000875,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201216921206,01216921206,youssef.nassar0874@customer.invalid,1999-11-23,F,PSE,False,2026-01-05 13:58:00
+CUST-00000876,Mariam Khaled Gaber,مريم خالد جابر,+201516929125,01516929125,mariam.gaber0875@synthetic.local,2000-06-08,Unspecified,EGY,True,2026-01-05 14:05:00
+CUST-00000877,Nour Nabil Mahfouz,نور نبيل محفوظ,+201016937044,0554128196,nour.mahfouz0876@example.eg,2001-01-21,M,SYR,False,2026-01-05 14:12:00
+CUST-00000878,Salma Ali Darwish,سلمى علي درويش,+201116944963,01116944963,salma.darwish0877@mail.test,2002-08-06,F,SDN,True,2026-01-05 14:19:00
+CUST-00000879,Hana Samir Zaki,هنا سمير زكي,+201216952882,01216952882,hana.zaki0878@customer.invalid,2003-03-19,Unspecified,JOR,False,2026-01-05 14:26:00
+CUST-00000880,Farida Adel Shoukry,فريدة عادل شكري,+201516960801,0974138909,farida.shoukry0879@synthetic.local,2004-10-04,M,PSE,True,2026-01-05 14:33:00
+CUST-00000881,Ahmed Hassan ElSayed,أحمد حسن السيد,+201016968720,01016968720,ahmed.elsayed0880@example.eg,2005-05-17,F,EGY,False,2026-01-05 14:40:00
+CUST-00000882,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201116976639,01116976639,mohamed.kamel0881@mail.test,2006-12-02,Unspecified,SYR,True,2026-01-05 14:47:00
+CUST-00000883,Mahmoud Tarek Fathy,محمود طارق فتحي,+201216984558,0404149622,mahmoud.fathy0882@customer.invalid,1965-07-15,M,SDN,False,2026-01-05 14:54:00
+CUST-00000884,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201516992477,01516992477,omar.abdelrahman0883@synthetic.local,1966-02-28,F,JOR,True,2026-01-05 15:01:00
+CUST-00000885,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201017000396,01017000396,youssef.nassar0884@example.eg,1967-09-13,Unspecified,PSE,False,2026-01-05 15:08:00
+CUST-00000886,Mariam Khaled Gaber,مريم خالد جابر,+201117008315,0644160335,mariam.gaber0885@mail.test,1968-04-26,M,EGY,True,2026-01-05 15:15:00
+CUST-00000887,Nour Nabil Mahfouz,نور نبيل محفوظ,+201217016234,01217016234,nour.mahfouz0886@customer.invalid,1969-11-11,F,SYR,False,2026-01-05 15:22:00
+CUST-00000888,Salma Ali Darwish,سلمى علي درويش,+201517024153,01517024153,salma.darwish0887@synthetic.local,1970-06-24,Unspecified,SDN,True,2026-01-05 15:29:00
+CUST-00000889,Hana Samir Zaki,هنا سمير زكي,+201017032072,0204171048,hana.zaki0888@example.eg,1971-01-09,M,JOR,False,2026-01-05 15:36:00
+CUST-00000890,Farida Adel Shoukry,فريدة عادل شكري,+201117039991,01117039991,farida.shoukry0889@mail.test,1972-08-22,F,PSE,True,2026-01-05 15:43:00
+CUST-00000891,Ahmed Hassan ElSayed,أحمد حسن السيد,+201217047910,01217047910,ahmed.elsayed0890@customer.invalid,1973-03-07,Unspecified,EGY,False,2026-01-05 15:50:00
+CUST-00000892,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201517055829,0504181761,mohamed.kamel0891@synthetic.local,1974-10-20,M,SYR,True,2026-01-05 15:57:00
+CUST-00000893,Mahmoud Tarek Fathy,محمود طارق فتحي,+201017063748,01017063748,mahmoud.fathy0892@example.eg,1975-05-05,F,SDN,False,2026-01-05 16:04:00
+CUST-00000894,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201117071667,01117071667,omar.abdelrahman0893@mail.test,1976-12-18,Unspecified,JOR,True,2026-01-05 16:11:00
+CUST-00000895,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201217079586,0884192474,youssef.nassar0894@customer.invalid,1977-07-03,M,PSE,False,2026-01-05 16:18:00
+CUST-00000896,Mariam Khaled Gaber,مريم خالد جابر,+201517087505,01517087505,mariam.gaber0895@synthetic.local,1978-02-16,F,EGY,True,2026-01-05 16:25:00
+CUST-00000897,Nour Nabil Mahfouz,نور نبيل محفوظ,+201017095424,01017095424,nour.mahfouz0896@example.eg,1979-09-01,Unspecified,SYR,False,2026-01-05 16:32:00
+CUST-00000898,Salma Ali Darwish,سلمى علي درويش,+201117103343,0304203187,salma.darwish0897@mail.test,1980-04-14,M,SDN,True,2026-01-05 16:39:00
+CUST-00000899,Hana Samir Zaki,هنا سمير زكي,+201217111262,01217111262,hana.zaki0898@customer.invalid,1981-11-27,F,JOR,False,2026-01-05 16:46:00
+CUST-00000900,Farida Adel Shoukry,فريدة عادل شكري,+201517119181,01517119181,farida.shoukry0899@synthetic.local,1982-06-12,Unspecified,PSE,True,2026-01-05 16:53:00
+CUST-00000901,Ahmed Hassan ElSayed,أحمد حسن السيد,+201017127100,0554213900,ahmed.elsayed0900@example.eg,1983-01-25,M,EGY,False,2026-01-05 17:00:00
+CUST-00000902,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201117135019,01117135019,mohamed.kamel0901@mail.test,1984-08-10,F,SYR,True,2026-01-05 17:07:00
+CUST-00000903,Mahmoud Tarek Fathy,محمود طارق فتحي,+201217142938,01217142938,mahmoud.fathy0902@customer.invalid,1985-03-23,Unspecified,SDN,False,2026-01-05 17:14:00
+CUST-00000904,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201517150857,0974224613,omar.abdelrahman0903@synthetic.local,1986-10-08,M,JOR,True,2026-01-05 17:21:00
+CUST-00000905,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201017158776,01017158776,youssef.nassar0904@example.eg,1987-05-21,F,PSE,False,2026-01-05 17:28:00
+CUST-00000906,Mariam Khaled Gaber,مريم خالد جابر,+201117166695,01117166695,mariam.gaber0905@mail.test,1988-12-06,Unspecified,EGY,True,2026-01-05 17:35:00
+CUST-00000907,Nour Nabil Mahfouz,نور نبيل محفوظ,+201217174614,0404235326,nour.mahfouz0906@customer.invalid,1989-07-19,M,SYR,False,2026-01-05 17:42:00
+CUST-00000908,Salma Ali Darwish,سلمى علي درويش,+201517182533,01517182533,salma.darwish0907@synthetic.local,1990-02-04,F,SDN,True,2026-01-05 17:49:00
+CUST-00000909,Hana Samir Zaki,هنا سمير زكي,+201017190452,01017190452,hana.zaki0908@example.eg,1991-09-17,Unspecified,JOR,False,2026-01-05 17:56:00
+CUST-00000910,Farida Adel Shoukry,فريدة عادل شكري,+201117198371,0644246039,farida.shoukry0909@mail.test,1992-04-02,M,PSE,True,2026-01-05 18:03:00
+CUST-00000911,Ahmed Hassan ElSayed,أحمد حسن السيد,+201217206290,01217206290,ahmed.elsayed0910@customer.invalid,1993-11-15,F,EGY,False,2026-01-05 18:10:00
+CUST-00000912,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201517214209,01517214209,mohamed.kamel0911@synthetic.local,1994-06-28,Unspecified,SYR,True,2026-01-05 18:17:00
+CUST-00000913,Mahmoud Tarek Fathy,محمود طارق فتحي,+201017222128,0204256752,mahmoud.fathy0912@example.eg,1995-01-13,M,SDN,False,2026-01-05 18:24:00
+CUST-00000914,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201117230047,01117230047,omar.abdelrahman0913@mail.test,1996-08-26,F,JOR,True,2026-01-05 18:31:00
+CUST-00000915,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201217237966,01217237966,youssef.nassar0914@customer.invalid,1997-03-11,Unspecified,PSE,False,2026-01-05 18:38:00
+CUST-00000916,Mariam Khaled Gaber,مريم خالد جابر,+201517245885,0504267465,mariam.gaber0915@synthetic.local,1998-10-24,M,EGY,True,2026-01-05 18:45:00
+CUST-00000917,Nour Nabil Mahfouz,نور نبيل محفوظ,+201017253804,01017253804,nour.mahfouz0916@example.eg,1999-05-09,F,SYR,False,2026-01-05 18:52:00
+CUST-00000918,Salma Ali Darwish,سلمى علي درويش,+201117261723,01117261723,salma.darwish0917@mail.test,2000-12-22,Unspecified,SDN,True,2026-01-05 18:59:00
+CUST-00000919,Hana Samir Zaki,هنا سمير زكي,+201217269642,0884278178,hana.zaki0918@customer.invalid,2001-07-07,M,JOR,False,2026-01-05 19:06:00
+CUST-00000920,Farida Adel Shoukry,فريدة عادل شكري,+201517277561,01517277561,farida.shoukry0919@synthetic.local,2002-02-20,F,PSE,True,2026-01-05 19:13:00
+CUST-00000921,Ahmed Hassan ElSayed,أحمد حسن السيد,+201017285480,01017285480,ahmed.elsayed0920@example.eg,2003-09-05,Unspecified,EGY,False,2026-01-05 19:20:00
+CUST-00000922,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201117293399,0304288891,mohamed.kamel0921@mail.test,2004-04-18,M,SYR,True,2026-01-05 19:27:00
+CUST-00000923,Mahmoud Tarek Fathy,محمود طارق فتحي,+201217301318,01217301318,mahmoud.fathy0922@customer.invalid,2005-11-03,F,SDN,False,2026-01-05 19:34:00
+CUST-00000924,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201517309237,01517309237,omar.abdelrahman0923@synthetic.local,2006-06-16,Unspecified,JOR,True,2026-01-05 19:41:00
+CUST-00000925,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201017317156,0554299604,youssef.nassar0924@example.eg,1965-01-01,M,PSE,False,2026-01-05 19:48:00
+CUST-00000926,Mariam Khaled Gaber,مريم خالد جابر,+201117325075,01117325075,mariam.gaber0925@mail.test,1966-08-14,F,EGY,True,2026-01-05 19:55:00
+CUST-00000927,Nour Nabil Mahfouz,نور نبيل محفوظ,+201217332994,01217332994,nour.mahfouz0926@customer.invalid,1967-03-27,Unspecified,SYR,False,2026-01-05 20:02:00
+CUST-00000928,Salma Ali Darwish,سلمى علي درويش,+201517340913,0974310317,salma.darwish0927@synthetic.local,1968-10-12,M,SDN,True,2026-01-05 20:09:00
+CUST-00000929,Hana Samir Zaki,هنا سمير زكي,+201017348832,01017348832,hana.zaki0928@example.eg,1969-05-25,F,JOR,False,2026-01-05 20:16:00
+CUST-00000930,Farida Adel Shoukry,فريدة عادل شكري,+201117356751,01117356751,farida.shoukry0929@mail.test,1970-12-10,Unspecified,PSE,True,2026-01-05 20:23:00
+CUST-00000931,Ahmed Hassan ElSayed,أحمد حسن السيد,+201217364670,0404321030,ahmed.elsayed0930@customer.invalid,1971-07-23,M,EGY,False,2026-01-05 20:30:00
+CUST-00000932,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201517372589,01517372589,mohamed.kamel0931@synthetic.local,1972-02-08,F,SYR,True,2026-01-05 20:37:00
+CUST-00000933,Mahmoud Tarek Fathy,محمود طارق فتحي,+201017380508,01017380508,mahmoud.fathy0932@example.eg,1973-09-21,Unspecified,SDN,False,2026-01-05 20:44:00
+CUST-00000934,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201117388427,0644331743,omar.abdelrahman0933@mail.test,1974-04-06,M,JOR,True,2026-01-05 20:51:00
+CUST-00000935,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201217396346,01217396346,youssef.nassar0934@customer.invalid,1975-11-19,F,PSE,False,2026-01-05 20:58:00
+CUST-00000936,Mariam Khaled Gaber,مريم خالد جابر,+201517404265,01517404265,mariam.gaber0935@synthetic.local,1976-06-04,Unspecified,EGY,True,2026-01-05 21:05:00
+CUST-00000937,Nour Nabil Mahfouz,نور نبيل محفوظ,+201017412184,0204342456,nour.mahfouz0936@example.eg,1977-01-17,M,SYR,False,2026-01-05 21:12:00
+CUST-00000938,Salma Ali Darwish,سلمى علي درويش,+201117420103,01117420103,salma.darwish0937@mail.test,1978-08-02,F,SDN,True,2026-01-05 21:19:00
+CUST-00000939,Hana Samir Zaki,هنا سمير زكي,+201217428022,01217428022,hana.zaki0938@customer.invalid,1979-03-15,Unspecified,JOR,False,2026-01-05 21:26:00
+CUST-00000940,Farida Adel Shoukry,فريدة عادل شكري,+201517435941,0504353169,farida.shoukry0939@synthetic.local,1980-10-28,M,PSE,True,2026-01-05 21:33:00
+CUST-00000941,Ahmed Hassan ElSayed,أحمد حسن السيد,+201017443860,01017443860,ahmed.elsayed0940@example.eg,1981-05-13,F,EGY,False,2026-01-05 21:40:00
+CUST-00000942,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201117451779,01117451779,mohamed.kamel0941@mail.test,1982-12-26,Unspecified,SYR,True,2026-01-05 21:47:00
+CUST-00000943,Mahmoud Tarek Fathy,محمود طارق فتحي,+201217459698,0884363882,mahmoud.fathy0942@customer.invalid,1983-07-11,M,SDN,False,2026-01-05 21:54:00
+CUST-00000944,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201517467617,01517467617,omar.abdelrahman0943@synthetic.local,1984-02-24,F,JOR,True,2026-01-05 22:01:00
+CUST-00000945,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201017475536,01017475536,youssef.nassar0944@example.eg,1985-09-09,Unspecified,PSE,False,2026-01-05 22:08:00
+CUST-00000946,Mariam Khaled Gaber,مريم خالد جابر,+201117483455,0304374595,mariam.gaber0945@mail.test,1986-04-22,M,EGY,True,2026-01-05 22:15:00
+CUST-00000947,Nour Nabil Mahfouz,نور نبيل محفوظ,+201217491374,01217491374,nour.mahfouz0946@customer.invalid,1987-11-07,F,SYR,False,2026-01-05 22:22:00
+CUST-00000948,Salma Ali Darwish,سلمى علي درويش,+201517499293,01517499293,salma.darwish0947@synthetic.local,1988-06-20,Unspecified,SDN,True,2026-01-05 22:29:00
+CUST-00000949,Hana Samir Zaki,هنا سمير زكي,+201017507212,0554385308,hana.zaki0948@example.eg,1989-01-05,M,JOR,False,2026-01-05 22:36:00
+CUST-00000950,Farida Adel Shoukry,فريدة عادل شكري,+201117515131,01117515131,farida.shoukry0949@mail.test,1990-08-18,F,PSE,True,2026-01-05 22:43:00
+CUST-00000951,Ahmed Hassan ElSayed,أحمد حسن السيد,+201217523050,01217523050,ahmed.elsayed0950@customer.invalid,1991-03-03,Unspecified,EGY,False,2026-01-05 22:50:00
+CUST-00000952,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201517530969,0974396021,mohamed.kamel0951@synthetic.local,1992-10-16,M,SYR,True,2026-01-05 22:57:00
+CUST-00000953,Mahmoud Tarek Fathy,محمود طارق فتحي,+201017538888,01017538888,mahmoud.fathy0952@example.eg,1993-05-01,F,SDN,False,2026-01-05 23:04:00
+CUST-00000954,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201117546807,01117546807,omar.abdelrahman0953@mail.test,1994-12-14,Unspecified,JOR,True,2026-01-05 23:11:00
+CUST-00000955,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201217554726,0404406734,youssef.nassar0954@customer.invalid,1995-07-27,M,PSE,False,2026-01-05 23:18:00
+CUST-00000956,Mariam Khaled Gaber,مريم خالد جابر,+201517562645,01517562645,mariam.gaber0955@synthetic.local,1996-02-12,F,EGY,True,2026-01-05 23:25:00
+CUST-00000957,Nour Nabil Mahfouz,نور نبيل محفوظ,+201017570564,01017570564,nour.mahfouz0956@example.eg,1997-09-25,Unspecified,SYR,False,2026-01-05 23:32:00
+CUST-00000958,Salma Ali Darwish,سلمى علي درويش,+201117578483,0644417447,salma.darwish0957@mail.test,1998-04-10,M,SDN,True,2026-01-05 23:39:00
+CUST-00000959,Hana Samir Zaki,هنا سمير زكي,+201217586402,01217586402,hana.zaki0958@customer.invalid,1999-11-23,F,JOR,False,2026-01-05 23:46:00
+CUST-00000960,Farida Adel Shoukry,فريدة عادل شكري,+201517594321,01517594321,farida.shoukry0959@synthetic.local,2000-06-08,Unspecified,PSE,True,2026-01-05 23:53:00
+CUST-00000961,Ahmed Hassan ElSayed,أحمد حسن السيد,+201017602240,0204428160,ahmed.elsayed0960@example.eg,2001-01-21,M,EGY,False,2026-01-06 00:00:00
+CUST-00000962,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201117610159,01117610159,mohamed.kamel0961@mail.test,2002-08-06,F,SYR,True,2026-01-06 00:07:00
+CUST-00000963,Mahmoud Tarek Fathy,محمود طارق فتحي,+201217618078,01217618078,mahmoud.fathy0962@customer.invalid,2003-03-19,Unspecified,SDN,False,2026-01-06 00:14:00
+CUST-00000964,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201517625997,0504438873,omar.abdelrahman0963@synthetic.local,2004-10-04,M,JOR,True,2026-01-06 00:21:00
+CUST-00000965,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201017633916,01017633916,youssef.nassar0964@example.eg,2005-05-17,F,PSE,False,2026-01-06 00:28:00
+CUST-00000966,Mariam Khaled Gaber,مريم خالد جابر,+201117641835,01117641835,mariam.gaber0965@mail.test,2006-12-02,Unspecified,EGY,True,2026-01-06 00:35:00
+CUST-00000967,Nour Nabil Mahfouz,نور نبيل محفوظ,+201217649754,0884449586,nour.mahfouz0966@customer.invalid,1965-07-15,M,SYR,False,2026-01-06 00:42:00
+CUST-00000968,Salma Ali Darwish,سلمى علي درويش,+201517657673,01517657673,salma.darwish0967@synthetic.local,1966-02-28,F,SDN,True,2026-01-06 00:49:00
+CUST-00000969,Hana Samir Zaki,هنا سمير زكي,+201017665592,01017665592,hana.zaki0968@example.eg,1967-09-13,Unspecified,JOR,False,2026-01-06 00:56:00
+CUST-00000970,Farida Adel Shoukry,فريدة عادل شكري,+201117673511,0304460299,farida.shoukry0969@mail.test,1968-04-26,M,PSE,True,2026-01-06 01:03:00
+CUST-00000971,Ahmed Hassan ElSayed,أحمد حسن السيد,+201217681430,01217681430,ahmed.elsayed0970@customer.invalid,1969-11-11,F,EGY,False,2026-01-06 01:10:00
+CUST-00000972,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201517689349,01517689349,mohamed.kamel0971@synthetic.local,1970-06-24,Unspecified,SYR,True,2026-01-06 01:17:00
+CUST-00000973,Mahmoud Tarek Fathy,محمود طارق فتحي,+201017697268,0554471012,mahmoud.fathy0972@example.eg,1971-01-09,M,SDN,False,2026-01-06 01:24:00
+CUST-00000974,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201117705187,01117705187,omar.abdelrahman0973@mail.test,1972-08-22,F,JOR,True,2026-01-06 01:31:00
+CUST-00000975,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201217713106,01217713106,youssef.nassar0974@customer.invalid,1973-03-07,Unspecified,PSE,False,2026-01-06 01:38:00
+CUST-00000976,Mariam Khaled Gaber,مريم خالد جابر,+201517721025,0974481725,mariam.gaber0975@synthetic.local,1974-10-20,M,EGY,True,2026-01-06 01:45:00
+CUST-00000977,Nour Nabil Mahfouz,نور نبيل محفوظ,+201017728944,01017728944,nour.mahfouz0976@example.eg,1975-05-05,F,SYR,False,2026-01-06 01:52:00
+CUST-00000978,Salma Ali Darwish,سلمى علي درويش,+201117736863,01117736863,salma.darwish0977@mail.test,1976-12-18,Unspecified,SDN,True,2026-01-06 01:59:00
+CUST-00000979,Hana Samir Zaki,هنا سمير زكي,+201217744782,0404492438,hana.zaki0978@customer.invalid,1977-07-03,M,JOR,False,2026-01-06 02:06:00
+CUST-00000980,Farida Adel Shoukry,فريدة عادل شكري,+201517752701,01517752701,farida.shoukry0979@synthetic.local,1978-02-16,F,PSE,True,2026-01-06 02:13:00
+CUST-00000981,Ahmed Hassan ElSayed,أحمد حسن السيد,+201017760620,01017760620,ahmed.elsayed0980@example.eg,1979-09-01,Unspecified,EGY,False,2026-01-06 02:20:00
+CUST-00000982,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201117768539,0644503151,mohamed.kamel0981@mail.test,1980-04-14,M,SYR,True,2026-01-06 02:27:00
+CUST-00000983,Mahmoud Tarek Fathy,محمود طارق فتحي,+201217776458,01217776458,mahmoud.fathy0982@customer.invalid,1981-11-27,F,SDN,False,2026-01-06 02:34:00
+CUST-00000984,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201517784377,01517784377,omar.abdelrahman0983@synthetic.local,1982-06-12,Unspecified,JOR,True,2026-01-06 02:41:00
+CUST-00000985,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201017792296,0204513864,youssef.nassar0984@example.eg,1983-01-25,M,PSE,False,2026-01-06 02:48:00
+CUST-00000986,Mariam Khaled Gaber,مريم خالد جابر,+201117800215,01117800215,mariam.gaber0985@mail.test,1984-08-10,F,EGY,True,2026-01-06 02:55:00
+CUST-00000987,Nour Nabil Mahfouz,نور نبيل محفوظ,+201217808134,01217808134,nour.mahfouz0986@customer.invalid,1985-03-23,Unspecified,SYR,False,2026-01-06 03:02:00
+CUST-00000988,Salma Ali Darwish,سلمى علي درويش,+201517816053,0504524577,salma.darwish0987@synthetic.local,1986-10-08,M,SDN,True,2026-01-06 03:09:00
+CUST-00000989,Hana Samir Zaki,هنا سمير زكي,+201017823972,01017823972,hana.zaki0988@example.eg,1987-05-21,F,JOR,False,2026-01-06 03:16:00
+CUST-00000990,Farida Adel Shoukry,فريدة عادل شكري,+201117831891,01117831891,farida.shoukry0989@mail.test,1988-12-06,Unspecified,PSE,True,2026-01-06 03:23:00
+CUST-00000991,Ahmed Hassan ElSayed,أحمد حسن السيد,+201217839810,0884535290,ahmed.elsayed0990@customer.invalid,1989-07-19,M,EGY,False,2026-01-06 03:30:00
+CUST-00000992,Mohamed Mostafa Kamel,محمد مصطفى كامل,+201517847729,01517847729,mohamed.kamel0991@synthetic.local,1990-02-04,F,SYR,True,2026-01-06 03:37:00
+CUST-00000993,Mahmoud Tarek Fathy,محمود طارق فتحي,+201017855648,01017855648,mahmoud.fathy0992@example.eg,1991-09-17,Unspecified,SDN,False,2026-01-06 03:44:00
+CUST-00000994,Omar Fouad Abdelrahman,عمر فؤاد عبد الرحمن,+201117863567,0304546003,omar.abdelrahman0993@mail.test,1992-04-02,M,JOR,True,2026-01-06 03:51:00
+CUST-00000995,Youssef Ibrahim Nassar,يوسف إبراهيم نصار,+201217871486,01217871486,youssef.nassar0994@customer.invalid,1993-11-15,F,PSE,False,2026-01-06 03:58:00
+CUST-00000996,Mariam Khaled Gaber,مريم خالد جابر,+201517879405,01517879405,mariam.gaber0995@synthetic.local,1994-06-28,Unspecified,EGY,True,2026-01-06 04:05:00
+CUST-00000997,Nour Nabil Mahfouz,نور نبيل محفوظ,+201017887324,0554556716,nour.mahfouz0996@example.eg,1995-01-13,M,SYR,False,2026-01-06 04:12:00
+CUST-00000998,Salma Ali Darwish,سلمى علي درويش,+201117895243,01117895243,salma.darwish0997@mail.test,1996-08-26,F,SDN,True,2026-01-06 04:19:00
+CUST-00000999,Hana Samir Zaki,هنا سمير زكي,+201217903162,01217903162,hana.zaki0998@customer.invalid,1997-03-11,Unspecified,JOR,False,2026-01-06 04:26:00
+CUST-00001000,Farida Adel Shoukry,فريدة عادل شكري,+201517911081,0974567429,farida.shoukry0999@synthetic.local,1998-10-24,M,PSE,True,2026-01-06 04:33:00
