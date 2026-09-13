@@ -578,6 +578,9 @@ class TextGatewayConfig:
     # admin ``/api/pii/text/*`` stays opt-in for backward compatibility.
     obfuscation_preprocess: bool = True
     obfuscation_expanders: list = field(default_factory=list)
+    # Operator overlay: exclude_terms, patterns, context_cues, quantity_units.
+    # Empty = shipped defaults only. Merged at RuleSet compile time.
+    rules: dict = field(default_factory=dict)
 
 
 @dataclass

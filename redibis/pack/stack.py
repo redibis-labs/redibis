@@ -155,6 +155,11 @@ class PackStackStore:
                 for r in pack_preview.files
                 if r.startswith("masking/plans/")
             )
+            report["text_gateway_files"] = sorted(
+                r
+                for r in pack_preview.files
+                if r.startswith("text_gateway/")
+            )
             report["prompt_files"] = sorted(
                 r
                 for r in pack_preview.files
@@ -294,9 +299,18 @@ class PackStackStore:
         )
         # Merge stashed named docs (replace by name — later layers win).
         for layer in self.list_layers():
-            quality, masking = load_stashed_named_documents(self.root, layer.identity)
+            quality, masking, rules, gazetteers, lexicons = load_stashed_named_documents(
+                self.root, layer.identity
+            )
             stack.quality_rulesets.update(quality)
             stack.masking_plans.update(masking)
+            stack.text_gateway_rules.update(rules)
+            for stem in rules:
+                stack.text_gateway_rule_sources[str(stem)] = (
+                    f"pack:{layer.id}@{layer.version}:{stem}"
+                )
+            stack.text_gateway_gazetteers.update(gazetteers)
+            stack.text_gateway_lexicons.update(lexicons)
         return stack
 
 

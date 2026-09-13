@@ -172,17 +172,34 @@ async function loadHealth() {
       text: "No NER model configured — only regex/phone patterns will run. Names and free-text addresses will not be detected.",
     });
   }
+  const defaultLlm = (health && health.default_llm) || {};
   const llm = (health && health.engines && health.engines.llm) || {};
-  if (!llm.available && !llm.enabled) {
+  const label = [defaultLlm.provider || llm.role_provider, defaultLlm.model].filter(Boolean).join(" / ");
+  if (defaultLlm.status === "missing_credentials") {
     banners.push({
-      kind: "info",
-      text: "LLM refiner not configured — bind pii.text_refiner under Settings → Text Gateway Models, or enable pii.llm.",
+      kind: "warn",
+      text: "LLM refiner is bound" + (label ? " (" + label + ")" : "") +
+        " but credentials are missing. " + (defaultLlm.reason || "Set the provider API key and restart."),
     });
-  } else if (llm.available || llm.enabled) {
-    const defaultLlm = (health && health.default_llm) || {};
-    const label = [defaultLlm.provider || llm.role_provider, defaultLlm.model].filter(Boolean).join(" / ");
+  } else if (defaultLlm.status === "raw_text_external_blocked") {
+    banners.push({
+      kind: "warn",
+      text: "LLM refiner is bound to a cloud provider" + (label ? " (" + label + ")" : "") +
+        ". " + (defaultLlm.reason || "Cloud free-text inference is disabled."),
+    });
+  } else if (defaultLlm.status === "configuration_error") {
+    banners.push({
+      kind: "warn",
+      text: "LLM refiner configuration error: " + (defaultLlm.reason || "check Settings → Text Gateway."),
+    });
+  } else if (!defaultLlm.role_bound && !llm.available && !llm.enabled) {
     banners.push({
       kind: "info",
+      text: "LLM refiner not configured — bind pii.text_refiner under Settings → Text Gateway, then return here (health refreshes on focus).",
+    });
+  } else if (defaultLlm.ready || llm.available || llm.enabled) {
+    banners.push({
+      kind: defaultLlm.ready ? "ok" : "info",
       text: "LLM refiner ready" + (label ? " (" + label + ")" : "") +
         ". Check “Use LLM refiner” to run it; local OpenAI-compatible servers do not need a cloud API key.",
     });
@@ -283,7 +300,15 @@ function renderSummary(env) {
     ["engines", (pii.engines_ran || []).join(", ")],
     ["unavailable", unavailableKeys.join(", ")],
     ["language", env.text_meta.language || ""],
+    ["provenance", env.provenance_uuid || ""],
+    ["run", env.run_uuid || ""],
   ];
+  if (env.provenance_degraded) {
+    kv.push(["degraded", "true"]);
+  }
+  const full = env.provenance || {};
+  if (full.stack_uuid) kv.push(["stack", full.stack_uuid]);
+  if (full.ner_backend) kv.push(["ner", full.ner_backend]);
   for (const [k, v] of kv) {
     const dt = document.createElement("dt");
     dt.appendChild(document.createTextNode(k));
@@ -573,6 +598,7 @@ async function runScan() {
   scanBtn.disabled = true;
   resetMaskPreview();
   showProgress();
+  await loadHealth();
   scanAbort = new AbortController();
   try {
     const env = await streamScan(scanPayload(), { signal: scanAbort.signal });
@@ -746,3 +772,7 @@ updateCount();
 syncLlmSelectors();
 resetMaskPreview();
 loadHealth();
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") loadHealth();
+});
+window.addEventListener("focus", loadHealth);

@@ -162,7 +162,15 @@ class TextScanner:
         llm_ran = False
         if cfg.use_llm and active_llm is not None:
             try:
-                llm_hits = active_llm.propose_spans(raw, candidates, cfg)
+                try:
+                    llm_hits = active_llm.propose_spans(
+                        raw,
+                        candidates,
+                        cfg,
+                        text_rules=getattr(self.ruleset, "text_rules", None),
+                    )
+                except TypeError:
+                    llm_hits = active_llm.propose_spans(raw, candidates, cfg)
                 llm_ran = True
                 if llm_hits:
                     candidates.extend(llm_hits)
@@ -189,6 +197,15 @@ class TextScanner:
                 candidates = VariantEquivalenceMerger().merge(candidates, text=raw)
             except Exception as exc:
                 logger.debug("equivalence merge skipped: %s", exc)
+
+        overlay = getattr(self.ruleset, "text_rules", None)
+        if overlay is not None:
+            try:
+                from redibis.pii.rules.text_filters import apply_text_rule_filters
+
+                candidates = apply_text_rule_filters(candidates, raw, overlay)
+            except Exception as exc:
+                logger.warning("text rule filters skipped: %s", exc)
 
         detections = self._resolver.resolve(
             candidates,

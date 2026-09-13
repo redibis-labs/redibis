@@ -1,0 +1,317 @@
+# Ground truth extracted from "Telecom Log PII Examples — Google Gemini" (21pp, 2026-09-12).
+#
+# GRADING NOTE — read before wiring into CI:
+#   match: value      → graded on normalized value + entity_type only (no offsets).
+#                       The source PDF right-truncates its code blocks, so exact raw
+#                       transcripts (and therefore offsets) are NOT reproducible from it.
+#                       Supply the raw text export to upgrade these to span-level grading.
+#   grade: strict     → counts toward the CI gate.
+#   grade: advisory   → tracked, never gates: the expected value is internally
+#                       inconsistent (see `defect`) or depends on an unsettled policy.
+#   canonical         → digit string the spoken form must assemble to.
+#   negative: true    → must NOT be detected (or must be detected as `not_type`).
+#
+# Entity types use the repo's canonical vocabulary (redibis.models.canonical_entity).
+# Types marked `proposed:` do not exist in the catalogue yet — see FREE_TEXT_PII_GROUND_TRUTH.md.
+
+schema_version: 1
+source: "Telecom Log PII Examples - Google Gemini.pdf"
+extracted: 2026-09-12
+default_match: value
+
+suites:
+
+  # ───────────────────────────────────────────────────────────────────────────
+  - id: en_basic
+    lang: en
+    region_hint: multi           # UK, AU, US in one suite — not EG
+    description: Baseline English telecom calls, plain formatting.
+    cases:
+      - id: EN1
+        entities:
+          - {value: "David Smith", type: PERSON}
+          - {value: "+44 7911 123456", type: PHONE_NUMBER, region: GB}
+          - {value: "david.smith123@example.com", type: EMAIL_ADDRESS}
+      - id: EN2
+        entities:
+          - {value: "358190102938475", type: IMEI}
+          - {value: "07700900112", type: PHONE_NUMBER, region: GB}
+      - id: EN3
+        entities:
+          - {value: "42 Wallaby Way, Sydney, NSW 2000", type: LOCATION, note: "full composed address"}
+          - {value: "00:1A:2B:3C:4D:5E", type: MAC_ADDRESS}
+      - id: EN4
+        entities:
+          - {value: "G87654321", type: PASSPORT}
+          - {value: "October 15th, 1985", type: DATE_OF_BIRTH, proposed: true}
+      - id: EN5
+        entities:
+          - {value: "4532 0123 4567 8910", type: CREDIT_CARD, luhn: valid}
+          - {value: "100 Main Street, Apt 4B, New York, NY 10001", type: LOCATION}
+          - {value: "$45", type: null, negative: true, reason: quantity_amount}
+
+  # ───────────────────────────────────────────────────────────────────────────
+  - id: structured_logs
+    lang: mixed
+    description: Pipe-delimited telecom log lines with embedded JSON and mixed script.
+    cases:
+      - id: LOG1
+        entities:
+          - {value: "966501234567", type: PHONE_NUMBER, region: SA}
+          - {value: "مريم_سعيد_92", type: PERSON, note: "username form, underscores"}
+          - {value: "+201009876543", type: PHONE_NUMBER, region: EG}
+          - {value: "+201223344556", type: PHONE_NUMBER, region: EG}
+          - {value: "شارع التحلية، جدة، مبنى ٤", type: LOCATION, note: "Arabic address, Eastern-Arabic building no"}
+          - {value: "#TK-441", type: SUPPORT_TICKET, tier: quasi_identifier}
+          - {value: "1029338475", type: ACCOUNT_ID, proposed: true, tier: quasi_identifier, note: "User_ID"}
+          - {value: "A9902", type: ACCOUNT_ID, proposed: true, tier: quasi_identifier, note: "CDR_REF"}
+          - {value: "Riyadh_Dist_5", type: LOCATION, tier: quasi_identifier}
+      - id: LOG2
+        entities:
+          - {value: "Youssef Al-Sayed", type: PERSON}
+          - {value: "29005150102345", type: EG_NATIONAL_ID, structure: pass, checkdigit: mismatch}
+          - {value: "ش التحرير, block 45, apt 12, Cairo", type: LOCATION, note: "mixed-script single entity — must not split"}
+          - {value: "+20-111-222-3344", type: PHONE_NUMBER, region: EG}
+          - {value: "فاطمة النجار", type: PERSON}
+          - {value: "fatima_n_88 [at] gmail . com", type: EMAIL_ADDRESS, obfuscation: spaced}
+          - {value: "00966 55 123 4567", type: PHONE_NUMBER, region: SA}
+          - {value: "412201234567890", type: IMSI}
+          - {value: "00:1A:2B:3C:4D:5E", type: MAC_ADDRESS}
+          - {value: "2001:0db8:85a3:0000:0000:8a2e:0370:7334", type: IP_ADDRESS, version: 6}
+          - {value: "٠١٠٩٨٧٦٥٤٣٢", type: PHONE_NUMBER, region: EG, script: arabic_indic}
+          - {value: "C-9921", type: ACCOUNT_ID, proposed: true, tier: quasi_identifier}
+          - {value: "محمود Hassan", type: PERSON, note: "script switch mid-entity"}
+          - {value: "A2345678", type: PASSPORT}
+          - {value: "1985-11-20", type: DATE_OF_BIRTH, proposed: true}
+          - {value: "a1b2c3d4", type: SESSION_ID, tier: quasi_identifier}
+          # Deliberate false-positive traps
+          - {value: "352415001234567", type: null, negative: true, not_type: IMEI,
+             reason: "labelled merchant_id — 15 digits, IMEI-shaped, corporate not personal"}
+          - {value: "15000 EGP", type: null, negative: true, reason: quantity_amount}
+
+  # ───────────────────────────────────────────────────────────────────────────
+  - id: en_ar_calls
+    lang: mixed
+    description: Customer-service calls, English frame with Arabic names/addresses.
+    cases:
+      - id: C1
+        entities:
+          - {value: "طارق عبدالله الشريف", type: PERSON}
+          - {value: "88-A492", type: ACCOUNT_ID, proposed: true, tier: quasi_identifier}
+          - {value: "١٠٤٤٥٥٦٦٧٧", type: NATIONAL_ID, script: arabic_indic, grade: advisory,
+             defect: "PDF labels this National ID but it is 10 digits; an EG NID is 14. Either non-EG or corpus error."}
+          - {value: "14th of March 1982", type: DATE_OF_BIRTH, proposed: true}
+          - {value: "050-998-1234", type: PHONE_NUMBER, region: SA}
+      - id: C2
+        entities:
+          - {value: "ahmed dot tech at hotmail dot com", type: EMAIL_ADDRESS, obfuscation: spoken}
+          - {value: "4A:3B:2C:11:00:FF", type: MAC_ADDRESS}
+          - {value: "212.34.56.78", type: IP_ADDRESS, version: 4}
+          - {value: "شارع الملك فهد، عمارة الياسمين، الدور الثالث", type: LOCATION,
+             note: "street + building + floor, no city/postcode"}
+      - id: C3
+        entities:
+          - {value: "4111 2222 3333 4444", type: CREDIT_CARD, luhn: invalid, grade: advisory,
+             defect: "fails Luhn — a Luhn-gated recognizer will correctly drop it"}
+          - {value: "11/28", type: CARD_EXPIRY, proposed: true}
+          - {value: "738", type: CARD_CVV, proposed: true}
+          - {value: "11432", type: POSTAL_CODE, proposed: true}
+      - id: C4
+        entities:
+          - {value: "A98765432", type: PASSPORT}
+          - {value: "John Doe", type: PERSON}
+          - {value: "ACC-99001", type: ACCOUNT_ID, proposed: true, tier: quasi_identifier}
+          - {value: "٠١٢٠٠٠١١١٢٢", type: PHONE_NUMBER, region: EG, script: arabic_indic}
+      - id: C5
+        entities:
+          - {value: "865432041234567", type: IMEI}
+          - {value: "سميرة محمود", type: PERSON}
+          - {value: "severe diabetes", type: GDPR_SPECIAL_CATEGORY, subtype: health}
+          - {value: "420011234567890", type: IMSI}
+          - {value: "24.7136, 46.6753", type: GPS_COORDINATES, proposed: true}
+
+  # ───────────────────────────────────────────────────────────────────────────
+  - id: ar_spoken_calls
+    lang: ar
+    region_hint: EG
+    description: >
+      Egyptian-dialect call transcripts as Whisper would emit them — numbers spoken,
+      not written. Every `canonical` is the digit string the assembler must produce.
+    cases:
+      - id: AR1
+        entities:
+          - {value: "محمد عبد السلام ابراهيم مرسي", type: PERSON}
+          - {spoken: "اتنين تسعة خمسة واحد تلاتة اتناشر زيرو زيرو واحد ستة", canonical: "2950713120016",
+             type: EG_NATIONAL_ID, grade: advisory,
+             defect: "13 digits — fails the 14-digit format stage of validate_egypt_national_id"}
+          - {spoken: "زيرو حداشر أربعة تلاتة اتنين واحد خمسة خمسة ستة سبعة", canonical: "01143215567",
+             type: PHONE_NUMBER, region: EG}
+      - id: AR2
+        entities:
+          - {spoken: "زيرو اتنين اتنين سبعة تسعة أربعة وخمسين تلاتين", canonical: "0227945430",
+             type: PHONE_NUMBER, subtype: landline, region: EG, note: "Cairo 02 prefix, 10 digits"}
+          - {value: "شريف نبيل الدسوقي", type: PERSON}
+          - {value: "شارع فيصل محطة العشرين برج الإيمان الدور السادس شقة 14", type: LOCATION,
+             note: "street + landmark(محطة) + building + floor + apartment — 5 parts, no city"}
+          - {spoken: "زيرو اتناشر اتنين تمانية تلاتة ستة أربعة تسعة واحد زيرو", canonical: "01228364910",
+             type: PHONE_NUMBER, region: EG}
+      - id: AR3
+        entities:
+          - {spoken: "زيرو ميتين سبعة وستين تلاتة وعشرين أربعة وعشرين", canonical: "01002675324",
+             type: PHONE_NUMBER, subtype: mobile_wallet, region: EG}
+          - {spoken: "زيرو ميتين تسعة وستين تلاتين اتناشر", canonical: "01002693012",
+             type: PHONE_NUMBER, subtype: mobile_wallet, region: EG}
+          - {value: "TXN-89321", type: TRANSACTION_ID, tier: quasi_identifier}
+          - {value: "5123456789012345", type: CREDIT_CARD, luhn: invalid, grade: advisory,
+             defect: "fails Luhn"}
+          - {value: "ahmed dot sayed 89 at yahoo dot com", type: EMAIL_ADDRESS, obfuscation: spoken}
+      - id: AR4
+        entities:
+          - {value: "ندى هاني كمال", type: PERSON}
+          - {value: "01099887766", type: PHONE_NUMBER, region: EG}
+          - {value: "358912098765432", type: IMEI}
+          - {value: "01555123498", type: PHONE_NUMBER, region: EG}
+      - id: AR5
+        entities:
+          - {spoken: "أربعة اتنين زيرو تلاتة، خمسة خمسة ستة ستة، سبعة تمنية تسعة زيرو، واحد اتنين تلاتة أربعة",
+             type: CREDIT_CARD, grade: advisory,
+             defect: "PDF gives no canonical digit string for this PAN"}
+          - {spoken: "شهر حداشر عشرين تلاتين", type: CARD_EXPIRY, proposed: true, grade: advisory,
+             defect: "ambiguous — 11/2030 or 11/30; PDF's English case used 11/28"}
+          - {spoken: "تلاتة سبعة اتنين", type: CARD_CVV, proposed: true}
+      - id: AR6
+        entities:
+          - {value: "سارة عبد الرحمن", type: PERSON}
+          - {value: "حالة ولادة مستعجلة", type: GDPR_SPECIAL_CATEGORY, subtype: health}
+          - {spoken: "اتنين واحد اتنين دوت خمسين دوت أربعتاشر دوت عشرة", canonical: "212.50.14.10",
+             type: IP_ADDRESS, version: 4, obfuscation: spoken, note: "دوت as separator token"}
+          - {value: "طريق الإسكندرية الصحراوي الكيلو خمسة وأربعين، قدام واحة عمر", type: LOCATION,
+             note: "highway + spoken kilometre marker + relative landmark (قدام)"}
+      - id: AR7
+        entities:
+          - {value: "شركة النور للاستيراد والتصدير", type: ORGANIZATION, grade: advisory,
+             defect: "policy conflict — ORGANIZATION is deliberately absent from DEFAULT_NER_LABELS"}
+          - {spoken: "مية وخمسة عشر داش تلتومية وعشرين داش ربعمية وخمسين", canonical: "115-320-450",
+             type: EG_TAX_ID, note: "داش = spoken dash delimiter"}
+          - {value: "خالد مصطفى كمال", type: PERSON}
+      - id: AR8
+        entities:
+          - {spoken: "إيه كابيتال، تسعة زيرو تلاتة أربعة خمسة سبعة اتنين واحد", canonical: "A90345721",
+             type: PASSPORT, note: "كابيتال = spoken letter-case marker; letter+digit assembly"}
+          - {value: "khaled underscore 20 at outlook dot com", type: EMAIL_ADDRESS, obfuscation: spoken}
+      - id: AR9
+        entities:
+          - {spoken: "زيرو مية، خمسة وخمسين، تلاتين، ربعمية", canonical: "01005530400",
+             type: PHONE_NUMBER, region: EG, note: "chunked: 0100|55|30|400 — the core grouping test"}
+          - {spoken: "اتنين تمانية تلاتة، زيرو تسعة واحد خمسة، زيرو واحد زيرو زيرو تلاتة تلاتة",
+             canonical: "28309150100333", type: EG_NATIONAL_ID, structure: pass, checkdigit: mismatch}
+          - {spoken: "تمانية سبعة ستة خمسة أربعة تلاتة اتنين واحد", canonical: "87654321", type: SIM_PUK}
+      - id: AR10
+        entities:
+          - {spoken: "زيرو مية، عشرين تلاتين، ربعمية وخمسين", canonical: "01002030450",
+             type: PHONE_NUMBER, subtype: mobile_wallet, region: EG}
+          - {spoken: "زيرو حداشر، اتنين اتنين، تلاتة تلاتة، أربعة خمسات", canonical: "01122335555",
+             type: PHONE_NUMBER, subtype: mobile_wallet, region: EG, note: "digit-plural: أربعة خمسات = 5555"}
+          - {spoken: "ستة، سبعة، زيرو، اتنين، واحد، تسعة", canonical: "670219", type: OTP}
+      - id: AR11
+        entities:
+          - {spoken: "خمسة اتنين تلاتة أربعة، زيرو زيرو زيرو واحد، تمنية تسعة زيرو اتنين، تلاتة ربعمية وخمسين",
+             canonical: "5234000189023450", type: CREDIT_CARD, luhn: invalid, grade: advisory,
+             defect: "fails Luhn; also mixes per-digit and compound grouping in one PAN"}
+          - {spoken: "زيرو خمسة، سبعة وعشرين", canonical: "05/27", type: CARD_EXPIRY, proposed: true}
+          - {spoken: "سبعمية وتمنية", canonical: "708", type: CARD_CVV, proposed: true}
+      - id: AR12
+        entities:
+          - {spoken: "خمسة زيرو، تمنية وسبعين", canonical: "5078", type: PARTIAL_CARD, proposed: true,
+             note: "first-4 / BIN fragment — must not be typed CREDIT_CARD"}
+          - {value: "محمود سيد متولي", type: PERSON}
+          - {spoken: "ميتين وتمنين، زيرو خمسة اتناشر، واحد وعشرين، زيرو زيرو، ربعمية وتلاتة",
+             canonical: "28005122100403", type: EG_NATIONAL_ID, structure: pass, checkdigit: mismatch}
+      - id: AR13
+        entities:
+          - {spoken: "تلات آلاف وخمسة", canonical: "3005", type: PARTIAL_CARD, proposed: true,
+             note: "THOUSANDS COMPOSITION — 3000+5 must assemble to 3005, not 30005 or 3000 5"}
+          - {spoken: "سبعة زيرو تسعة اتنين", canonical: "7092", type: PARTIAL_CARD, proposed: true}
+
+  # ───────────────────────────────────────────────────────────────────────────
+  - id: mixed_script_calls
+    lang: mixed
+    region_hint: EG
+    description: Egyptian Arabic dialect with English telecom jargon and spoken symbols.
+    cases:
+      - id: MX14
+        entities:
+          - {spoken: "زيرو مية، اتنين تلاتة أربعة، خمسة ستة سبعة تمانية", canonical: "01002345678",
+             type: PHONE_NUMBER, region: EG}
+          - {value: "m dot hassan 99 at gmail dot com", type: EMAIL_ADDRESS, obfuscation: spoken}
+      - id: MX15
+        entities:
+          - {value: "01155667788", type: PHONE_NUMBER, region: EG}
+          - {spoken: "تلاتة خمسة، زيرو اتنين، واحد أربعة، زيرو تمانية، تسعة زيرو، واحد اتنين تلاتة أربعة",
+             canonical: "350214089901234", type: IMEI}
+      - id: MX16
+        entities:
+          - {spoken: "زيرو ميتين، تسعة تمانية سبعة، ستة خمسات", canonical: "010029875555",
+             type: PHONE_NUMBER, subtype: mobile_wallet, region: EG, grade: advisory,
+             defect: "12 digits — an EG MSISDN is 11; also 'ستة خمسات' (six 5s) contradicts the four 5s in the value"}
+          - {spoken: "اتنين تمانية خمسة، زيرو أربعة اتناشر، زيرو واحد، زيرو زيرو، تلاتة اتنين واحد أربعة",
+             canonical: "285041201003214", type: EG_NATIONAL_ID, grade: advisory,
+             defect: "15 digits — fails the 14-digit format stage"}
+      - id: MX17
+        entities:
+          - {spoken: "زيرو اتنين، تلاتة تلاتة، أربعة أربعة، خمسة خمسة ستة ستة", canonical: "0233445566",
+             type: PHONE_NUMBER, subtype: landline, region: EG}
+          - {value: "شارع التسعين الجنوبي، التجمع الخامس، فيلا 12، compound Lake View", type: LOCATION,
+             note: "mixed-script address; Latin compound name inside an Arabic address"}
+          - {spoken: "A1 colon B2 colon C3 colon D4 colon E5 colon F6", canonical: "A1:B2:C3:D4:E5:F6",
+             type: MAC_ADDRESS, obfuscation: spoken, note: "colon as spoken delimiter"}
+      - id: MX18
+        entities:
+          - {value: "شركة Alpha Trade", type: ORGANIZATION, grade: advisory,
+             defect: "policy conflict — see AR7"}
+          - {value: "طارق الدسوقي", type: PERSON}
+          - {spoken: "خمسمية وعشرين، داش، ربعمية، داش، تلاتين", canonical: "30-400-520",
+             type: EG_TAX_ID, grade: advisory,
+             defect: "8 digits — an EG tax ID is 9 (xxx-xxx-xxx); also spoken order does not match the value"}
+          - {value: "01550099887", type: PHONE_NUMBER, region: EG}
+
+  # ───────────────────────────────────────────────────────────────────────────
+  - id: everyday_calls
+    lang: mixed
+    region_hint: EG
+    description: Routine Egyptian calls — plan change, delivery, voucher, PUK, ticket.
+    cases:
+      - id: EV19
+        entities:
+          - {value: "01011223344", type: PHONE_NUMBER, region: EG}
+          - {value: "مصطفى كمال محمود", type: PERSON}
+          - {value: "postpaid", type: null, negative: true, reason: plan_noun}
+          - {value: "الكنترول", type: null, negative: true, reason: plan_noun}
+      - id: EV20
+        entities:
+          - {value: "15 شارع المعادي الجديد، متفرع من شارع النمر، عمارة 4، شقة 12", type: LOCATION,
+             note: "house no + street + relative street + building + apartment — عمارة 4 / شقة 12 must stay INSIDE the address"}
+          - {spoken: "زيرو خمستاشر، اتنين اتنين، تلاتة أربعة خمسة، ستة سبعة تمانية",
+             canonical: "01522345678", type: PHONE_NUMBER, region: EG}
+          - {value: "4", type: null, negative: true, not_type: [PHONE_NUMBER, OTP], reason: address_building_number}
+          - {value: "12", type: null, negative: true, not_type: [PHONE_NUMBER, OTP], reason: address_apartment_number}
+      - id: EV21
+        entities:
+          - {spoken: "واحد اتنين تلاتة، أربعة خمسة ستة، سبعة تمانية تسعة، زيرو واحد، اتنين تلاتة أربعة",
+             canonical: "12345678901234", type: VOUCHER,
+             note: "14 digits — must resolve to VOUCHER not EG_NATIONAL_ID, on scratch-card context alone"}
+          - {value: "01233445566", type: PHONE_NUMBER, region: EG}
+          - {value: "100 جنيه", type: null, negative: true, reason: quantity_amount}
+      - id: EV22
+        entities:
+          - {spoken: "اتنين تسعة زيرو، واحد واحد اتنين اتنين، زيرو واحد، زيرو اتنين، تلاتة أربعة خمسة",
+             canonical: "29011220102345", type: EG_NATIONAL_ID, structure: pass, checkdigit: mismatch}
+          - {value: "12345678", type: SIM_PUK}
+      - id: EV23
+        entities:
+          - {value: "SR-45099", type: SUPPORT_TICKET, tier: quasi_identifier}
+          - {value: "ياسمين طارق", type: PERSON, subject: caller, spoken_by: agent,
+             note: "SUBJECT ATTRIBUTION — the agent utters the caller's name; subject != speaker"}
+          - {spoken: "زيرو حداشر، خمسة خمسة، زيرو زيرو، اتنين تلاتة، واحد واحد", canonical: "01155002311",
+             type: PHONE_NUMBER, region: EG}
+          - {value: "أسبوع", type: null, negative: true, reason: quantity_duration}

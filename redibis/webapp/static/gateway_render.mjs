@@ -10,9 +10,27 @@ export const IDENT = new Set([
   "PERSON", "DATE_OF_BIRTH", "DATE_TIME", "NRP", "AGE",
 ]);
 
-export const RANK = { direct: 3, contact: 2, identity: 1, other: 0 };
+export const RANK = {
+  extra: 6, fp: 5, bad: 5, fn: 4, miss: 4, near: 3, direct: 3, tp: 3, exact: 3,
+  contact: 2, gold: 2, identity: 1, proposal: 0, other: 0,
+};
 
-export function classOf(entityType) {
+const CLASS_TINT = {
+  exact: "exact",
+  equivalent: "exact",
+  superset: "near",
+  subset: "near",
+  overlap_partial: "near",
+  split: "near",
+  merged: "near",
+  type_mismatch: "bad",
+  spurious: "bad",
+  guard_violation: "bad",
+  missed: "miss",
+};
+
+export function classOf(entityType, evalKind) {
+  if (evalKind) return evalKind;
   const t = String(entityType || "");
   if (DIRECT.has(t)) return "direct";
   if (CONTACT.has(t)) return "contact";
@@ -61,7 +79,7 @@ export function segmentsFor(text, spans) {
     const covering = ids.map((id) => valid[id]);
     const top = covering.length
       ? covering.reduce((a, b) =>
-          RANK[classOf(a.entity_type)] >= RANK[classOf(b.entity_type)] ? a : b
+          RANK[classOf(a.entity_type, a.eval_kind)] >= RANK[classOf(b.entity_type, b.eval_kind)] ? a : b
         )
       : null;
     out.push({
@@ -80,6 +98,94 @@ export function segmentsFor(text, spans) {
 
 export function concatenatedText(segments) {
   return segments.map((s) => s.text).join("");
+}
+
+export function selectionOffsets(container, selection) {
+  const sel = selection || (typeof window !== "undefined" ? window.getSelection() : null);
+  if (!container || !sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
+  const range = sel.getRangeAt(0);
+  if (!container.contains(range.commonAncestorContainer)) return null;
+  const pre = range.cloneRange();
+  pre.selectNodeContents(container);
+  pre.setEnd(range.startContainer, range.startOffset);
+  const start = toChars(pre.toString()).length;
+  const end = start + toChars(range.toString()).length;
+  return end > start ? { start, end } : null;
+}
+
+export function overlayEvalSpans(expected, predicted, metric, proposals) {
+  const matchedExpected = new Set(
+    (metric && metric.matches || []).map((m) => m.expected_index)
+  );
+  const matchedPredicted = new Set(
+    (metric && metric.matches || []).map((m) => m.predicted_index)
+  );
+  const out = [];
+  (expected || []).forEach((span, i) => {
+    out.push({
+      ...span,
+      eval_kind: matchedExpected.has(i) ? "tp" : "fn",
+    });
+  });
+  (predicted || []).forEach((span, i) => {
+    if (matchedPredicted.has(i)) return;
+    out.push({ ...span, eval_kind: "fp" });
+  });
+  (proposals || []).forEach((span) => {
+    out.push({ ...span, is_proposal: true, eval_kind: "proposal" });
+  });
+  return out;
+}
+
+export function overlayFromMatchClasses(expected, predicted, rows, proposals) {
+  const out = [];
+  (rows || []).forEach((row) => {
+    const tint = CLASS_TINT[row.class] || "near";
+    const ei = row.expected_index;
+    const pi = row.predicted_index;
+    const gold = ei == null ? null : (expected || [])[ei];
+    const pred = pi == null ? null : (predicted || [])[pi];
+    if (gold) {
+      out.push({
+        ...gold,
+        eval_kind: row.class === "missed" ? "miss" : tint,
+        match_class: row.class,
+        extra_left: row.extra_left,
+        extra_right: row.extra_right,
+      });
+    }
+    if (pred && row.class !== "missed") {
+      out.push({
+        ...pred,
+        eval_kind: tint,
+        match_class: row.class,
+      });
+      if (gold && (row.extra_left || row.extra_right)) {
+        if (pred.start < gold.start) {
+          out.push({
+            start: pred.start,
+            end: gold.start,
+            entity_type: pred.entity_type,
+            eval_kind: "extra",
+            match_class: row.class,
+          });
+        }
+        if (pred.end > gold.end) {
+          out.push({
+            start: gold.end,
+            end: pred.end,
+            entity_type: pred.entity_type,
+            eval_kind: "extra",
+            match_class: row.class,
+          });
+        }
+      }
+    }
+  });
+  (proposals || []).forEach((span) => {
+    out.push({ ...span, is_proposal: true, eval_kind: "proposal" });
+  });
+  return out;
 }
 
 export function classifyBanners({ truncated, maxChars, wantedEngines, enginesRan, spanCount }) {
@@ -114,7 +220,7 @@ export function renderHighlights(container, text, spans, documentRef) {
       continue;
     }
     const mark = doc.createElement("mark");
-    mark.className = `gw-hl gw-${classOf(seg.top.entity_type)}`;
+    mark.className = `gw-hl gw-${classOf(seg.top.entity_type, seg.top.eval_kind)}`;
     if (seg.allProposals) mark.classList.add("gw-proposal");
     mark.dataset.abbr = abbr(seg.top.entity_type);
     mark.dataset.spans = JSON.stringify(
@@ -126,6 +232,9 @@ export function renderHighlights(container, text, spans, documentRef) {
         validator: s.validator,
         context_boost: s.context_boost,
         is_proposal: s.is_proposal,
+        eval_kind: s.eval_kind,
+        start: s.start,
+        end: s.end,
       }))
     );
     mark.tabIndex = 0;

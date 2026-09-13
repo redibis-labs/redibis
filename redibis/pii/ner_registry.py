@@ -282,6 +282,12 @@ class NERModelRegistry:
             threshold=effective_threshold,
             batch_size=batch_size,
         )
+        try:
+            from redibis.pii.provenance import digest_ner_backend
+
+            digest_ner_backend(backend)
+        except Exception:
+            logger.debug("NER weight digest skipped", exc_info=True)
         cls._cache[key] = backend
         return backend
 

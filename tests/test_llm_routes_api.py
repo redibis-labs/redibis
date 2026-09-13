@@ -74,7 +74,40 @@ def test_routes_get_put_if_match(client):
         },
     )
     assert ok.status_code == 200
-    assert ok.json()["routes"]["revision"] == 2
+    saved = ok.json()["routes"]
+    assert saved["revision"] == 2
+    assert saved["settings"]["llm"]["default"]["provider"] == "ollama"
+    assert saved["settings"]["llm"]["roles"]["agent.planner"]["provider"] == "sglang"
+
+
+def test_roles_only_put_preserves_default(client):
+    first = client.put(
+        "/api/llm/routes",
+        headers={"If-Match": "revision:0"},
+        json={
+            "schema_version": 1,
+            "settings": {
+                "llm": {
+                    "default": {"provider": "sglang", "model": "default"},
+                    "roles": {"agent.planner": {"provider": "sglang", "model": "default"}},
+                }
+            },
+        },
+    )
+    assert first.status_code == 200, first.text
+    second = client.put(
+        "/api/llm/routes",
+        headers={"If-Match": "revision:1"},
+        json={
+            "schema_version": 1,
+            "settings": {"llm": {"roles": {"pii.text_refiner": {"provider": "sglang", "model": "qwen"}}}},
+        },
+    )
+    assert second.status_code == 200, second.text
+    llm = second.json()["routes"]["settings"]["llm"]
+    assert llm["default"]["provider"] == "sglang"
+    assert llm["roles"]["agent.planner"]["provider"] == "sglang"
+    assert llm["roles"]["pii.text_refiner"]["provider"] == "sglang"
 
 
 def test_routes_validate_and_runtime(client):

@@ -564,16 +564,29 @@ def apply_routes_put(
     if not isinstance(llm_in, dict):
         raise RoutingError("settings.llm object is required")
 
-    default = llm_in.get("default") if isinstance(llm_in.get("default"), dict) else {}
+    default = llm_in.get("default") if isinstance(llm_in.get("default"), dict) else None
     roles_in = llm_in.get("roles") if isinstance(llm_in.get("roles"), dict) else {}
     validate_role_overrides(roles_in)
+
+    cur_llm = cur.get("llm") if isinstance(cur.get("llm"), dict) else {}
+    cur_default = cur_llm.get("default") if isinstance(cur_llm.get("default"), dict) else {}
+    cur_roles = dict(cur_llm.get("roles") or {}) if isinstance(cur_llm.get("roles"), dict) else {}
+    if default is None:
+        default = dict(cur_default)
+    else:
+        default = {
+            "provider": str(default.get("provider") or cur_default.get("provider") or "").strip(),
+            "model": str(default.get("model") or cur_default.get("model") or "").strip(),
+        }
+    roles = dict(cur_roles)
+    roles.update(roles_in)
 
     llm_block = {
         "default": {
             "provider": str(default.get("provider") or "").strip(),
             "model": str(default.get("model") or "").strip(),
         },
-        "roles": dict(roles_in),
+        "roles": roles,
     }
     # Keep legacy keys in sync so older UI/CLI paths keep working.
     cur["llm"] = llm_block

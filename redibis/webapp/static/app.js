@@ -4,6 +4,8 @@ var LOGO="data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUA
 var S={view:"homepage",aboutOpen:false,settingsOpen:false,stab:"data",
   file:null,fname:"",rows:0,cols:0,columns:[],
   sid:null,scope:null,prog:0,pmsg:"",logs:[],result:null,
+  evalSessionId:null,evalDataset:null,evalReport:null,evalTarget:"engine",
+  evalSemantic:false,evalMinF1:0.8,evalBusy:false,evalAbort:null,evalStage:"",
   piiDets:[],piiF:"all",contracts:[],selContract:null,cyaml:"",chist:[],
   rxCat:[],es:null,sample:null,
   // Debug page state
@@ -186,6 +188,8 @@ function clearScanState(){
     approved:{items:[],summary:{}},apprSel:null,apprPreview:null,
     pasteCode:"",pasteRules:[],pasteErrors:[],pasteEval:null,pasteBusy:false,qResultFilter:"all",
     piiManual:{},piiRejected:{},
+    evalSessionId:null,evalDataset:null,evalReport:null,evalTarget:"engine",
+    evalSemantic:false,evalMinF1:0.8,evalBusy:false,evalAbort:null,evalStage:"",
     regexSet:{name:null,replace_all:false,patterns:{}},piiRegexTest:null,
     piiRxDraft:{pattern:"",entity:"PHONE_NUMBER",key:"",testVal:"",testCol:"",listPatternKey:"",matchMode:"structured",msisdnNorm:true},
     _piiDiscReady:false,
@@ -2840,6 +2844,7 @@ async function openDataTab(sub){
   S.dataSub=sub||"columns"; set({view:"data"});
   if(S.dataSub==="columns") loadDataColumns();
   else if(S.dataSub==="preview") loadDataRecord(0);
+  else if(S.dataSub==="eval") loadDataEval();
   else if(S.dataSub==="mask") loadMaskPlan(false);
 }
 function setDataSub(sub){ openDataTab(sub); }
@@ -3034,7 +3039,7 @@ function vMaskExportHistory(){
 function dataSubBar(){
   var sub=S.dataSub||"columns";
   function b(id,l){return "<button class=\"btn btn-sm"+(sub===id?" btn-red":" btn-ghost")+"\" onclick=\"setDataSub('"+id+"')\">"+l+"</button>";}
-  return "<div class=\"row\" style=\"gap:8px;margin-bottom:18px\">"+b("columns","Columns")+b("preview","Raw record")+b("mask","Mask & Export")+"</div>";
+  return "<div class=\"row\" style=\"gap:8px;margin-bottom:18px\">"+b("columns","Columns")+b("preview","Raw record")+b("eval","Evaluation")+b("mask","Mask & Export")+"</div>";
 }
 
 function vData(){
@@ -3048,6 +3053,7 @@ function vData(){
     "</div>"+
     dataSubBar();
   if(sub==="preview") return head+vDataPreview()+"</main>";
+  if(sub==="eval") return head+vDataEval()+"</main>";
   if(sub==="mask") return head+vDataMask()+"</main>";
   return head+vDataColumns()+"</main>";
 }
@@ -3087,6 +3093,187 @@ function vDataPreview(){
       return "<tr><td class=\"mono col-name\">"+E(f.column)+"</td><td>"+E(f.value)+"</td></tr>";
     }).join("")+
     "</tbody></table></div>";
+  return h;
+}
+
+async function loadDataEval(){
+  try{
+    await ensureSession();
+    if(S.evalSessionId!==S.sid){
+      if(S.evalAbort)S.evalAbort.abort();
+      S.evalDataset=null;
+      S.evalReport=null;
+      S.evalError=null;
+    }
+    if(!S.evalDataset){
+      S.evalDataset=await GET("/api/sessions/"+S.sid+"/eval/scaffold");
+      S.evalSessionId=S.sid;
+    }
+    render();
+  }catch(e){ alert(e.message); }
+}
+function evalCol(i){
+  return ((S.evalDataset&&S.evalDataset.columns)||[])[i];
+}
+function setEvalField(i, key, value){
+  var c=evalCol(i); if(!c) return;
+  if(key==="is_pii") c.is_pii=!!value;
+  else if(key==="tags") c.tags=String(value||"").split(",").map(function(s){return s.trim();}).filter(Boolean);
+  else c[key]=value;
+  S.evalReport=null;
+}
+async function importEvalFile(ev){
+  var file=ev.target.files&&ev.target.files[0];
+  ev.target.value="";
+  if(!file) return;
+  try{
+    var raw=JSON.parse(await file.text());
+    var checked=await POST("/api/sessions/"+S.sid+"/eval/validate",{dataset:raw,target:S.evalTarget||"engine"});
+    S.evalSessionId=S.sid;
+    S.evalDataset=checked;
+    S.evalReport=null;
+    var warn=[];
+    if((checked.missing_columns||[]).length) warn.push("missing "+checked.missing_columns.join(", "));
+    if((checked.extra_columns||[]).length) warn.push("extra "+checked.extra_columns.join(", "));
+    if(checked.stale_fingerprint) warn.push("stale fingerprint");
+    toast(warn.length?"Imported with "+warn.join("; "):"Imported evaluation matrix");
+    render();
+  }catch(e){ alert("Import failed: "+apiErr(e)); }
+}
+function exportEvalDataset(){
+  var payload=S.evalDataset||{};
+  var blob=new Blob([JSON.stringify({
+    kind:"redibis.table_column_eval_dataset",
+    schema_version:"1.0",
+    redibis_version:payload.redibis_version||"",
+    table_name:payload.table_name||S.table||"",
+    fingerprint:payload.fingerprint||"",
+    residency:"portable",
+    columns:(payload.columns||[]).map(function(c){
+      return {
+        name:c.name, is_pii:!!c.is_pii, entity_type:c.entity_type||"",
+        logicalType:c.logicalType||"", privacy_classification:c.privacy_classification||"",
+        businessName:c.businessName||"", description:c.description||"",
+        business_definition:c.business_definition||"", tags:c.tags||[]
+      };
+    })
+  }, null, 2)], {type:"application/json"});
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="table-eval-dataset.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+async function runDataEval(){
+  if(!S.evalDataset) return;
+  S.evalBusy=true; S.evalError=null; S.evalStage="starting"; render();
+  var controller=new AbortController();
+  S.evalAbort=controller;
+  try{
+    var response=await fetch("/api/sessions/"+S.sid+"/eval/run/stream",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        dataset:S.evalDataset,
+        target:S.evalTarget||"engine",
+        semantic:!!S.evalSemantic
+      }),
+      signal:controller.signal
+    });
+    if(!response.ok)throw new Error(await response.text());
+    var reader=response.body.getReader(),decoder=new TextDecoder(),buffer="";
+    while(true){
+      var part=await reader.read();
+      buffer+=decoder.decode(part.value||new Uint8Array(),{stream:!part.done});
+      var lines=buffer.split("\n");buffer=lines.pop()||"";
+      for(var i=0;i<lines.length;i++){
+        if(!lines[i].trim())continue;
+        var event=JSON.parse(lines[i]);
+        if(event.event==="stage"){S.evalStage=event.stage||"";render();}
+        else if(event.event==="result")S.evalReport=event.report;
+        else if(event.event==="error")throw new Error(event.detail||"Evaluation failed");
+      }
+      if(part.done)break;
+    }
+  }catch(e){
+    S.evalError=e&&e.name==="AbortError"?"Evaluation cancelled":apiErr(e);
+  }
+  S.evalBusy=false;S.evalAbort=null;S.evalStage="";
+  render();
+}
+function cancelDataEval(){if(S.evalAbort)S.evalAbort.abort();}
+function vDataEval(){
+  var ds=S.evalDataset;
+  var cols=(ds&&ds.columns)||[];
+  var h="<div class=\"row\" style=\"justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px\">"+
+    "<div class=\"stitle\">Expected PII / definitions — compared to engine, contract, or LLM proposals</div>"+
+    "<div class=\"row\" style=\"gap:8px;flex-wrap:wrap\">"+
+      "<select class=\"input\" onchange=\"S.evalTarget=this.value\">"+
+        ["engine","contract","llm"].map(function(t){
+          return "<option value=\""+t+"\""+((S.evalTarget||"engine")===t?" selected":"")+">"+t+"</option>";
+        }).join("")+
+      "</select>"+
+      "<label class=\"hint\"><input type=\"checkbox\" "+(S.evalSemantic?"checked":"")+" onchange=\"S.evalSemantic=this.checked\"/> semantic definitions</label>"+
+      "<label class=\"hint\">min F1 <input class=\"input\" type=\"number\" min=\"0\" max=\"1\" step=\"0.01\" style=\"width:72px\" value=\""+E(S.evalMinF1)+"\" onchange=\"S.evalMinF1=Math.max(0,Math.min(1,Number(this.value)||0))\"/></label>"+
+      "<button class=\"btn btn-red btn-sm\" "+(S.evalBusy?"disabled":"")+" onclick=\"runDataEval()\">▶ Evaluate</button>"+
+      (S.evalBusy?"<button class=\"btn btn-ghost btn-sm\" onclick=\"cancelDataEval()\">Stop · "+E(S.evalStage||"running")+"</button>":"")+
+      "<button class=\"btn btn-ghost btn-sm\" onclick=\"exportEvalDataset()\">↓ Export JSON</button>"+
+      "<button class=\"btn btn-ghost btn-sm\" onclick=\"document.getElementById('evalFile').click()\">↑ Import</button>"+
+      "<input id=\"evalFile\" type=\"file\" accept=\"application/json,.json\" hidden onchange=\"importEvalFile(event)\"/>"+
+    "</div></div>";
+  h+="<div class=\"hint\" style=\"margin-bottom:10px\">Exports are value-free. Engine suggestions are shown but not auto-accepted. Evaluation never writes the contract. Semantic judging sends truncated definition text through the configured guarded enrichment provider.</div>";
+  if(!ds) return h+"<div class=\"record-preview-empty\">Loading columns…</div>";
+  if(S.evalError) h+="<div class=\"cbox\" style=\"border-color:var(--red);margin-bottom:12px\">"+E(S.evalError)+"</div>";
+  if(S.evalReport){
+    var m=(S.evalReport.exact&&S.evalReport.exact.micro)||{};
+    var p=(S.evalReport.pii&&S.evalReport.pii.micro)||{};
+    var passed=Number(m.f1||0)>=Number(S.evalMinF1||0);
+    var prov=S.evalReport.provenance||{};
+    h+="<div class=\"cbox\" style=\"margin-bottom:12px\"><strong>"+(passed?"PASS":"FAIL")+" · Exact F1 "+E(m.f1)+" / "+E(S.evalMinF1)+"</strong> · PII F1 "+E(p.f1)+
+      " · target "+E(S.evalReport.target)+
+      (prov.engines?" · engines "+E(prov.engines):"")+
+      (prov.equation?" · equation "+E(prov.equation):"")+
+      (prov.llm_proposal_count!=null?" · LLM proposals "+E(prov.llm_proposal_count):"")+
+      ((S.evalReport.missing_columns||[]).length?" · missing "+E(S.evalReport.missing_columns.join(", ")):"")+
+      ((S.evalReport.extra_columns||[]).length?" · extra "+E(S.evalReport.extra_columns.join(", ")):"")+
+      ((S.evalReport.actual_missing_columns||[]).length?" · target missing "+E(S.evalReport.actual_missing_columns.join(", ")):"")+
+      ((S.evalReport.actual_extra_columns||[]).length?" · target extra "+E(S.evalReport.actual_extra_columns.join(", ")):"")+
+      (S.evalReport.stale_fingerprint?" · stale fingerprint":"")+"</div>";
+  }
+  h+="<div class=\"card\" style=\"padding:0;overflow:auto\"><table class=\"tbl\" style=\"font-size:12px\"><thead><tr>"+
+    "<th>Column</th><th>PII</th><th>Entity</th><th>Logical type</th><th>Privacy</th><th>Business name</th><th>Description</th><th>Business definition</th><th>Tags</th><th>Suggestion</th></tr></thead><tbody>";
+  cols.forEach(function(c,i){
+    var sug=c.suggestion||{};
+    h+="<tr><td class=\"mono\">"+E(c.name)+"</td>"+
+      "<td><input type=\"checkbox\" "+(c.is_pii?"checked":"")+" onchange=\"setEvalField("+i+",'is_pii',this.checked);render()\"/></td>"+
+      "<td><input class=\"input mono\" style=\"width:140px\" value=\""+E(c.entity_type||"")+"\" onchange=\"setEvalField("+i+",'entity_type',this.value)\"/></td>"+
+      "<td><input class=\"input\" style=\"width:110px\" value=\""+E(c.logicalType||"")+"\" onchange=\"setEvalField("+i+",'logicalType',this.value)\"/></td>"+
+      "<td><input class=\"input\" style=\"width:130px\" value=\""+E(c.privacy_classification||"")+"\" onchange=\"setEvalField("+i+",'privacy_classification',this.value)\"/></td>"+
+      "<td><input class=\"input\" style=\"width:140px\" value=\""+E(c.businessName||"")+"\" onchange=\"setEvalField("+i+",'businessName',this.value)\"/></td>"+
+      "<td><input class=\"input\" style=\"width:180px\" value=\""+E(c.description||"")+"\" onchange=\"setEvalField("+i+",'description',this.value)\"/></td>"+
+      "<td><input class=\"input\" style=\"width:180px\" value=\""+E(c.business_definition||"")+"\" onchange=\"setEvalField("+i+",'business_definition',this.value)\"/></td>"+
+      "<td><input class=\"input\" style=\"width:140px\" value=\""+E((c.tags||[]).join(', '))+"\" onchange=\"setEvalField("+i+",'tags',this.value)\"/></td>"+
+      "<td class=\"hint\">"+(sug.is_pii?E(sug.entity_type||"PII"):"—")+"</td></tr>";
+  });
+  h+="</tbody></table></div>";
+  if(S.evalReport&&(S.evalReport.columns||[]).length){
+    h+="<div class=\"stitle\" style=\"margin-top:16px\">Per-column results</div>"+
+      "<div class=\"card\" style=\"padding:0;overflow:auto\"><table class=\"tbl\" style=\"font-size:12px\"><thead><tr>"+
+      "<th>Column</th><th>PII</th><th>Entity</th><th>Field differences</th><th>F1</th><th>Source</th></tr></thead><tbody>";
+    (S.evalReport.columns||[]).forEach(function(r){
+      var f=r.fields||{};
+      var diffs=Object.keys(f).filter(function(k){return f[k]&&f[k].match===false;}).map(function(k){
+        return k+": "+String(f[k].expected)+" → "+String(f[k].actual);
+      }).join("; ");
+      h+="<tr><td class=\"mono\">"+E(r.name)+"</td>"+
+        "<td>"+E((f.is_pii&&f.is_pii.expected)+" → "+(f.is_pii&&f.is_pii.actual))+"</td>"+
+        "<td>"+E((f.entity_type&&f.entity_type.expected)+" → "+(f.entity_type&&f.entity_type.actual))+"</td>"+
+        "<td>"+E(diffs||"—")+"</td>"+
+        "<td>"+E(r.exact&&r.exact.f1)+"</td>"+
+        "<td>"+E(r.source)+(r.is_proposal?" · proposal":"")+"</td></tr>";
+    });
+    h+="</tbody></table></div>";
+  }
   return h;
 }
 
@@ -3821,12 +4008,13 @@ function vSettings(){
     var on;
     if(id==="pii") on="S.settingsTab=\""+id+"\";ensureNerLabelsLoaded().then(function(){render()})";
     else if(id==="ner") on="openNerSettingsTab()";
-    else if(id==="llm") on="S.settingsTab=\""+id+"\";"+(S.llmProviders&&S.llmProviders.length?"render()":"loadLlmProviders()");
+    else if(id==="llm") on="S.settingsTab=\""+id+"\";"+(S.llmProviders&&S.llmProviders.length?"loadLlmRoutesRuntime().then(function(){render()})":"loadLlmProviders().then(function(){return loadLlmRoutesRuntime()}).then(function(){render()})");
     else if(id==="gateway_models") on="S.settingsTab=\""+id+"\";"+(S.llmProviders&&S.llmProviders.length?"loadLlmRoutesRuntime().then(function(){render()})":"loadLlmProviders().then(function(){return loadLlmRoutesRuntime()}).then(function(){render()})");
     else if(id==="providers") on="S.settingsTab=\""+id+"\";"+(S.llmProviders&&S.llmProviders.length?"render()":"loadLlmProviders()");
     else if(id==="agents") on="S.settingsTab=\""+id+"\";loadAgentsRuntimeTab()";
     else if(id==="behavior") on="S.settingsTab=\""+id+"\";loadBehaviorPanel()";
     else if(id==="packs") on="S.settingsTab=\""+id+"\";loadPacksPanel()";
+    else if(id==="text_rules") on="S.settingsTab=\""+id+"\";loadTextRulesPanel()";
     else if(id==="prompts") on="S.settingsTab=\""+id+"\";loadPromptsPanel()";
     else on="S.settingsTab=\""+id+"\";render()";
     return "<button class='btn btn-sm"+(tab===id?" btn-red":" btn-ghost")+"' onclick='"+on+"'>"+label+"</button>";
@@ -3834,7 +4022,7 @@ function vSettings(){
 
   var tabs="<div class='row' style='gap:6px;margin-bottom:20px;flex-wrap:wrap'>"+
     stab("scan","Scan")+stab("pii","PII")+stab("ner","NER Models")+stab("quality","Quality")+
-    stab("classification","Classification")+stab("behavior","Behavior")+stab("packs","Packs")+stab("prompts","Prompts")+stab("llm","LLM")+
+    stab("classification","Classification")+stab("behavior","Behavior")+stab("packs","Packs")+stab("text_rules","Text Rules")+stab("prompts","Prompts")+stab("llm","LLM")+
     stab("gateway_models","Text Gateway")+stab("providers","Providers")+stab("agents","Agents")+
     stab("configs","Saved Configs")+stab("load","Load Session")+stab("debug","Debug 🔍")+
   "</div>";
@@ -4220,7 +4408,7 @@ function vSettings(){
     content="<div class='cbox'>"+
       "<div class='stitle mb10'>Portable Packs</div>"+
       "<div style='font-size:.82rem;color:var(--muted);margin-bottom:12px'>"+
-        "Import/export <span class='mono'>.rdbpack</span> bundles (config, locale, enrichment prompts, behavior, quality, masking). "+
+        "Import/export <span class='mono'>.rdbpack</span> bundles (config, locale, enrichment prompts, behavior, quality, masking, text-gateway rules). "+
         "Import validates then shows a dry-run report before applying a new stack layer. "+
         "Enrichment prompts in the pack replace <strong>Settings → Prompts</strong>; export includes your current prompt edits. "+
         "Behavior policies import as inactive drafts unless you check activate."+
@@ -4256,6 +4444,85 @@ function vSettings(){
       (S.packLastImport?
         "<div style='font-size:.78rem;color:var(--green,#15803d);margin-top:8px'>"+
           "Last import: "+E(S.packLastImport.identity||"")+" — "+E(S.packLastImport.activate_note||"ok")+
+        "</div>":"")+
+    "</div>";
+
+    var pvers=S.packVersions||[];
+    var vrows=pvers.length?pvers.map(function(p){
+      var uid=E(p.uuid||"");
+      var active=p.active?"<span class='chip'>active</span>":"";
+      return "<tr>"+
+        "<td class='mono' style='font-size:.7rem'>"+E(p.family_id||"")+"<div style='color:var(--muted)'>"+uid.slice(0,13)+"…</div></td>"+
+        "<td>"+E(p.version||"")+" "+active+"</td>"+
+        "<td style='font-size:.72rem'>"+E((p.author||"")+" · "+(p.published_at||""))+"</td>"+
+        "<td style='font-size:.72rem'>"+E(p.kind||"")+"</td>"+
+        "<td><button class='btn btn-sm btn-ghost' onclick='activatePackVersion(\""+uid+"\")'>Activate</button> "+
+            "<button class='btn btn-sm btn-ghost' onclick='showPackVersionRuns(\""+uid+"\")'>Runs</button></td>"+
+      "</tr>";
+    }).join(""):"<tr><td colspan='5' style='color:var(--muted);padding:12px'>No published pack versions yet. Author text rules and Publish — that mints a UUID without activating it.</td></tr>";
+    content+=
+      "<div class='cbox' style='margin-top:16px'>"+
+        "<div class='stitle mb10'>Published pack versions</div>"+
+        "<div style='font-size:.82rem;color:var(--muted);margin-bottom:10px'>"+
+          "Immutable versions (uuid + parent lineage). Publish ≠ activate. Rollback = activate the previous uuid. "+
+          "“Runs under this version” closes the loop from a rule change to its measured effect."+
+        "</div>"+
+        "<table class='tbl' style='font-size:.78rem'><thead><tr>"+
+          "<th>family / uuid</th><th>version</th><th>author</th><th>kind</th><th></th>"+
+        "</tr></thead><tbody>"+vrows+"</tbody></table>"+
+        (S.packVersionRuns?
+          "<div style='margin-top:10px;font-size:.78rem'><div class='stitle' style='margin-bottom:6px'>Runs</div>"+
+            ((S.packVersionRuns.runs||[]).map(function(r){
+              return "<div class='mono'>"+E(r.run_uuid||"")+" · "+E(r.kind||"")+" · "+E(r.finished||"")+" · chars "+E(String(r.char_count||0))+"</div>";
+            }).join("")||"<span style='color:var(--muted)'>No runs recorded for this uuid.</span>")+
+          "</div>":"")+
+      "</div>";
+  } else if(tab==="text_rules"){
+    if(!S.textRulesLoaded && !S._textRulesLoading){
+      S._textRulesLoading=true;
+      loadTextRulesPanel().finally(function(){S._textRulesLoading=false;});
+    }
+    var draftObj=S.textRulesDraft||S.textRulesEffective||{};
+    var draftText=S.textRulesDraftText!=null?S.textRulesDraftText:JSON.stringify(draftObj,null,2);
+    var persisted=!!S.textRulesPersistedOutside;
+    content="<div class='cbox'>"+
+      "<div class='stitle mb10'>Text Rules</div>"+
+      "<div style='font-size:.82rem;color:var(--muted);margin-bottom:12px'>"+
+        "Draft overlay (exclusions, context cues, custom patterns, quantity units). "+
+        "Dry-run never persists. Publish mints an immutable pack version — it does not activate. "+
+        "Precedence: builtin → pack stack → config → persisted → draft."+
+      "</div>"+
+      (persisted?
+        "<div style='margin-bottom:12px;padding:10px;border:1px solid #f59e0b;background:#fffbeb;border-radius:8px;font-size:.82rem'>"+
+          "Persisted <span class='mono'>pii_text_rules</span> exist outside a pack (operator quick-fix debt). "+
+          "<button class='btn btn-sm btn-red' onclick='promotePersistedTextRules()'>Promote to pack version</button>"+
+        "</div>":"")+
+      "<div class='row' style='gap:8px;margin-bottom:12px;flex-wrap:wrap'>"+
+        "<button class='btn btn-sm btn-ghost' onclick='loadTextRulesPanel()'>↺ refresh</button>"+
+        "<button class='btn btn-sm btn-ghost' onclick='saveTextRulesDraft()'>Save draft (persisted)</button>"+
+        "<button class='btn btn-sm btn-ghost' onclick='dryRunTextRules()'>Dry run</button>"+
+        "<button class='btn btn-sm btn-red' onclick='publishTextRules()'>Publish pack version</button>"+
+      "</div>"+
+      "<textarea id='textRulesEditor' class='input mono' style='width:100%;min-height:280px;font-size:.78rem' "+
+        "oninput='S.textRulesDraftText=this.value'>"+E(draftText)+"</textarea>"+
+      "<div class='stitle' style='margin-top:16px;margin-bottom:8px'>Publish</div>"+
+      inp("Version (semver)","tr_version",S.textRulesPublishVersion||"1.0.0")+
+      inp("Description (required changelog)","tr_description",S.textRulesPublishDescription||"")+
+      inp("Author","tr_author",S.textRulesPublishAuthor||"operator")+
+      inp("Eval run uuid","tr_eval_run",S.textRulesEvalRun||"")+
+      "<label style='display:flex;align-items:center;gap:6px;font-size:.78rem;margin-bottom:10px'>"+
+        "<input id='tr_override' type='checkbox'/> allow unevaluated / failed gate (admin override)"+
+      "</label>"+
+      inp("Override reason","tr_override_reason",S.textRulesOverrideReason||"")+
+      (S.textRulesDryRun?
+        "<div style='margin-top:10px;font-size:.78rem'>Dry run: "+
+          E(String((S.textRulesDryRun.entity_counts&&JSON.stringify(S.textRulesDryRun.entity_counts))||"{}"))+
+          " · provenance "+E(S.textRulesDryRun.provenance_uuid||"")+
+        "</div>":"")+
+      (S.textRulesPublishResult?
+        "<div style='margin-top:10px;font-size:.78rem;color:var(--green,#15803d)'>"+
+          "Published uuid "+E((S.textRulesPublishResult.pack&&S.textRulesPublishResult.pack.uuid)||"")+
+          " — not activated."+
         "</div>":"")+
     "</div>";
   } else if(tab==="prompts"){
@@ -4858,6 +5125,12 @@ async function loadPacksPanel(){
     var stack=await GET("/api/rdbpack/stack");
     S.packLayers=stack.layers||[];
     S.packsStackDir=stack.stack_dir||"";
+    try{
+      var vers=await GET("/api/rdbpack/versions");
+      S.packVersions=vers.packs||[];
+    }catch(_){
+      S.packVersions=S.packVersions||[];
+    }
     S.packsLoaded=true;
     render();
   }catch(e){
@@ -4865,6 +5138,103 @@ async function loadPacksPanel(){
     toast("Packs panel: "+(e.message||e));
     render();
   }
+}
+async function activatePackVersion(uuid){
+  try{
+    await POST("/api/rdbpack/activate",{uuid:uuid});
+    toast("Activated pack "+uuid+" (live stack updated)");
+    await loadPacksPanel();
+  }catch(e){
+    toast("Activate failed: "+(e.message||e));
+  }
+}
+async function showPackVersionRuns(uuid){
+  try{
+    S.packVersionRuns=await GET("/api/rdbpack/versions/"+encodeURIComponent(uuid)+"/runs");
+    render();
+  }catch(e){
+    toast("Runs lookup failed: "+(e.message||e));
+  }
+}
+function _readTextRulesDraft(){
+  var el=document.getElementById("textRulesEditor");
+  var raw=el?el.value:(S.textRulesDraftText||"");
+  try{ return JSON.parse(raw||"{}"); }
+  catch(e){ throw new Error("draft JSON is invalid: "+e.message); }
+}
+async function loadTextRulesPanel(){
+  try{
+    var snap=await GET("/api/pii/text/rules");
+    S.textRulesEffective=snap.rules||{};
+    S.textRulesStored=snap.stored||{};
+    S.textRulesDefaults=snap.defaults||{};
+    S.textRulesPersistedOutside=!!snap.persisted_outside_pack;
+    if(S.textRulesDraftText==null){
+      S.textRulesDraft=Object.keys(S.textRulesStored||{}).length?S.textRulesStored:S.textRulesEffective;
+    }
+    S.textRulesLoaded=true;
+    render();
+  }catch(e){
+    S.textRulesLoaded=true;
+    toast("Text rules: "+(e.message||e));
+    render();
+  }
+}
+async function saveTextRulesDraft(){
+  try{
+    var rules=_readTextRulesDraft();
+    await PUT("/api/pii/text/rules",{rules:rules});
+    S.textRulesDraftText=null;
+    toast("Saved persisted pii_text_rules — promote to a pack when you can");
+    await loadTextRulesPanel();
+  }catch(e){ toast("Save failed: "+(e.message||e)); }
+}
+async function dryRunTextRules(){
+  try{
+    var rules=_readTextRulesDraft();
+    var text=window.prompt("Playground text to scan with this draft (not stored):","agent called about the bill")||"";
+    S.textRulesDryRun=await POST("/api/pii/text/rules/dry-run",{text:text,draft_rules:rules,engines:"regex"});
+    render();
+  }catch(e){ toast("Dry run failed: "+(e.message||e)); }
+}
+async function publishTextRules(){
+  try{
+    var rules=_readTextRulesDraft();
+    var version=(document.getElementById("tr_version")||{}).value||"1.0.0";
+    var description=(document.getElementById("tr_description")||{}).value||"";
+    var author=(document.getElementById("tr_author")||{}).value||"operator";
+    var evalRun=(document.getElementById("tr_eval_run")||{}).value||"";
+    var override=!!(document.getElementById("tr_override")&&document.getElementById("tr_override").checked);
+    var reason=(document.getElementById("tr_override_reason")||{}).value||"";
+    S.textRulesPublishResult=await POST("/api/pii/text/rules/publish",{
+      rules:rules, version:version, description:description, author:author,
+      eval_run_uuid:evalRun, allow_unevaluated:override, unevaluated_reason:reason
+    });
+    toast("Published — not activated. Use Packs → Activate.");
+    await loadPacksPanel();
+    render();
+  }catch(e){ toast("Publish failed: "+(e.message||e)); }
+}
+async function promotePersistedTextRules(){
+  try{
+    var version=(document.getElementById("tr_version")||{}).value||"1.0.0";
+    var description=(document.getElementById("tr_description")||{}).value||"promote persisted pii_text_rules";
+    var author=(document.getElementById("tr_author")||{}).value||"operator";
+    var evalRun=(document.getElementById("tr_eval_run")||{}).value||"";
+    var override=!!(document.getElementById("tr_override")&&document.getElementById("tr_override").checked);
+    var reason=(document.getElementById("tr_override_reason")||{}).value||"promote persisted rules into a pack";
+    if(!evalRun && !override){
+      toast("Attach an eval run uuid, or check admin override with a reason");
+      return;
+    }
+    S.textRulesPublishResult=await POST("/api/pii/text/rules/promote",{
+      version:version, description:description, author:author,
+      eval_run_uuid:evalRun, allow_unevaluated:override, unevaluated_reason:reason
+    });
+    toast("Promoted persisted rules to a pack version (not activated)");
+    await loadTextRulesPanel();
+    await loadPacksPanel();
+  }catch(e){ toast("Promote failed: "+(e.message||e)); }
 }
 async function loadPromptsPanel(){
   try{
@@ -5169,7 +5539,7 @@ function applySettingsClassification(){
   toast("Classification settings applied");
   render();
 }
-function applySettingsLlm(){
+async function applySettingsLlm(){
   syncLlmSettingsDraftFromInputs();
   var endpointErr=validateLlmApiBase(cfg.llm_endpoint_url,cfg.llm_provider);
   if(endpointErr){ alert(endpointErr); return; }
@@ -5184,9 +5554,9 @@ function applySettingsLlm(){
       },
     }).catch(function(){});
   }
-  Promise.all([
-    persistLlmSettingsToRegistry(),
-    PUT("/api/settings/global",{settings:{
+  try{
+    await persistLlmSettingsToRegistry();
+    await PUT("/api/settings/global",{settings:{
       llm_defaults:{
         enabled:cfg.llm_enabled,
         provider:cfg.llm_provider,
@@ -5197,16 +5567,15 @@ function applySettingsLlm(){
         planner_provider:cfg.agentic_planner_provider||cfg.llm_provider||"",
         planner_model:cfg.agentic_planner_model||cfg.llm_model||"",
       },
-    }}),
-    persistLlmCapabilityRoutes(),
-  ]).then(function(){
+    }});
+    await persistLlmCapabilityRoutes();
     toast("LLM settings applied");
-    loadLlmProviders().catch(function(){});
-    loadLlmRoutesRuntime().catch(function(){});
+    await loadLlmProviders().catch(function(){});
+    await loadLlmRoutesRuntime().catch(function(){});
     render();
-  }).catch(function(e){
+  }catch(e){
     alert("Save failed: "+apiErr(e));
-  });
+  }
 }
 
 var GATEWAY_MODEL_ROLES=["pii.text_refiner","gateway.toxicity","gateway.prompt_injection"];
@@ -5221,13 +5590,19 @@ function vSettingsGatewayModelsTab(){
   var roles=(S.llmRoutesRuntime&&S.llmRoutesRuntime.roles)||{};
   var allProvs=llmRefinerProviderList();
   var preferred=["sglang","vllm","ollama"];
-  var provs=allProvs.filter(function(p){return preferred.indexOf(p.name)>=0;});
+  var seen={};
+  var provs=[];
+  preferred.forEach(function(n){
+    var hit=allProvs.find(function(p){return p.name===n;});
+    if(hit){ provs.push(hit); seen[n]=true; }
+  });
+  allProvs.forEach(function(p){ if(!seen[p.name]) provs.push(p); });
   if(!provs.length){
     preferred.forEach(function(n){provs.push({name:n,known_models:[]});});
   }
   var cards=GATEWAY_MODEL_ROLES.map(function(role){
     var b=roles[role]||{};
-    var curProv=b.provider||"sglang";
+    var curProv=b.provider||"";
     var curModel=b.model||"";
     var enabled=b.enabled!==false;
     var hint=GATEWAY_PROVIDER_HINTS[curProv]||{label:"local",endpoint:""};
@@ -5235,10 +5610,10 @@ function vSettingsGatewayModelsTab(){
     var endpoint=(active.api_base||hint.endpoint||"");
     var models=(active.known_models||[]).slice();
     var idSafe=role.replace(/\./g,"_");
-    var opts=provs.map(function(p){
+    var opts=["<option value=''"+(!curProv?" selected":"")+">(unset / inherit)</option>"].concat(provs.map(function(p){
       var tag=(GATEWAY_PROVIDER_HINTS[p.name]&&GATEWAY_PROVIDER_HINTS[p.name].label)||(p.cloud?"cloud":"local");
       return "<option value='"+E(p.name)+"'"+(p.name===curProv?" selected":"")+">"+E(p.name)+" — "+E(tag)+"</option>";
-    }).join("");
+    })).join("");
     return "<div class='cbox' style='margin-bottom:14px' data-gateway-role='"+E(role)+"'>"+
       "<div class='stitle mb10' style='font-size:.9rem'>"+E(role)+"</div>"+
       "<label style='display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer'>"+
@@ -5269,9 +5644,11 @@ function vSettingsGatewayModelsTab(){
   return "<div class='cbox'>"+
     "<div class='stitle mb10'>Text Gateway Models</div>"+
     "<div style='font-size:.82rem;color:var(--muted);margin-bottom:14px'>"+
-      "Bind the free-text refiner and optional safety judges. Default provider is <b>SGLang</b> (GPU). "+
-      "vLLM is GPU-oriented; Ollama works on CPU or GPU. Changes apply to new Gateway scans only. "+
-      "LLM findings stay <span class='mono'>is_proposal: true</span> until a deterministic rule confirms them."+
+      "Bind the free-text refiner and optional safety judges. Local GPU defaults are SGLang / vLLM; Ollama works on CPU. "+
+      "Changes apply to new Gateway scans; the Gateway page refreshes health when it regains focus. "+
+      "LLM findings stay <span class='mono'>is_proposal: true</span> until a deterministic rule confirms them. "+
+      "<span class='mono'>text_gateway.toxicity_llm_enabled</span> and "+
+      "<span class='mono'>prompt_injection_llm_enabled</span> stay YAML-only — binding a judge role is not enough if those flags are off."+
     "</div>"+
     cards+
     "<button class='btn btn-red' onclick='applySettingsGatewayModels()' style='margin-top:4px'>Apply Text Gateway models</button>"+
@@ -5310,10 +5687,18 @@ async function testGatewayModelRole(role){
 
 async function applySettingsGatewayModels(){
   var current={};
+  var rev=0;
+  var existingDefault={};
+  var env;
   try{
-    var env=await GET("/api/llm/routes");
+    env=await GET("/api/llm/routes");
     current=(env&&env.settings&&env.settings.llm&&env.settings.llm.roles)||{};
-  }catch(_e){ current={}; }
+    existingDefault=(env&&env.settings&&env.settings.llm&&env.settings.llm.default)||{};
+    if(env&&env.revision!=null) rev=env.revision;
+  }catch(_e){
+    alert("Save failed: could not load current routes");
+    return;
+  }
   var roles=Object.assign({}, current);
   var registryPatch={};
   GATEWAY_MODEL_ROLES.forEach(function(role){
@@ -5322,24 +5707,29 @@ async function applySettingsGatewayModels(){
     var modelEl=document.getElementById("gw_role_model_"+idSafe);
     var enEl=document.getElementById("gw_role_en_"+idSafe);
     var epEl=document.getElementById("gw_role_endpoint_"+idSafe);
-    var provider=(provEl&&provEl.value)||"sglang";
+    var provider=(provEl&&provEl.value)||"";
     roles[role]={
       provider:provider,
       model:(modelEl&&modelEl.value)||"",
       enabled:!(enEl)||enEl.checked,
     };
-    if(epEl&&epEl.value){
+    if(provider && epEl&&epEl.value){
       registryPatch[provider]={api_base:epEl.value};
     }
   });
-  var rev=(S.llmRoutesRuntime&&S.llmRoutesRuntime.revision!=null)?S.llmRoutesRuntime.revision:null;
-  var putOpts={};
-  if(rev!=null) putOpts.headers={"If-Match":"revision:"+rev};
+  var putOpts={headers:{"If-Match":"revision:"+rev}};
   try{
+    await PUT("/api/llm/routes",{settings:{llm:{default:existingDefault,roles:roles}}}, putOpts);
     if(Object.keys(registryPatch).length){
-      await PUT("/api/llm-providers/registry",{providers:registryPatch});
+      try{
+        await PUT("/api/llm-providers/registry",{providers:registryPatch});
+      }catch(regErr){
+        alert("Role bindings saved, but provider endpoints were not: "+apiErr(regErr));
+        await loadLlmRoutesRuntime();
+        render();
+        return;
+      }
     }
-    await PUT("/api/llm/routes",{settings:{llm:{roles:roles}}}, putOpts);
     toast("Text Gateway models saved");
     await loadLlmRoutesRuntime();
     render();
@@ -5411,15 +5801,24 @@ function collectRoleMatrixFromDom(){
 }
 
 async function persistLlmCapabilityRoutes(){
-  var cur=await GET("/api/llm/routes");
+  var cur;
+  try{
+    cur=await GET("/api/llm/routes");
+  }catch(e){
+    throw e;
+  }
   var rev=cur&&cur.revision!=null?cur.revision:0;
+  var existing=((cur&&cur.settings&&cur.settings.llm&&cur.settings.llm.roles)||{});
+  var existingDefault=((cur&&cur.settings&&cur.settings.llm&&cur.settings.llm.default)||{});
   var matrix=collectRoleMatrixFromDom();
   var plannerProv=(cfg.agentic_planner_provider||cfg.llm_provider||"").trim();
   var plannerModel=(cfg.agentic_planner_model||cfg.llm_model||"").trim();
   var enrichProv=(cfg.llm_provider||"").trim();
   var enrichModel=(cfg.llm_model||"").trim();
-  var roles=matrix||{};
-  if(!matrix){
+  var roles=Object.assign({}, existing);
+  if(matrix){
+    Object.keys(matrix).forEach(function(role){ roles[role]=matrix[role]; });
+  }else{
     if(enrichProv){
       roles["contract.enrichment"]={provider:enrichProv,model:enrichModel,enabled:!!cfg.llm_enabled};
       roles["provider.probe"]={provider:enrichProv,model:enrichModel};
@@ -5427,19 +5826,18 @@ async function persistLlmCapabilityRoutes(){
     }
     if(plannerProv){
       roles["agent.planner"]={provider:plannerProv,model:plannerModel,enabled:true};
-    }else{
+    }else if(!roles["agent.planner"]){
       roles["agent.planner"]={provider:"",model:"",enabled:true,fallback:"heuristic"};
     }
-  }else if(roles["agent.planner"]&&roles["agent.planner"].provider){
-    // Keep legacy agentic_defaults in sync via server apply_routes_put.
-  }else if(!roles["agent.planner"]){
-    roles["agent.planner"]={provider:plannerProv,model:plannerModel,enabled:true,fallback:plannerProv?undefined:"heuristic"};
   }
   await PUT("/api/llm/routes",{
     schema_version:1,
     settings:{
       llm:{
-        default:{provider:enrichProv,model:enrichModel},
+        default:{
+          provider:enrichProv||existingDefault.provider||"",
+          model:enrichModel||existingDefault.model||"",
+        },
         roles:roles,
       },
     },

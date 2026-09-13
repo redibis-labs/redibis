@@ -12,7 +12,13 @@ class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class PackMetadata(_Strict):
+class PackMetadata(BaseModel):
+    """Pack identity. Unknown future fields are ignored so ``requires.redibis``
+    can fail closed before pydantic rejects a newer manifest.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
     id: str
     version: str
     uuid: Optional[str] = None
@@ -23,6 +29,10 @@ class PackMetadata(_Strict):
     created: Optional[str] = None
     base: Optional[str] = None
     tenant: Optional[str] = None
+    # Attached evaluation evidence (publish flow). Absent on older packs.
+    eval_run_uuid: Optional[str] = None
+    eval_gate_passed: Optional[bool] = None
+    eval_gate_summary: Optional[str] = None
 
     @field_validator("id", "version")
     @classmethod
@@ -68,6 +78,10 @@ class PackContents(_Strict):
     classification: list[str] = Field(default_factory=list)
     ner: bool = False
     ner_weights: bool = False
+    # First-class Text Gateway section (not config/redibis.yaml).
+    text_gateway_rules: list[str] = Field(default_factory=list)
+    text_gateway_gazetteers: list[str] = Field(default_factory=list)
+    text_gateway_lexicons: list[str] = Field(default_factory=list)
 
 
 class PackManifest(_Strict):

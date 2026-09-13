@@ -87,6 +87,11 @@ class AppliedPackStack:
     classification_packs: dict[str, Any] = field(default_factory=dict)
     prompt_templates: dict[str, str] = field(default_factory=dict)
     behavior_policy_paths: list[str] = field(default_factory=list)
+    text_gateway_rules: dict[str, Any] = field(default_factory=dict)
+    text_gateway_gazetteers: dict[str, Any] = field(default_factory=dict)
+    text_gateway_lexicons: dict[str, Any] = field(default_factory=dict)
+    # stem → ``pack:{id}@{version}:{stem}`` for the layer that last wrote it.
+    text_gateway_rule_sources: dict[str, str] = field(default_factory=dict)
 
     def layer_audit(self) -> list[dict[str, Any]]:
         return [layer.to_dict() for layer in self.layers]

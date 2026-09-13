@@ -111,3 +111,95 @@ def register_pack_routes(app: Any, *, store_factory=None) -> None:
         if not identity:
             raise HTTPException(status_code=400, detail="identity required")
         return _call(_store().remove, identity)
+
+    @app.get("/api/rdbpack/versions")
+    def rdbpack_versions(family_id: str = Query("")) -> dict:
+        from redibis.pack.publish import default_pack_store
+
+        store = default_pack_store()
+        refs = store.list(family_id=family_id or None)
+        active = {f"{L.id}@{L.version}" for L in _store().list_layers()}
+        rows = []
+        for ref in refs:
+            payload = ref.to_dict()
+            payload["active"] = f"{ref.id}@{ref.version}" in active
+            rows.append(payload)
+        return {"packs": rows, "count": len(rows)}
+
+    @app.get("/api/rdbpack/versions/{uuid}")
+    def rdbpack_version_detail(uuid: str) -> dict:
+        from redibis.pack.publish import default_pack_store
+
+        store = default_pack_store()
+        ref = store.head(uuid)
+        if ref is None:
+            raise HTTPException(status_code=404, detail="unknown pack uuid")
+        payload = ref.to_dict()
+        payload["history"] = [r.to_dict() for r in store.history(ref.family_id)]
+        from redibis.pii.run_store import get_run_store
+
+        payload["runs"] = [
+            r.to_dict() for r in get_run_store().runs_for_pack_uuid(ref.uuid, limit=50)
+        ]
+        return payload
+
+    @app.post("/api/rdbpack/activate")
+    def rdbpack_activate(body: dict) -> dict:
+        """Activate a published pack UUID into the live stack (audited, separate from publish)."""
+        from redibis.pack.publish import default_pack_store
+
+        uid = str((body or {}).get("uuid") or "").strip()
+        if not uid:
+            raise HTTPException(status_code=400, detail="uuid required")
+        published = default_pack_store()
+        try:
+            data = published.get(uid)
+        except Exception as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        with tempfile.TemporaryDirectory(prefix="rdbpack-activate-") as td:
+            path = Path(td) / f"{uid}.rdbpack"
+            path.write_bytes(data)
+            report = _call(
+                _store().import_pack,
+                path,
+                dry_run=False,
+                activate=bool((body or {}).get("activate_behavior")),
+            )
+            report["activated_uuid"] = uid
+            return report
+
+    @app.get("/api/rdbpack/versions/{uuid}/runs")
+    def rdbpack_version_runs(uuid: str, limit: int = Query(100)) -> dict:
+        from redibis.pii.run_store import get_run_store
+
+        rows = get_run_store().runs_for_pack_uuid(uuid, limit=limit)
+        return {"runs": [r.to_dict() for r in rows], "count": len(rows)}
+
+    @app.get("/api/rdbpack/versions/{uuid}/diff")
+    def rdbpack_version_diff(uuid: str, against: str = Query(...)) -> dict:
+        from redibis.pack.diff import diff_pack_files, format_pack_diff
+        from redibis.pack.loader import load_pack
+        from redibis.pack.publish import default_pack_store
+
+        store = default_pack_store()
+        try:
+            left_bytes = store.get(uuid)
+            right_bytes = store.get(against)
+        except Exception as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        with tempfile.TemporaryDirectory(prefix="rdbpack-vdiff-") as td:
+            left_path = Path(td) / "left.rdbpack"
+            right_path = Path(td) / "right.rdbpack"
+            left_path.write_bytes(left_bytes)
+            right_path.write_bytes(right_bytes)
+            left = _call(load_pack, left_path)
+            right = _call(load_pack, right_path)
+            from redibis.pack.loader import pack_files_from_loaded
+
+            diff = diff_pack_files(pack_files_from_loaded(left), pack_files_from_loaded(right))
+        return {
+            "left": uuid,
+            "right": against,
+            "diff": diff,
+            "text": format_pack_diff(diff, left_label=uuid, right_label=against),
+        }

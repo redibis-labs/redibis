@@ -17,7 +17,7 @@ import shutil
 from contextlib import asynccontextmanager
 from uuid import uuid4
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
 import yaml
 
@@ -744,6 +744,217 @@ async def data_columns(session_id: str) -> dict:
 @app.patch("/api/sessions/{session_id}/data/columns")
 async def data_columns_patch(session_id: str, body: ColumnToggleBody) -> dict:
     return _masking_service(session_id).set_column_include(body.column, body.include_in_scan)
+
+
+class TableEvalBody(BaseModel):
+    dataset: dict
+    target: Literal["engine", "contract", "llm"] = "engine"
+    engines: str = "both"
+    equation: str = "independent"
+    semantic: bool = False
+
+
+@app.get("/api/sessions/{session_id}/eval/scaffold")
+async def session_eval_scaffold(session_id: str) -> dict:
+    from redibis.evaluation.service import scaffold_from_frame
+
+    session = _require_session(session_id)
+    svc = _masking_service(session_id)
+    suggestions = {}
+    for d in getattr(session, "pii_detections", None) or []:
+        if isinstance(d, dict):
+            col, det, ent = d.get("column"), d.get("detected"), d.get("entity_type")
+        else:
+            col = getattr(d, "column", None)
+            det = getattr(d, "detected", False)
+            ent = getattr(d, "entity_type", "")
+        if col:
+            suggestions[str(col)] = {"is_pii": bool(det), "entity_type": ent or ""}
+    return scaffold_from_frame(svc._df(), table_name=session.table_name, suggestions=suggestions)
+
+
+@app.post("/api/sessions/{session_id}/eval/validate")
+async def session_eval_validate(session_id: str, body: TableEvalBody) -> dict:
+    from redibis.evaluation.adapters import from_column_evaluations_corpus
+    from redibis.evaluation.schema import TableEvalError, structural_fingerprint, validate_table_dataset
+
+    svc = _masking_service(session_id)
+    df = svc._df()
+    names = [str(c) for c in df.columns]
+    try:
+        dataset = body.dataset
+        if dataset.get("column_evaluations") and not dataset.get("kind"):
+            dataset = from_column_evaluations_corpus(dataset)
+        return validate_table_dataset(
+            dataset,
+            table_columns=names,
+            table_fingerprint=structural_fingerprint(names, [str(df[c].dtype) for c in df.columns]),
+        )
+    except TableEvalError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/sessions/{session_id}/eval/export")
+async def session_eval_export(session_id: str, body: TableEvalBody) -> dict:
+    """Return a portable, value-free dataset. Labels stay request-scoped."""
+    from redibis.evaluation.schema import TableEvalError, structural_fingerprint, validate_table_dataset
+
+    svc = _masking_service(session_id)
+    df = svc._df()
+    names = [str(c) for c in df.columns]
+    try:
+        raw_dataset = body.dataset
+        if raw_dataset.get("column_evaluations") and not raw_dataset.get("kind"):
+            from redibis.evaluation.adapters import from_column_evaluations_corpus
+
+            raw_dataset = from_column_evaluations_corpus(raw_dataset)
+        dataset = validate_table_dataset(
+            raw_dataset,
+            table_columns=names,
+            table_fingerprint=structural_fingerprint(names, [str(df[c].dtype) for c in df.columns]),
+        )
+    except TableEvalError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "kind": dataset["kind"],
+        "schema_version": dataset["schema_version"],
+        "redibis_version": dataset["redibis_version"],
+        "table_name": dataset["table_name"],
+        "fingerprint": dataset["fingerprint"],
+        "residency": "portable",
+        "columns": [
+            {
+                "name": col["name"],
+                "is_pii": col["is_pii"],
+                "entity_type": col["entity_type"],
+                "logicalType": col["logicalType"],
+                "privacy_classification": col["privacy_classification"],
+                "businessName": col["businessName"],
+                "description": col["description"],
+                "business_definition": col["business_definition"],
+                "tags": col["tags"],
+            }
+            for col in dataset["columns"]
+        ],
+        "missing_columns": dataset["missing_columns"],
+        "extra_columns": dataset["extra_columns"],
+        "stale_fingerprint": dataset["stale_fingerprint"],
+    }
+
+
+def _run_session_table_eval(session_id: str, body: TableEvalBody, *, progress_cb=None, cancel_event=None):
+    from redibis.config import RedibisConfig
+    from redibis.evaluation.schema import TableEvalError
+    from redibis.evaluation.service import run_table_evaluation
+
+    session = _require_session(session_id)
+    svc = _masking_service(session_id)
+    dataset_table = str(body.dataset.get("table_name") or body.dataset.get("table") or "").strip()
+    if dataset_table and dataset_table != session.table_name:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"evaluation dataset table {dataset_table!r} does not match "
+                f"session table {session.table_name!r}"
+            ),
+        )
+    contract = None
+    if body.target == "contract":
+        try:
+            contract = get_contract_store().get_active(session.table_name)
+        except Exception:
+            contract = None
+        if contract is None:
+            raise HTTPException(status_code=404, detail="no active contract for this table")
+    cfg = getattr(session, "redibis_config", None) or RedibisConfig.default()
+    equation = body.equation or getattr(getattr(session, "common_config", None), "equation", None) or "independent"
+    try:
+        return run_table_evaluation(
+            body.dataset,
+            df=svc._df(),
+            contract=contract,
+            target=body.target,
+            engines=body.engines,
+            equation=equation,
+            redibis_config=cfg,
+            semantic=body.semantic,
+            progress_cb=progress_cb,
+            cancel_event=cancel_event,
+        )
+    except TableEvalError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/sessions/{session_id}/eval/run")
+async def session_eval_run(session_id: str, body: TableEvalBody) -> dict:
+    from starlette.concurrency import run_in_threadpool
+
+    _require_session(session_id)
+    return await run_in_threadpool(_run_session_table_eval, session_id, body)
+
+
+@app.post("/api/sessions/{session_id}/eval/run/stream")
+async def session_eval_run_stream(session_id: str, request: Request, body: TableEvalBody):
+    import threading
+
+    from starlette.concurrency import run_in_threadpool
+
+    from redibis.evaluation.service import TableEvalCancelled
+
+    _require_session(session_id)
+
+    async def _events():
+        import asyncio
+
+        queue: asyncio.Queue = asyncio.Queue()
+        loop = asyncio.get_running_loop()
+        done = object()
+        cancel_event = threading.Event()
+
+        def _on_progress(stage: str, detail: dict) -> None:
+            loop.call_soon_threadsafe(
+                queue.put_nowait, {"event": "stage", "stage": stage, **detail}
+            )
+
+        async def _run():
+            try:
+                report = await run_in_threadpool(
+                    lambda: _run_session_table_eval(
+                        session_id, body, progress_cb=_on_progress, cancel_event=cancel_event
+                    )
+                )
+                await queue.put({"event": "result", "report": report})
+            except TableEvalCancelled:
+                await queue.put({"event": "error", "detail": "evaluation cancelled"})
+            except HTTPException as exc:
+                await queue.put({"event": "error", "detail": str(exc.detail)})
+            except Exception:
+                await queue.put({"event": "error", "detail": "evaluation failed"})
+            finally:
+                await queue.put(done)
+
+        task = asyncio.ensure_future(_run())
+        try:
+            while True:
+                if await request.is_disconnected():
+                    cancel_event.set()
+                    task.cancel()
+                    break
+                try:
+                    item = await asyncio.wait_for(queue.get(), timeout=0.25)
+                except asyncio.TimeoutError:
+                    continue
+                if item is done:
+                    break
+                yield (json.dumps(item) + "\n").encode("utf-8")
+        finally:
+            cancel_event.set()
+            if not task.done():
+                task.cancel()
+
+    resp = StreamingResponse(_events(), media_type="application/x-ndjson")
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @app.get("/api/sessions/{session_id}/mask/plan")
@@ -2969,21 +3180,13 @@ class LlmRoutesBody(BaseModel):
 
 
 def _credential_ready_map() -> dict[str, bool]:
-    import os
-    from redibis.enrich.providers import load_provider_configs
+    from redibis.enrich.providers import list_providers, provider_is_credential_ready
 
     out: dict[str, bool] = {}
-    for name, cfg in (load_provider_configs() or {}).items():
-        if not isinstance(cfg, dict):
-            continue
-        env_name = str(cfg.get("api_key_env") or "").strip()
-        if not env_name:
-            out[str(name)] = True
-            continue
-        ready = bool(os.getenv(env_name))
-        if str(name).lower() == "gemini" and not ready:
-            ready = bool(os.getenv("GOOGLE_API_KEY"))
-        out[str(name)] = ready
+    for row in list_providers() or []:
+        name = str(row.get("name") or "")
+        if name:
+            out[name] = provider_is_credential_ready(row)
     return out
 
 
@@ -3016,24 +3219,28 @@ async def put_llm_routes(body: LlmRoutesBody, request: Request) -> dict:
     from redibis.enrich.capability_routing import RoutingError, apply_routes_put, routes_public_envelope
 
     expected = _parse_if_match_revision(request)
-    gs = get_config_store().load_global_settings()
-    try:
+
+    def _mutate(gs: dict) -> dict:
         merged = apply_routes_put(
             gs,
             {"schema_version": body.schema_version, "settings": body.settings or {}},
             expected_revision=expected,
         )
+        if _settings_contains_secret_key(merged.get("llm") or {}):
+            raise ValueError(
+                "secret-bearing settings must use environment or provider credential references"
+            )
+        return merged
+
+    try:
+        merged = get_config_store().update_global_settings(_mutate)
     except RoutingError as exc:
         msg = str(exc)
         if "revision mismatch" in msg:
             raise HTTPException(status_code=409, detail=msg) from exc
         raise HTTPException(status_code=400, detail=msg) from exc
-    if _settings_contains_secret_key(merged.get("llm") or {}):
-        raise HTTPException(
-            status_code=400,
-            detail="secret-bearing settings must use environment or provider credential references",
-        )
-    get_config_store().save_global_settings(merged)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"status": "saved", "routes": routes_public_envelope(merged)}
 
 

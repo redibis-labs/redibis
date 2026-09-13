@@ -124,6 +124,15 @@ def _assemble(
     raw_manifest = parse_yaml_bytes(files[MANIFEST_NAME])
     if not isinstance(raw_manifest, dict):
         raise PackValidationError("pack.yaml must be a mapping")
+    # Fail on requires.redibis from the raw YAML before pydantic sees unknown
+    # future metadata fields (those are ignored on PackMetadata).
+    raw_requires = raw_manifest.get("requires")
+    if isinstance(raw_requires, dict):
+        spec = raw_requires.get("redibis")
+        if spec is not None and str(spec).strip():
+            from redibis.pack.requirements import _check_version_range
+
+            _check_version_range(str(spec))
     try:
         manifest = PackManifest.model_validate(raw_manifest)
     except Exception as exc:
@@ -144,6 +153,12 @@ def _assemble(
 
     if "config/redibis.yaml" in files:
         validate_pack_config(parse_yaml_bytes(files["config/redibis.yaml"]))
+
+    from redibis.pack.sections import validate_text_gateway_document
+
+    for rel, data in files.items():
+        if rel.startswith("text_gateway/") and rel.endswith((".yaml", ".yml")):
+            validate_text_gateway_document(parse_yaml_bytes(data), relpath=rel)
 
     from redibis.training.residency import ArtifactResidencyGate
 

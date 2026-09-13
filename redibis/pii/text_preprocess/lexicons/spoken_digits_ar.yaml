@@ -150,3 +150,16 @@ partial_card_labels:
   - آخر
   - اخر
   - bin
+
+voucher_labels:
+  - scratch card
+  - scratch
+  - كارت شحن
+  - كود الشحن
+  - 14 رقم
+
+puk_labels:
+  - puk
+  - puk code
+  - رمز puk
+  - الـ puk

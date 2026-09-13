@@ -1,0 +1,87 @@
+kind: redibis.text_span_eval_corpus
+schema_version: "1.2"
+id: sample.free_text_pii
+normalization_profile: v1
+cases:
+  - id: email-en
+    text: "Contact alice@example.com please"
+    language: en
+    tags: [email]
+    expected:
+      - id: s1
+        entity_type: EMAIL_ADDRESS
+        value: alice@example.com
+        grade: strict
+
+  - id: phone-trailing-punct
+    text: "Call 01522345678."
+    language: en
+    tags: [phone, trailing_punct]
+    expected:
+      - id: s1
+        entity_type: PHONE_NUMBER
+        value: "01522345678"
+        canonical: "01522345678"
+        grade: strict
+        note: "trailing sentence period must not score as a miss"
+
+  - id: spoken-phone
+    text: "رقم الموبايل صفر واحد خمسة اثنين"
+    language: ar
+    tags: [spoken_number, arabic]
+    expected:
+      - id: s1
+        entity_type: PHONE_NUMBER
+        value: "صفر واحد خمسة اثنين"
+        canonical: "0152"
+        spoken: true
+        grade: advisory
+        defect: "short spoken fragment for scoring demos"
+
+  - id: address-guards
+    text: "العنوان 15 شارع النيل عمارة 4، شقة 12"
+    language: ar
+    tags: [address, eg]
+    expected:
+      - id: s1
+        entity_type: LOCATION
+        value: "15 شارع النيل عمارة 4، شقة 12"
+        grade: strict
+        note: "5-part address"
+    forbidden:
+      - id: f1
+        entity_type: PHONE_NUMBER
+        value: "4"
+        reason: "address building number"
+      - id: f2
+        entity_type: OTP
+        value: "12"
+        reason: "address apartment number"
+      - id: f3
+        entity_type: PHONE_NUMBER
+        value: "15"
+        reason: "address street number"
+      - id: f4
+        entity_type: OTP
+        value: "15"
+        reason: "street number is not an OTP"
+      - id: f5
+        entity_type: PHONE_NUMBER
+        value: "12"
+        reason: "apartment number is not a phone"
+      - id: f6
+        entity_type: EG_NATIONAL_ID
+        value: "4"
+        reason: "building number is not a national id"
+      - id: f7
+        entity_type: VOUCHER
+        value: "12"
+        reason: "apartment number is not a voucher"
+      - id: f8
+        entity_type: IMEI
+        value: "15"
+        reason: "street number is not an IMEI"
+      - id: f9
+        entity_type: IMSI
+        value: "12"
+        reason: "apartment number is not an IMSI"

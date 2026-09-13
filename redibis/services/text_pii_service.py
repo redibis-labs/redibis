@@ -33,9 +33,17 @@ class TextPIIService:
         ruleset: Optional[RuleSet] = None,
         ner_backend: object | None = None,
         policies: Optional[dict[str, DeidPolicy]] = None,
+        text_rules_overlay: Any = None,
+        skip_stored_text_rules: bool = False,
+        merge_builtin_text_rules: bool = True,
+        pack_stack: Any = None,
     ):
         self._cfg = redibis_config
         self._policies = dict(policies or {})
+        self._pinned_text_rules = text_rules_overlay
+        self._skip_stored_text_rules = skip_stored_text_rules
+        self._merge_builtin_text_rules = merge_builtin_text_rules
+        self._eval_pack_stack = pack_stack
         self._ruleset = ruleset or self._compile_ruleset()
         self._ner = ner_backend if ner_backend is not None else self._try_load_ner()
         self._llm = self._try_llm()
@@ -49,11 +57,38 @@ class TextPIIService:
             ner_backend=self._ner,
             llm_refiner=self._llm,
         )
+        self._provenance_cache: dict[str, Any] = {}
 
     @property
     def config(self) -> Any:
         """The ``RedibisConfig`` this service was built from (may be ``None``)."""
         return self._cfg
+
+    def _operator_text_rules(self, *, include_config: bool = True):
+        """Config ``text_gateway.rules`` plus persisted ``pii_text_rules``.
+
+        When compiling from a pack stack, pass ``include_config=False`` so
+        ``from_stack()`` remains the sole applier of ``config.text_gateway.rules``.
+        """
+        from redibis.pii.text_rules import merge_text_rules
+
+        if self._pinned_text_rules is not None:
+            return self._pinned_text_rules
+        gw_rules = None
+        if include_config and self._cfg is not None:
+            gw = getattr(self._cfg, "text_gateway", None)
+            gw_rules = getattr(gw, "rules", None) if gw is not None else None
+        stored = None
+        if not self._skip_stored_text_rules:
+            try:
+                from redibis.config import load_global_settings_optional
+
+                stored = load_global_settings_optional().get("pii_text_rules")
+            except Exception:
+                stored = None
+        return merge_text_rules(gw_rules, stored) if include_config else (
+            merge_text_rules(stored) if stored else None
+        )
 
     def _compile_ruleset(self) -> RuleSet:
         """Prefer active pack stack / config packs; fall back to builtin default."""
@@ -61,6 +96,11 @@ class TextPIIService:
         region = "EG"
         labels = None
         overrides = None
+        if self._eval_pack_stack is not None:
+            return self._with_text_rules(
+                RuleSetCompiler.from_stack(self._eval_pack_stack),
+                self._operator_text_rules(include_config=False),
+            )
         if self._cfg is not None:
             pii = getattr(self._cfg, "pii", None)
             if pii is not None:
@@ -81,7 +121,11 @@ class TextPIIService:
                     from redibis.pack import apply_packs_from_config
 
                     stack = apply_packs_from_config(self._cfg)
-                    return RuleSetCompiler.from_stack(stack)
+                    self._eval_pack_stack = stack
+                    return self._with_text_rules(
+                        RuleSetCompiler.from_stack(stack),
+                        self._operator_text_rules(include_config=False),
+                    )
                 except Exception as exc:
                     logger.info("pack RuleSet from config packs skipped: %s", exc)
 
@@ -93,7 +137,11 @@ class TextPIIService:
                 layers = [L for L in store.list_layers() if L.path]
                 if layers:
                     stack = store.resolve(self._cfg)
-                    return RuleSetCompiler.from_stack(stack)
+                    self._eval_pack_stack = stack
+                    return self._with_text_rules(
+                        RuleSetCompiler.from_stack(stack),
+                        self._operator_text_rules(include_config=False),
+                    )
             except Exception as exc:
                 logger.info("pack RuleSet from active stack skipped: %s", exc)
 
@@ -102,6 +150,114 @@ class TextPIIService:
             thresholds=thr,
             default_region=region,
             ner_labels=labels,
+            text_rules=self._operator_text_rules(include_config=True),
+            merge_builtin_text_rules=self._merge_builtin_text_rules,
+        )
+
+    @staticmethod
+    def _with_text_rules(rs: RuleSet, extra) -> RuleSet:
+        from redibis.pii.text_rules import merge_text_rules
+
+        if extra is None:
+            return rs
+        combined = merge_text_rules(getattr(rs, "text_rules", None), extra)
+        extra_source = "draft" if getattr(extra, "_draft", False) else "persisted"
+        # Pinned overlays (eval --rules / draft) are named by the caller via
+        # rules_source on the service; default the extra layer to persisted.
+        sources = tuple(getattr(rs, "rules_source", ()) or ())
+        if extra_source not in sources:
+            sources = sources + (extra_source,)
+        return RuleSetCompiler.default(
+            regex_overrides=rs.regex_overrides,
+            thresholds=rs.thresholds,
+            default_region=rs.default_region,
+            ner_labels=list(rs.ner_labels),
+            ner_phrases=rs.ner_phrases,
+            context_tokens=rs.context_tokens,
+            faker_locales=rs.faker_locales,
+            text_rules=combined,
+            ruleset_id=rs.id,
+            version=rs.version,
+            merge_builtin_text_rules=False,
+            rules_source=sources,
+        )
+
+    def scan_provenance(self, scan_config: Optional[TextScanConfig] = None):
+        """Mint (and cache) the ScanProvenance for this service + scan config."""
+        from redibis.pii.provenance import mint_scan_provenance
+
+        cfg = scan_config or TextScanConfig()
+        cache_key = (
+            cfg.engines,
+            cfg.language,
+            cfg.min_score,
+            cfg.use_llm,
+            cfg.preprocess_obfuscation,
+            cfg.preprocess_expanders,
+            cfg.max_chars,
+        )
+        cached = self._provenance_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        stack = self._eval_pack_stack
+        if stack is None:
+            try:
+                from redibis.config import RedibisConfig
+                from redibis.pack.resolver import builtin_default_layer
+                from redibis.pack.stack_models import AppliedPackStack
+
+                stack = AppliedPackStack(
+                    config=self._cfg or RedibisConfig.default(),
+                    layers=[builtin_default_layer()],
+                )
+            except Exception:
+                stack = None
+        record = mint_scan_provenance(
+            ruleset=self._ruleset,
+            stack=stack,
+            ner_backend=self._ner,
+            redibis_config=self._cfg,
+            scan_config=cfg,
+        )
+        self._provenance_cache[cache_key] = record
+        return record
+
+    def _stamp_provenance(
+        self,
+        result: DetectionResult,
+        *,
+        scan_config: TextScanConfig,
+        text: str,
+        kind: str,
+        include_full: bool,
+    ) -> DetectionResult:
+        from dataclasses import replace
+
+        from redibis.pii.eval.provenance import new_run_uuid
+
+        try:
+            prov = self.scan_provenance(scan_config)
+        except Exception as exc:
+            logger.info("scan provenance mint skipped: %s", exc)
+            return replace(
+                result,
+                provenance_degraded=True,
+                provenance_degraded_reason=str(exc),
+                run_uuid=new_run_uuid(),
+            )
+        try:
+            from redibis.pii.run_store import get_run_store
+
+            get_run_store().put_provenance(prov)
+        except Exception:
+            logger.debug("provenance store write skipped", exc_info=True)
+        return replace(
+            result,
+            provenance_uuid=prov.provenance_uuid,
+            provenance_degraded=prov.provenance_degraded,
+            provenance_degraded_reason=prov.provenance_degraded_reason,
+            run_uuid=new_run_uuid(),
+            provenance=prov.to_dict() if include_full else None,
         )
 
     def _try_load_ner(self):
@@ -181,6 +337,7 @@ class TextPIIService:
         llm_model: str = "",
         preprocess_obfuscation: Optional[bool] = None,
         preprocess_expanders: Optional[list[str]] = None,
+        include_provenance: bool = False,
     ) -> DetectionResult:
         if text is None:
             raise TextPIIServiceError("text is required")
@@ -211,6 +368,13 @@ class TextPIIService:
         if use_llm and (llm_provider or "").strip():
             llm_override = self._build_llm_override(llm_provider.strip(), (llm_model or "").strip())
         result = self._scanner.scan(text, cfg, progress_cb=progress_cb, llm_override=llm_override)
+        result = self._stamp_provenance(
+            result,
+            scan_config=cfg,
+            text=text,
+            kind="api_scan",
+            include_full=bool(include_provenance),
+        )
         # Metadata-only logging — never log raw body
         logger.info(
             "text_pii_scan chars=%s entities=%s engines=%s language=%s latency_ms=%.1f "
@@ -286,6 +450,13 @@ class TextPIIService:
 
             pol = replace(pol, locale=self._ruleset.locale_for_language(lang))
         deid = DeidApplier().apply(text, result, pol)
+        from dataclasses import replace as _replace
+
+        deid = _replace(
+            deid,
+            provenance_uuid=result.provenance_uuid,
+            run_uuid=result.run_uuid,
+        )
         logger.info(
             "text_pii_deid chars=%s applied=%s policy=%s reversible=%s",
             len(text),

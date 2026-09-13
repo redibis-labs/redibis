@@ -55,6 +55,8 @@ class DeidResult:
     reversible_spans: int
     run_key_ref: str
     kind: str = "span"
+    provenance_uuid: str = ""
+    run_uuid: str = ""
     # Column path only — DataFrame held by reference (not serialized with secrets).
     deidentified_frame: Any = field(default=None, hash=False, compare=False)
 
@@ -66,6 +68,8 @@ class DeidResult:
             "policy_version": self.policy_version,
             "reversible_spans": self.reversible_spans,
             "run_key_ref": self.run_key_ref,
+            "provenance_uuid": self.provenance_uuid,
+            "run_uuid": self.run_uuid,
             "original_spans": [
                 {
                     "start": s.start,

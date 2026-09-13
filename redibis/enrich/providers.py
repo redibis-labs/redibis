@@ -40,7 +40,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Mapping, Optional
 from urllib.parse import urlparse
 
 
@@ -164,6 +164,24 @@ def _local_openai_compat_needs_placeholder(
     if model.startswith("openai/") and base and (local_host or base.startswith("http://")):
         return True
     return False
+
+
+def provider_is_credential_ready(profile: Mapping) -> bool:
+    """True when the provider can be called without a missing API key."""
+    kind = str(profile.get("kind") or "")
+    name = str(profile.get("name") or "")
+    if kind == "demo" or profile.get("offline"):
+        return True
+    if not profile.get("needs_key"):
+        return True
+    if profile.get("api_key_env_set") or profile.get("api_key_saved"):
+        return True
+    return _local_openai_compat_needs_placeholder(
+        provider_name=name,
+        residency=str(profile.get("residency") or ""),
+        api_base=profile.get("api_base"),
+        litellm_model=str(profile.get("model") or profile.get("litellm_model") or ""),
+    )
 
 
 def normalize_model_id(model: str, *, model_prefix: str = "") -> str:
@@ -612,7 +630,17 @@ def list_providers(config_path: Optional[str] = None) -> list[dict]:
             "model_prefix": model_prefix,
             "default_model_bare": default_bare,
             "known_models": known_models,
-            "needs_key": False if kind == "demo" else bool(cfg.get("api_key_env") or cfg.get("api_key")),
+            "needs_key": (
+                False
+                if kind == "demo"
+                or _local_openai_compat_needs_placeholder(
+                    provider_name=name,
+                    residency=str(cfg.get("residency") or ""),
+                    api_base=cfg.get("api_base"),
+                    litellm_model=str(litellm_model or ""),
+                )
+                else bool(cfg.get("api_key_env") or cfg.get("api_key"))
+            ),
             "api_key_env": api_key_env,
             "api_key_env_set": bool(
             api_key_env and os.getenv(api_key_env)

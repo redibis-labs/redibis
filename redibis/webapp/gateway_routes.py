@@ -16,10 +16,11 @@ import logging
 import time
 from typing import Any, Optional
 
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from redibis import __version__ as REDIBIS_VERSION
 from redibis.services.text_pii_service import (
     TextPIIService,
     TextPIIServiceError,
@@ -36,6 +37,8 @@ SCAN_WINDOW_S = 60
 # more generous budget since they are meant for pre-flight chat gating.
 GUARD_LIMIT = 60
 GUARD_WINDOW_S = 60
+EVAL_MAX_CASES = 100
+EVAL_MAX_TOTAL_CHARS = 200_000
 
 KEY_FIELDS = (
     "master_key",
@@ -84,6 +87,29 @@ class GatewayGuardBody(BaseModel):
     text: str
     check_toxicity: bool = True
     check_prompt_injection: bool = True
+
+
+class GatewayEvaluationBody(BaseModel):
+    dataset: dict
+    language: str = "en"
+    engines: str = "both"
+    min_score: float = Field(default=0.35, ge=0.0, le=1.0)
+    use_llm: bool = False
+    llm_provider: str = ""
+    llm_model: str = ""
+    overlap_iou: float = Field(default=0.5, gt=0.0, le=1.0)
+    draft_rules: Optional[dict] = None
+    pack: str = ""
+    normalization: str = "v1"
+    tier: list[str] | str = "strict,value,overlap,type"
+    persist: bool = True
+    label: str = ""
+    run_uuid: str = ""
+
+
+class CorpusPatchBody(BaseModel):
+    dataset: dict[str, Any]
+    actions: list[dict[str, Any]] = Field(default_factory=list)
 
 
 def _svc() -> TextPIIService:
@@ -205,7 +231,7 @@ def envelope(
         )
         decision = {"action": action, "reasons": reasons}
 
-    return {
+    out = {
         "text_meta": {
             "char_count": int(_pick(d, "char_count", default=0) or 0),
             "original_char_count": original_char_count,
@@ -217,7 +243,13 @@ def envelope(
         },
         "analysers": analysers,
         "decision": decision,
+        "provenance_uuid": _pick(d, "provenance_uuid", default="") or "",
+        "run_uuid": _pick(d, "run_uuid", default="") or "",
+        "provenance_degraded": bool(_pick(d, "provenance_degraded", default=False)),
     }
+    if d.get("provenance"):
+        out["provenance"] = d["provenance"]
+    return out
 
 
 def _guard_role_health(role: str, *, llm_enabled: bool) -> dict:
@@ -267,12 +299,87 @@ def _safe_llm_providers() -> list[dict]:
                 "offline": bool(p.get("offline")),
                 "needs_key": bool(p.get("needs_key")),
                 "api_key_env_set": bool(p.get("api_key_env_set")),
+                "api_key_saved": bool(p.get("api_key_saved")),
+                "kind": p.get("kind"),
+                "residency": p.get("residency"),
+                "api_base": p.get("api_base"),
                 "default_model_bare": p.get("default_model_bare"),
             }
             for p in list_providers()
         ]
     except Exception:
         return []
+
+
+def _text_refiner_health(cfg: Any, providers: list[dict]) -> dict:
+    """Resolve the effective Gateway role and explain config-level readiness."""
+    from redibis.config import load_global_settings_optional
+    from redibis.enrich.capability_routing import RoutingError, get_provider_for_role
+
+    try:
+        gs = load_global_settings_optional()
+    except Exception:
+        gs = None
+    try:
+        provider, binding = get_provider_for_role(
+            "pii.text_refiner",
+            gs=gs,
+            agents_cfg=getattr(cfg, "agents", None),
+        )
+    except RoutingError as exc:
+        return {
+            "role": "pii.text_refiner",
+            "role_bound": False,
+            "ready": False,
+            "status": "unbound",
+            "reason": str(exc),
+        }
+    except Exception as exc:
+        return {
+            "role": "pii.text_refiner",
+            "role_bound": False,
+            "ready": False,
+            "status": "configuration_error",
+            "reason": str(exc),
+        }
+
+    from redibis.enrich.providers import provider_is_credential_ready
+
+    metadata = next(
+        (row for row in providers if row.get("name") == binding.provider), {}
+    )
+    model = binding.model or metadata.get("default_model_bare") or ""
+    cloud = bool(metadata.get("cloud"))
+    key_ready = provider_is_credential_ready(metadata) if metadata else True
+    pii_llm = getattr(getattr(cfg, "pii", None), "llm", None)
+    external_allowed = bool(getattr(pii_llm, "allow_external_raw_text", False))
+    if not key_ready:
+        status = "missing_credentials"
+        reason = (
+            f"{binding.provider} requires its configured API-key environment variable; "
+            "set it and restart the webapp"
+        )
+    elif cloud and not external_allowed:
+        status = "raw_text_external_blocked"
+        reason = (
+            "cloud free-text inference is disabled; enable "
+            "pii.llm.allow_external_raw_text only when policy permits"
+        )
+    else:
+        status = "configured"
+        reason = "configuration is ready; use the role test to verify connectivity"
+    return {
+        "role": "pii.text_refiner",
+        "role_bound": True,
+        "provider": binding.provider or getattr(provider, "name", ""),
+        "model": model,
+        "cloud": cloud,
+        "credential_ready": key_ready,
+        "ready": key_ready and (not cloud or external_allowed),
+        "status": status,
+        "reason": reason,
+        "source": binding.source,
+    }
 
 
 def _run_guards(body: GatewayScanBody, text: str, redibis_config: Any) -> dict:
@@ -352,6 +459,154 @@ def _deidentified_block(deid: Any) -> dict:
     }
 
 
+def _prepare_evaluation(body: GatewayEvaluationBody, actor: str) -> tuple[dict, dict, int]:
+    from redibis.pii.eval import DatasetValidationError, eval_limiter_weight, validate_dataset
+
+    catalogue = _call(_svc().entities).get("entities", [])
+    allowed = {
+        str(row.get("entity_type") or "").upper()
+        for row in catalogue
+        if row.get("entity_type")
+    }
+    if not allowed:
+        raise HTTPException(
+            status_code=503,
+            detail="PII entity catalogue is unavailable; evaluation cannot validate labels",
+        )
+    try:
+        dataset = validate_dataset(body.dataset, allowed_entity_types=allowed)
+    except DatasetValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if len(dataset["cases"]) > EVAL_MAX_CASES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"evaluation exceeds max cases ({EVAL_MAX_CASES})",
+        )
+    oversized = [
+        case["id"] for case in dataset["cases"] if len(case["text"]) > UI_MAX_CHARS
+    ]
+    if oversized:
+        raise HTTPException(
+            status_code=413,
+            detail=f"{len(oversized)} case(s) exceed {UI_MAX_CHARS} characters",
+        )
+    total_chars = sum(len(case["text"]) for case in dataset["cases"])
+    if total_chars > EVAL_MAX_TOTAL_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"evaluation exceeds total character limit ({EVAL_MAX_TOTAL_CHARS})",
+        )
+    weight = eval_limiter_weight(
+        len(dataset["cases"]), total_chars, use_llm=body.use_llm
+    )
+    if not SCAN_LIMITER.allow(f"gateway-eval:{actor}", weight=weight):
+        raise HTTPException(
+            status_code=429,
+            detail="too many evaluations — wait a moment and try again",
+        )
+    cfg = _redibis_config()
+    if body.use_llm:
+        providers = _safe_llm_providers()
+        if body.llm_provider:
+            from redibis.enrich.providers import provider_is_credential_ready
+
+            metadata = next(
+                (row for row in providers if row.get("name") == body.llm_provider),
+                None,
+            )
+            if metadata is not None and not provider_is_credential_ready(metadata):
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"LLM provider {body.llm_provider!r} is missing credentials",
+                )
+        else:
+            readiness = _text_refiner_health(cfg, providers)
+            if not readiness.get("ready"):
+                raise HTTPException(
+                    status_code=409,
+                    detail=str(readiness.get("reason") or "LLM refiner is not ready"),
+                )
+    gw_cfg = getattr(cfg, "text_gateway", None)
+    options = {
+        "language": body.language,
+        "engines": body.engines,
+        "min_score": body.min_score,
+        "use_llm": body.use_llm,
+        "llm_provider": body.llm_provider,
+        "llm_model": body.llm_model,
+        "max_chars": UI_MAX_CHARS,
+        "overlap_iou": body.overlap_iou,
+        "preprocess_obfuscation": bool(
+            getattr(gw_cfg, "obfuscation_preprocess", True)
+        ),
+        "preprocess_expanders": list(
+            getattr(gw_cfg, "obfuscation_expanders", None) or []
+        ),
+        "normalization": body.normalization or "v1",
+        "tiers": body.tier,
+        "label": body.label or "",
+        "run_uuid": body.run_uuid or "",
+        "draft_rules": body.draft_rules,
+        "pack": body.pack or "",
+        "persist": bool(body.persist),
+    }
+    return dataset, options, total_chars
+
+
+def _run_evaluation(dataset: dict, options: dict, *, progress_cb=None, cancel_event=None) -> dict:
+    from redibis.pii.eval import DatasetValidationError, evaluate_with_service
+    from redibis.pii.eval.registry import put_run
+    from redibis.pii.text_rules import TextRuleOverlay, merge_text_rules
+    from redibis.services.text_pii_service import TextPIIServiceError
+
+    svc = _svc()
+    draft = options.get("draft_rules")
+    pack = options.get("pack") or ""
+    if draft or pack:
+        overlay = None
+        pack_stack = None
+        pack_header = None
+        if draft:
+            overlay = merge_text_rules(
+                getattr(getattr(svc, "_ruleset", None), "text_rules", None),
+                TextRuleOverlay.from_dict(draft),
+            )
+            options["rules_source"] = "service+draft"
+        if pack:
+            from redibis.pii.eval.pinning import EvalPinError, resolve_pack_stack
+
+            try:
+                pack_stack, pack_header = resolve_pack_stack(
+                    pack=str(pack), redibis_config=_redibis_config()
+                )
+            except EvalPinError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            options["pack_stack_header"] = pack_header
+        svc = TextPIIService(
+            redibis_config=_redibis_config(),
+            text_rules_overlay=overlay,
+            skip_stored_text_rules=overlay is not None,
+            merge_builtin_text_rules=overlay is None,
+            pack_stack=pack_stack,
+            ner_backend=getattr(_svc(), "_ner", None),
+        )
+    try:
+        report = evaluate_with_service(
+            svc,
+            dataset,
+            options=options,
+            progress_cb=progress_cb,
+            cancel_event=cancel_event,
+        )
+    except DatasetValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except TextPIIServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    if options.get("persist", True):
+        put_run(report)
+    return report
+
+
 def register_gateway_routes(
     app: Any,
     templates: Any,
@@ -381,6 +636,23 @@ def register_gateway_routes(
         _no_store(resp)
         return resp
 
+    @app.get("/gateway/evaluations", response_class=HTMLResponse)
+    async def gateway_evaluations_page(request: Request):
+        resp = templates.TemplateResponse(
+            request=request,
+            name="gateway_eval.html",
+            context=page_context_fn(
+                request,
+                js_v=asset_v_fn("gateway_eval.js"),
+                css_v=asset_v_fn("gateway.css"),
+                ui_max_chars=UI_MAX_CHARS,
+                eval_max_cases=EVAL_MAX_CASES,
+                redibis_version=REDIBIS_VERSION,
+            ),
+        )
+        _no_store(resp)
+        return resp
+
     @app.get("/api/gateway/health")
     async def gateway_health(request: Request) -> Any:
         """Truthful engine/provider availability — safe fields only (no keys)."""
@@ -389,6 +661,12 @@ def register_gateway_routes(
         gw_cfg = getattr(cfg, "text_gateway", None)
         toxicity_llm_enabled = bool(getattr(gw_cfg, "toxicity_llm_enabled", False))
         prompt_injection_llm_enabled = bool(getattr(gw_cfg, "prompt_injection_llm_enabled", False))
+        providers = _safe_llm_providers()
+        default_llm = _text_refiner_health(cfg, providers)
+        try:
+            catalogue = list((_svc().entities() or {}).get("entities") or [])
+        except Exception:
+            catalogue = []
         payload = {
             "engines": health.get("engines", {}),
             "guards": {
@@ -399,7 +677,8 @@ def register_gateway_routes(
                     "gateway.prompt_injection", llm_enabled=prompt_injection_llm_enabled
                 ),
             },
-            "llm_providers": _safe_llm_providers(),
+            "llm_providers": providers,
+            "entity_catalogue": catalogue,
             "text_gateway": {
                 "toxicity_llm_enabled": toxicity_llm_enabled,
                 "prompt_injection_llm_enabled": prompt_injection_llm_enabled,
@@ -410,23 +689,169 @@ def register_gateway_routes(
                     getattr(gw_cfg, "obfuscation_expanders", None) or []
                 ),
             },
-            "default_llm": {
-                "role": "pii.text_refiner",
-                "provider": (health.get("engines") or {}).get("llm", {}).get("role_provider")
-                or "",
-                "role_bound": bool(
-                    (health.get("engines") or {}).get("llm", {}).get("role_bound")
-                ),
-            },
+            "default_llm": default_llm,
         }
         return _json_no_store(payload)
 
+    @app.post("/api/gateway/evaluations/run")
+    async def gateway_evaluations_run(
+        request: Request, body: GatewayEvaluationBody
+    ) -> Any:
+        """Scan and score a portable dataset in memory; persist nothing."""
+        from starlette.concurrency import run_in_threadpool
+
+        dataset, options, total_chars = _prepare_evaluation(body, _actor(request))
+        report = await run_in_threadpool(_run_evaluation, dataset, options)
+        logger.info(
+            "gateway_evaluation actor=%s cases=%s chars=%s exact_f1=%s overlap_f1=%s",
+            _actor(request),
+            len(dataset["cases"]),
+            total_chars,
+            report["exact"]["micro"]["f1"],
+            report["overlap"]["micro"]["f1"],
+        )
+        return _json_no_store(report)
+
+    @app.post("/api/gateway/evaluations/run/stream")
+    async def gateway_evaluations_run_stream(
+        request: Request, body: GatewayEvaluationBody
+    ) -> Any:
+        """NDJSON progress events, then the evaluation report.
+
+        Disconnect cancels later cases; a currently running model call is
+        bounded by the provider timeout.
+        """
+        import threading
+
+        from starlette.concurrency import run_in_threadpool
+
+        from redibis.pii.eval import EvalCancelled
+
+        dataset, options, total_chars = _prepare_evaluation(body, _actor(request))
+        t0 = time.perf_counter()
+
+        async def _events():
+            import asyncio
+
+            queue: asyncio.Queue = asyncio.Queue()
+            loop = asyncio.get_running_loop()
+            done = object()
+            cancel_event = threading.Event()
+
+            def _on_progress(stage: str, detail: dict) -> None:
+                loop.call_soon_threadsafe(
+                    queue.put_nowait, {"event": "stage", "stage": stage, **detail}
+                )
+
+            def _do_eval():
+                return _run_evaluation(
+                    dataset,
+                    options,
+                    progress_cb=_on_progress,
+                    cancel_event=cancel_event,
+                )
+
+            async def _run():
+                try:
+                    report = await run_in_threadpool(_do_eval)
+                    await queue.put({"event": "result", "report": report})
+                except EvalCancelled:
+                    await queue.put({"event": "error", "detail": "evaluation cancelled"})
+                except HTTPException as exc:
+                    await queue.put({"event": "error", "detail": str(exc.detail)})
+                except Exception:
+                    logger.exception("gateway_evaluations_run_stream failed")
+                    await queue.put({"event": "error", "detail": "evaluation failed"})
+                finally:
+                    await queue.put(done)
+
+            task = asyncio.ensure_future(_run())
+            try:
+                while True:
+                    if await request.is_disconnected():
+                        cancel_event.set()
+                        task.cancel()
+                        break
+                    try:
+                        item = await asyncio.wait_for(queue.get(), timeout=0.25)
+                    except asyncio.TimeoutError:
+                        continue
+                    if item is done:
+                        break
+                    yield (json.dumps(item) + "\n").encode("utf-8")
+            finally:
+                cancel_event.set()
+                if not task.done():
+                    task.cancel()
+            logger.info(
+                "gateway_evaluation_stream actor=%s cases=%s chars=%s latency_ms=%.1f",
+                _actor(request),
+                len(dataset["cases"]),
+                total_chars,
+                (time.perf_counter() - t0) * 1000,
+            )
+
+        resp = StreamingResponse(_events(), media_type="application/x-ndjson")
+        _no_store(resp)
+        return resp
+
+    @app.get("/api/gateway/evaluations/runs")
+    async def gateway_evaluations_runs() -> Any:
+        from redibis.pii.eval.registry import list_runs
+
+        return _json_no_store({"runs": list_runs()})
+
+    @app.get("/api/gateway/evaluations/runs/{run_uuid}")
+    async def gateway_evaluations_run_get(run_uuid: str) -> Any:
+        from redibis.pii.eval.registry import get_run
+
+        report = get_run(run_uuid)
+        if report is None:
+            raise HTTPException(status_code=404, detail="unknown evaluation run")
+        return _json_no_store(report)
+
+    @app.get("/api/gateway/evaluations/runs/{run_uuid}/cases/{case_id}")
+    async def gateway_evaluations_case(run_uuid: str, case_id: str) -> Any:
+        from redibis.pii.eval.registry import get_case
+
+        row = get_case(run_uuid, case_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="unknown evaluation case")
+        return _json_no_store(row)
+
+    @app.get("/api/gateway/evaluations/compare")
+    async def gateway_evaluations_compare(a: str, b: str) -> Any:
+        from redibis.pii.eval.registry import compare_runs
+
+        try:
+            return _json_no_store(compare_runs(a, b))
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.post("/api/gateway/evaluations/corpus-patch")
+    async def gateway_evaluations_corpus_patch(body: CorpusPatchBody) -> Any:
+        from redibis.pii.eval.corpus_patch import apply_corpus_patch, draft_rules_from_actions
+
+        result = apply_corpus_patch(body.dataset, body.actions)
+        result["draft_rules"] = draft_rules_from_actions(body.actions)
+        return _json_no_store(result)
+
     @app.post("/api/gateway/scan")
-    async def gateway_scan(request: Request, body: GatewayScanBody) -> Any:
+    async def gateway_scan(
+        request: Request,
+        body: GatewayScanBody,
+        provenance: str = Query(""),
+    ) -> Any:
         text, original_n, truncated = _guard(request, body.text)
         t0 = time.perf_counter()
         cfg = _redibis_config()
-        result = _call(_svc().scan, text, **_scan_kwargs(body, UI_MAX_CHARS))
+        kwargs = _scan_kwargs(body, UI_MAX_CHARS)
+        from redibis.webapp.pii_text_routes import role_may_see_full_provenance
+
+        kwargs["include_provenance"] = (
+            str(provenance).lower() == "full" and role_may_see_full_provenance(request)
+        )
+        result = _call(_svc().scan, text, **kwargs)
         guards = _run_guards(body, text, cfg)
         payload = envelope(
             result,
@@ -435,6 +860,12 @@ def register_gateway_routes(
             guards=guards,
             redibis_config=cfg,
         )
+        try:
+            from redibis.webapp.pii_text_routes import _record_result
+
+            _record_result(result, text=text, kind="gateway_scan", actor=_actor(request))
+        except Exception:
+            logger.debug("gateway run registry skipped", exc_info=True)
         pii = payload["analysers"]["pii"]
         logger.info(
             "gateway_scan actor=%s chars=%s original=%s truncated=%s "

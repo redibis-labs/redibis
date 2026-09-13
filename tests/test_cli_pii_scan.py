@@ -167,8 +167,12 @@ def _assert_pii_subcontract(sub_store, table: str, run_id: str) -> dict:
 
 
 def _local_ner_model_path() -> str | None:
+    from tests.conftest import host_ner_model_path
+
     path = os.environ.get("REDIBIS_NER_MODEL", "").strip()
-    return path if path and Path(path).exists() else None
+    if path and Path(path).exists():
+        return path
+    return host_ner_model_path()
 
 
 @pytest.fixture

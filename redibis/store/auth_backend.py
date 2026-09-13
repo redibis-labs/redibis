@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import sqlite3
 import threading
 from contextlib import contextmanager
 from pathlib import Path
@@ -432,12 +431,20 @@ class StorageAuthBackend:
 
 # ── DB backend (stdlib sqlite3; psycopg lazy for postgres://) ───────────────
 
+def _sqlite3():
+    """Lazy — JSON auth must not fail when conda sqlite/_icu cannot load."""
+    import sqlite3
+
+    return sqlite3
+
+
 class _AuthDb:
     def __init__(self, url: str):
+        sqlite3 = _sqlite3()
         self.url = url or "sqlite:///:memory:"
         self.kind = "postgres" if self.url.startswith("postgres") else "sqlite"
         self._lock = threading.RLock()
-        self._mem: Optional[sqlite3.Connection] = None
+        self._mem: Any = None
         if self.kind == "sqlite" and (
             ":memory:" in self.url or self.url in ("sqlite://", "sqlite:///")
         ):
@@ -466,6 +473,7 @@ class _AuthDb:
         path = self._sqlite_path()
         if path != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
+        sqlite3 = _sqlite3()
         conn = sqlite3.connect(path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         return conn

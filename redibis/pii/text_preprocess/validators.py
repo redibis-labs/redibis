@@ -54,7 +54,7 @@ class DigitRouterValidator:
     name = "digit_router"
     entity_types = frozenset({
         "PHONE_NUMBER", "EG_NATIONAL_ID", "IMEI", "IMSI", "ICCID", "CREDIT_CARD",
-        "CVV", "OTP", "CREDIT_CARD_EXPIRATION",
+        "CVV", "OTP", "CREDIT_CARD_EXPIRATION", "VOUCHER", "SIM_PUK",
     })
 
     def validate(
@@ -81,6 +81,26 @@ class DigitRouterValidator:
             blob, _EXPIRY_HINTS
         )
         partial_context = _has_any(blob, _PARTIAL_CARD_HINTS)
+
+        if hint in {"VOUCHER", "SCRATCH_CARD", "SCRATCH_CARD_PIN"} and 10 <= len(digits) <= 16:
+            return ValidationOutcome(
+                ok=True,
+                validator="voucher_length",
+                entity_type="VOUCHER",
+                score=0.86,
+                is_proposal=False,
+                reason="context_voucher",
+            )
+
+        if hint == "SIM_PUK" and len(digits) == 8:
+            return ValidationOutcome(
+                ok=True,
+                validator="labeled_secret",
+                entity_type="SIM_PUK",
+                score=0.88,
+                is_proposal=False,
+                reason="context_puk",
+            )
 
         if cvv_context and 3 <= len(digits) <= 4:
             return ValidationOutcome(
@@ -379,7 +399,7 @@ class LabeledSecretValidator:
         value = (canonical or "").strip()
         if not value or len(value) < 4:
             return ValidationOutcome(ok=False, reason="secret_short")
-        hint = (entity_hint or "SECRET").upper()
+        hint = (entity_hint or "SECRET").upper().replace(" ", "_")
         if hint not in self.entity_types:
             hint = "SECRET"
         return ValidationOutcome(

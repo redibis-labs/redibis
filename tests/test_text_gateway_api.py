@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 
 import pytest
@@ -23,9 +24,7 @@ class FakeResult:
     def __init__(self, text: str, **extra):
         self.text = text
         self.extra = extra
-
-    def to_dict(self, *, return_text: bool = True) -> dict:
-        spans = self.extra.get("spans") or [
+        spans = extra.get("spans") or [
             {
                 "entity_type": "EMAIL_ADDRESS",
                 "start": 0,
@@ -33,9 +32,23 @@ class FakeResult:
                 "score": 0.91,
                 "engine": "regex",
                 "is_proposal": False,
-                "text": self.text[:5] if return_text else "",
+                "text": self.text[:5] if self.text else "",
             }
         ]
+        self.detections = spans
+        self.ruleset_id = extra.get("ruleset_id", "builtin")
+        self.ruleset_version = extra.get("ruleset_version", "1.0.0")
+        self.engines_ran = extra.get("engines_ran", ["regex"])
+
+    def to_dict(self, *, return_text: bool = True) -> dict:
+        spans = []
+        for span in self.detections:
+            item = dict(span)
+            if not return_text:
+                item["text"] = ""
+            elif "text" not in item:
+                item["text"] = self.text[span["start"]:span["end"]]
+            spans.append(item)
         return {
             "kind": "span",
             "spans": spans,
@@ -112,6 +125,12 @@ class FakeService:
     @property
     def config(self):
         return None
+
+    def entities(self, *, language: str = "en"):
+        return {
+            "entities": [{"entity_type": "EMAIL_ADDRESS", "family": "contact"}],
+            "language": language,
+        }
 
 
 @pytest.fixture(autouse=True)
@@ -421,3 +440,135 @@ def test_scan_envelope_stays_backward_compatible_without_guards(client):
     assert body["analysers"]["toxicity"] == {"status": "not_configured"}
     assert body["analysers"]["prompt_injection"] == {"status": "not_configured"}
     assert body["decision"] == {"action": "allow", "reasons": []}
+
+
+EVAL_DATASET = {
+    "kind": "redibis.text_span_eval_dataset",
+    "schema_version": "1.0",
+    "offset_unit": "unicode_codepoint",
+    "cases": [
+        {
+            "id": "c1",
+            "text": "alice",
+            "language": "en",
+            "expected_spans": [
+                {"start": 0, "end": 5, "entity_type": "EMAIL_ADDRESS"}
+            ],
+        }
+    ],
+}
+
+
+def test_explorer_can_run_gateway_evaluation(client, caplog):
+    _explorer(client)
+    with caplog.at_level(logging.INFO, logger="redibis.webapp.gateway"):
+        r = _post(client, "/api/gateway/evaluations/run", {"dataset": EVAL_DATASET})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["kind"] == "redibis.text_span_eval_report"
+    assert body["exact"]["micro"]["tp"] == 1
+    assert r.headers.get("Cache-Control") == "no-store"
+    blob = " ".join(rec.getMessage() for rec in caplog.records)
+    assert "alice" not in blob
+
+
+def test_explorer_can_stream_gateway_evaluation(client):
+    _explorer(client)
+    r = _post(client, "/api/gateway/evaluations/run/stream", {"dataset": EVAL_DATASET})
+    assert r.status_code == 200, r.text
+    lines = [json.loads(line) for line in r.text.splitlines() if line.strip()]
+    assert any(ev.get("event") == "result" for ev in lines)
+
+
+def test_evaluation_fails_closed_when_llm_is_unready(client):
+    _explorer(client)
+    r = _post(
+        client,
+        "/api/gateway/evaluations/run",
+        {"dataset": EVAL_DATASET, "use_llm": True},
+    )
+    assert r.status_code == 409
+    assert "requires" in r.json()["detail"] or "not ready" in r.json()["detail"]
+
+
+def test_evaluation_rejects_invalid_dataset(client):
+    _explorer(client)
+    r = _post(client, "/api/gateway/evaluations/run", {"dataset": {"kind": "nope"}})
+    assert r.status_code == 400
+
+
+def test_evaluation_registry_compare_and_corpus_patch(client):
+    _explorer(client)
+    r = _post(client, "/api/gateway/evaluations/run", {"dataset": EVAL_DATASET, "label": "a"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    uid = body["provenance"]["run_uuid"]
+    listed = client.get("/api/gateway/evaluations/runs")
+    assert listed.status_code == 200
+    assert any(row["run_uuid"] == uid for row in listed.json()["runs"])
+    got = client.get(f"/api/gateway/evaluations/runs/{uid}")
+    assert got.status_code == 200
+    assert got.json()["provenance"]["run_uuid"] == uid
+    case_id = EVAL_DATASET["cases"][0]["id"]
+    case = client.get(f"/api/gateway/evaluations/runs/{uid}/cases/{case_id}")
+    assert case.status_code == 200
+    r2 = _post(client, "/api/gateway/evaluations/run", {"dataset": EVAL_DATASET, "label": "b"})
+    uid2 = r2.json()["provenance"]["run_uuid"]
+    cmp = client.get(f"/api/gateway/evaluations/compare?a={uid}&b={uid2}")
+    assert cmp.status_code == 200
+    patch = _post(
+        client,
+        "/api/gateway/evaluations/corpus-patch",
+        {"dataset": EVAL_DATASET, "actions": [{"action": "exclude_term", "term": "agent"}]},
+    )
+    assert patch.status_code == 200
+    assert "agent" in patch.json()["draft_rules"]["exclude_terms"]
+
+
+def test_evaluations_page_no_store(client):
+    _explorer(client)
+    r = client.get("/gateway/evaluations")
+    assert r.status_code == 200
+    assert r.headers.get("Cache-Control") == "no-store"
+    assert b"gateway_eval.js" in r.content
+    assert b'id="evText"' in r.content
+
+
+def test_settings_role_binding_appears_in_gateway_health(client, tmp_path, monkeypatch):
+    monkeypatch.setenv("REDIBIS_CONFIGS_DIR", str(tmp_path / "configs"))
+    (tmp_path / "configs").mkdir(parents=True, exist_ok=True)
+    assert _login(client, "admin", ADMIN_PW).status_code == 200
+    current = client.get("/api/llm/routes")
+    assert current.status_code == 200, current.text
+    rev = current.json().get("revision", 0)
+    put = client.put(
+        "/api/llm/routes",
+        headers={
+            "X-CSRF-Token": client.cookies.get(CSRF_COOKIE) or "",
+            "If-Match": f"revision:{rev}",
+        },
+        json={
+            "schema_version": 1,
+            "settings": {
+                "llm": {
+                    "roles": {
+                        "pii.text_refiner": {
+                            "provider": "demo",
+                            "model": "offline",
+                            "enabled": True,
+                        }
+                    }
+                }
+            },
+        },
+    )
+    assert put.status_code == 200, put.text
+    health = client.get("/api/gateway/health")
+    assert health.status_code == 200, health.text
+    llm = health.json()["default_llm"]
+    assert llm["role"] == "pii.text_refiner"
+    assert llm["role_bound"] is True
+    assert llm["provider"] == "demo"
+    assert llm["model"]
+    assert "status" in llm
+

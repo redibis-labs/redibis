@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from redibis.agents.dag_trace import build_audit_dag
 from redibis.agents.deep_profile import get_capability, list_capabilities, run_deep_profile

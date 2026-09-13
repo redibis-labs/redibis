@@ -47,10 +47,31 @@ import yaml
 log = logging.getLogger(__name__)
 
 
+def _write_json_unlocked(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+    if path.exists():
+        shutil.copy2(path, path.with_suffix(path.suffix + ".bak"))
+    fd, tmp_name = tempfile.mkstemp(
+        dir=str(path.parent), prefix=".global_settings.", suffix=".tmp",
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as tmp:
+            tmp.write(text)
+            tmp.flush()
+            os.fsync(tmp.fileno())
+        os.replace(tmp_name, path)
+    except Exception:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
+
+
 def _atomic_write_json(path: Path, payload: dict) -> None:
     """Lock → bak → temp → replace for local JSON config files."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    text = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
     lock_path = path.with_suffix(path.suffix + ".lock")
     with open(lock_path, "a+", encoding="utf-8") as lock_fh:
         try:
@@ -59,23 +80,7 @@ def _atomic_write_json(path: Path, payload: dict) -> None:
         except Exception:
             pass
         try:
-            if path.exists():
-                shutil.copy2(path, path.with_suffix(path.suffix + ".bak"))
-            fd, tmp_name = tempfile.mkstemp(
-                dir=str(path.parent), prefix=".global_settings.", suffix=".tmp",
-            )
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8") as tmp:
-                    tmp.write(text)
-                    tmp.flush()
-                    os.fsync(tmp.fileno())
-                os.replace(tmp_name, path)
-            except Exception:
-                try:
-                    os.unlink(tmp_name)
-                except OSError:
-                    pass
-                raise
+            _write_json_unlocked(path, payload)
         finally:
             try:
                 import fcntl
@@ -338,6 +343,39 @@ class LocalConfigStore:
         except Exception:
             return {}
 
+    def update_global_settings(self, mutator):
+        """Read-modify-write global settings under the same lock as save."""
+        path = self.config_dir / "global_settings.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = path.with_suffix(path.suffix + ".lock")
+        with open(lock_path, "a+", encoding="utf-8") as lock_fh:
+            try:
+                import fcntl
+                fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+            except Exception:
+                pass
+            try:
+                current = {}
+                if path.exists():
+                    try:
+                        with open(path, "r", encoding="utf-8") as f:
+                            loaded = json.load(f)
+                        if isinstance(loaded, dict):
+                            current = loaded
+                    except Exception:
+                        current = {}
+                updated = mutator(dict(current))
+                if not isinstance(updated, dict):
+                    raise TypeError("update_global_settings mutator must return a dict")
+                _write_json_unlocked(path, updated)
+                return updated
+            finally:
+                try:
+                    import fcntl
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+                except Exception:
+                    pass
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -550,3 +588,11 @@ class ObjectConfigStore:
             return self.backend.get_json(self.quality_bucket, key)
         except KeyError:
             return {}
+
+    def update_global_settings(self, mutator):
+        current = self.load_global_settings()
+        updated = mutator(dict(current) if isinstance(current, dict) else {})
+        if not isinstance(updated, dict):
+            raise TypeError("update_global_settings mutator must return a dict")
+        self.save_global_settings(updated)
+        return updated

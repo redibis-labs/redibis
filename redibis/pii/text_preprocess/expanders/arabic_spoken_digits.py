@@ -58,11 +58,14 @@ def _build_lexicon() -> tuple:
     otp_labels = list(data.get("otp_labels") or [])
     expiry_labels = list(data.get("expiry_labels") or [])
     partial_labels = list(data.get("partial_card_labels") or [])
+    voucher_labels = list(data.get("voucher_labels") or [])
+    puk_labels = list(data.get("puk_labels") or [])
     return (
         digit_map, teen_map, tens_map, hundreds_map, plurals_map,
         connectors, thousands,
         phone_labels, nid_labels, card_labels, cvv_labels,
         otp_labels, expiry_labels, partial_labels,
+        voucher_labels, puk_labels,
     )
 
 
@@ -81,6 +84,8 @@ def _build_lexicon() -> tuple:
     _OTP_LABELS,
     _EXPIRY_LABELS,
     _PARTIAL_LABELS,
+    _VOUCHER_LABELS,
+    _PUK_LABELS,
 ) = _build_lexicon()
 
 _STRIP_EDGE = re.compile(r"^[\(\[\{«\"'،,.;:!?؟]+|[\)\]\}»\"'،,.;:!?؟]+$")
@@ -271,6 +276,8 @@ def _classify_run(
         [
             ("CVV", _CVV_LABELS, 60),
             ("OTP", _OTP_LABELS, 80),
+            ("SIM_PUK", _PUK_LABELS, 100),
+            ("VOUCHER", _VOUCHER_LABELS, 160),
             ("CREDIT_CARD_EXPIRATION", _EXPIRY_LABELS, 80),
             ("CREDIT_CARD", _PARTIAL_LABELS, 80),
             ("CREDIT_CARD", _CARD_LABELS, 100),
@@ -285,12 +292,26 @@ def _classify_run(
         hint, label = "", ""
     if hint == "CREDIT_CARD_EXPIRATION" and n not in (3, 4):
         hint, label = "", ""
+    if hint == "SIM_PUK" and n != 8:
+        hint, label = "", ""
+    if hint == "VOUCHER" and not (10 <= n <= 16):
+        hint, label = "", ""
+    if n == 14:
+        voucher_label = label_near(text, start, end, _VOUCHER_LABELS, radius=200)
+        if voucher_label and hint in {"", "CREDIT_CARD", "PHONE_NUMBER"}:
+            return "VOUCHER", voucher_label, True
     if hint == "CREDIT_CARD" and n >= 12:
         # 14-digit Egyptian NID near "قومي" wins over ambient "كارت".
         nid_label = label_near(text, start, end, _NID_LABELS, radius=120)
         if nid_label and n == 14:
             return "EG_NATIONAL_ID", nid_label, True
     if not hint:
+        voucher_label = label_near(text, start, end, _VOUCHER_LABELS, radius=160)
+        if voucher_label and 10 <= n <= 16:
+            return "VOUCHER", voucher_label, True
+        puk_label = label_near(text, start, end, _PUK_LABELS, radius=100)
+        if puk_label and n == 8:
+            return "SIM_PUK", puk_label, True
         if n == 14:
             nid_label = label_near(text, start, end, _NID_LABELS, radius=120)
             return "EG_NATIONAL_ID", nid_label, bool(nid_label)
@@ -345,6 +366,8 @@ class ArabicSpokenDigitsExpander:
                 if not hint:
                     if n == 14:
                         hint = "EG_NATIONAL_ID"
+                    elif n == 8 and label_near(text, start, end, _PUK_LABELS, radius=100):
+                        hint = "SIM_PUK"
                     elif 8 <= n <= 13:
                         hint = "PHONE_NUMBER"
                     elif 15 <= n <= 16:

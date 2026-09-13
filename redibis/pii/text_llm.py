@@ -18,7 +18,9 @@ Offsets are Unicode code-point indices into the given text (Python string indice
 Only propose clear PII. Do not invent offsets that do not match the text.
 Entity types include: PERSON, PHONE_NUMBER, EG_NATIONAL_ID, EMAIL_ADDRESS,
 IMEI, IMSI, ICCID, CREDIT_CARD, LOCATION, AGE, PASSWORD_HASH, API_KEY, SECRET,
-OTP, PASSPORT, IBAN_CODE.
+OTP, PASSPORT, IBAN_CODE, SIM_PUK, VOUCHER, SUPPORT_TICKET.
+Do not flag role labels (Agent, Caller) or quantity+unit phrases (30 GB, 100 جنيه).
+When an address cue is present, span the whole address clause, not one keyword.
 """
 
 _SYSTEM_AR = """\
@@ -31,7 +33,9 @@ The span text MUST equal text[start:end] exactly — including spoken words and
 parenthetical digits when both appear together.
 Entity types: PERSON, PHONE_NUMBER, EG_NATIONAL_ID, EMAIL_ADDRESS, IMEI, IMSI,
 ICCID, CREDIT_CARD, LOCATION, AGE, PASSWORD_HASH, API_KEY, SECRET, OTP,
-PASSPORT, IBAN_CODE.
+PASSPORT, IBAN_CODE, SIM_PUK, VOUCHER, SUPPORT_TICKET.
+Do not flag role labels (Agent, Caller) or quantity+unit phrases (30 GB, 100 جنيه).
+When an address cue such as العنوان is present, span the whole address clause.
 Only propose clear PII. Do not invent offsets.
 """
 
@@ -43,6 +47,54 @@ _CLOUD_LLM_PROVIDERS = frozenset({
     "openai", "azure", "azure_openai", "gemini", "google", "google_genai",
     "anthropic", "bedrock", "vertex", "mistral", "cohere", "groq",
 })
+
+
+def _overlay_prompt(text_rules: object | None) -> str:
+    if text_rules is None:
+        return ""
+    to_dict = getattr(text_rules, "to_dict", None)
+    data = to_dict() if callable(to_dict) else {}
+    if not isinstance(data, dict) or not data:
+        return ""
+    lines = ["Operator cues (use these; take the whole clause when extend=sentence):"]
+    cues = data.get("context_cues") or {}
+    if isinstance(cues, dict):
+        for et, cue in list(cues.items())[:12]:
+            if isinstance(cue, dict):
+                trigs = ", ".join(str(t) for t in (cue.get("triggers") or [])[:8])
+                extend = cue.get("extend") or ""
+            else:
+                trigs = str(cue)
+                extend = ""
+            extra = f" extend={extend}" if extend else ""
+            lines.append(f"- {et}: {trigs}{extra}")
+    excludes = data.get("exclude_terms") or []
+    if excludes:
+        lines.append("Never flag these surfaces: " + ", ".join(str(x) for x in excludes[:24]))
+    units = data.get("quantity_units") or []
+    if units:
+        lines.append("Numbers next to these units are not PII: " + ", ".join(str(x) for x in units[:16]))
+    lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def _candidate_summary(existing: list[Candidate], text: str, *, limit: int = 24) -> str:
+    if not existing:
+        return "Existing engines found 0 candidates.\n"
+    lines = [f"Existing engines found {len(existing)} candidate(s):"]
+    for cand in existing[:limit]:
+        start = cand.start
+        end = cand.end
+        slice_txt = ""
+        if start is not None and end is not None and 0 <= start < end <= len(text):
+            slice_txt = text[start:end][:48].replace("\n", " ")
+        lines.append(
+            f"- [{start}:{end}] {cand.entity_type} {cand.engine} {slice_txt!r}"
+        )
+    if len(existing) > limit:
+        lines.append(f"- … {len(existing) - limit} more")
+    lines.append("")
+    return "\n".join(lines)
 
 
 def _system_prompt(config: TextScanConfig) -> str:
@@ -69,6 +121,8 @@ class LlmTextRefiner:
         text: str,
         existing: list[Candidate],
         config: TextScanConfig,
+        *,
+        text_rules: object | None = None,
     ) -> list[Candidate]:
         llm_cfg = getattr(getattr(self._cfg, "pii", None), "llm", None)
         if self._provider is None:
@@ -85,9 +139,11 @@ class LlmTextRefiner:
         sample = text if len(text) <= 4000 else text[:4000]
         prompt = (
             f"Text:\n{sample}\n\n"
-            f"Existing engines found {len(existing)} candidate(s). "
+            f"{_overlay_prompt(text_rules)}"
+            f"{_candidate_summary(existing, text)}\n"
             "Propose any missed PII spans (spoken Arabic digits, obfuscated emails, "
-            "names, addresses, telecom IDs)."
+            "names, full addresses, telecom IDs, PUK, voucher PINs, ticket IDs). "
+            "Extend partial address/name spans to the full clause."
         )
         try:
             raw = self._call_model(prompt, system=system)

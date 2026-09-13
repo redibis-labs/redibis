@@ -79,6 +79,10 @@ dependencies:
       - pgvector>=0.2
       - sentence-transformers>=3.0
 
+      # 4e. YData Profiling (also in redibis[all] / air-gap)
+      - ydata-profiling>=4.6,<5
+      - setuptools>=68,<82
+
       # 5. Dev tooling
       - jupyterlab-git==0.50.0
       - nbformat==5.10.4

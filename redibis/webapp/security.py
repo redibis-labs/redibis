@@ -148,15 +148,16 @@ class SlidingWindowLimiter:
         self._hits: dict[str, list[float]] = {}
         self._lock = threading.Lock()
 
-    def allow(self, key: str) -> bool:
+    def allow(self, key: str, weight: int = 1) -> bool:
+        n = max(1, int(weight))
         now = time.monotonic()
         cutoff = now - self.window_s
         with self._lock:
             q = self._hits.setdefault(key, [])
             q[:] = [t for t in q if t > cutoff]
-            if len(q) >= self.limit:
+            if len(q) + n > self.limit:
                 return False
-            q.append(now)
+            q.extend([now] * n)
             return True
 
     def over_limit(self, key: str) -> bool:

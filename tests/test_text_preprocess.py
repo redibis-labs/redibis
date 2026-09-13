@@ -333,3 +333,37 @@ def test_nid_label_beats_generic_raqam_phone_hint(scanner):
         assert text[n.start:n.end] == n.text
         assert n.is_proposal
         assert not n.validator
+
+
+def test_arabic_spoken_voucher_not_nid(ar_ctx):
+    text = (
+        "scratch card مليني الـ 14 رقم "
+        "واحد اتنين تلاتة، أربعة خمسة ستة، سبعة تمانية تسعة، زيرو واحد، اتنين تلاتة أربعة"
+    )
+    spans = ArabicSpokenDigitsExpander().expand(text, ar_ctx)
+    assert any(
+        s.canonical == "12345678901234" and s.entity_hint == "VOUCHER" for s in spans
+    ), [(s.canonical, s.entity_hint) for s in spans]
+
+
+def test_puk_code_with_gap_words(scanner):
+    text = "الـ PUK code هو 12345678"
+    result = scanner.scan(
+        text,
+        TextScanConfig(
+            engines="regex",
+            language="ar",
+            min_score=0.2,
+            preprocess_obfuscation=True,
+        ),
+    )
+    puks = [d for d in result.detections if d.entity_type == "SIM_PUK"]
+    assert any("12345678" in (d.text or "") for d in puks), result.detections
+
+
+def test_spoken_grouped_phone_case20_style(ar_ctx):
+    text = "يكلمك على رقم زيرو خمستاشر، اتنين اتنين، تلاتة أربعة خمسة، ستة سبعة تمانية"
+    spans = ArabicSpokenDigitsExpander().expand(text, ar_ctx)
+    assert any(s.canonical == "01522345678" for s in spans), [
+        (s.canonical, s.entity_hint) for s in spans
+    ]

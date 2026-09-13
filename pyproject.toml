@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "redibis"
-version = "0.6.11"
+version = "0.6.13"
 description = "Data contract pipeline — ODCS v3 with GE quality, Presidio + GLiNER PII detection, and Arabic + English support."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -78,6 +78,7 @@ memory = ["psycopg2-binary>=2.9", "pgvector>=0.2", "sentence-transformers>=3.0"]
 vector-pg = ["psycopg2-binary>=2.9", "pgvector>=0.2"]
 agents = ["langgraph>=0.2", "langgraph-checkpoint>=2.0"]
 copilotkit = ["ag-ui-langgraph>=0.0.41"]
+ydata = ["ydata-profiling>=4.6,<5", "setuptools>=68,<82"]
 # Test + notebook stack (CI and data_scanning.ipynb). Pin GE like docker/local.
 dev = [
     "pytest==8.2.0",
@@ -123,6 +124,8 @@ all = [
     "ff3>=1.0",
     "sqlalchemy>=1.4.52,<2.0",
     "duckdb==1.5.2",
+    "ydata-profiling>=4.6,<5",
+    "setuptools>=68,<82",
 ]
 
 [project.scripts]
@@ -165,6 +168,7 @@ redibis = [
     "agents/packs/*.yaml",
     "config/*.yaml",
     "pii/text_preprocess/lexicons/*.yaml",
+    "pii/eval/profiles/*.yaml",
     "DEVELOPER_GUIDE.md",
     "py.typed",
 ]

@@ -137,14 +137,16 @@ def build_default_sections(
 
 def default_contents_flags(sections: dict[str, Any]) -> dict[str, Any]:
     """Derive ``PackContents`` fields from the assembled section paths."""
-    class_names = sorted(
-        {
-            p.rsplit("/", 1)[-1].removesuffix(".yaml").removesuffix(".yml")
-            for p in sections
-            if p.startswith("classification/packs/")
-            and p.endswith((".yaml", ".yml"))
-        }
-    )
+    def _stems(prefix: str) -> list[str]:
+        return sorted(
+            {
+                p.rsplit("/", 1)[-1].removesuffix(".yaml").removesuffix(".yml")
+                for p in sections
+                if p.startswith(prefix) and p.endswith((".yaml", ".yml"))
+            }
+        )
+
+    class_names = _stems("classification/packs/")
     return {
         "config": "config/redibis.yaml" in sections,
         "locale": any(p.startswith("locale/") for p in sections),
@@ -154,4 +156,7 @@ def default_contents_flags(sections: dict[str, Any]) -> dict[str, Any]:
         "quality": [],
         "masking": [],
         "ner_weights": False,
+        "text_gateway_rules": _stems("text_gateway/rules/"),
+        "text_gateway_gazetteers": _stems("text_gateway/gazetteers/"),
+        "text_gateway_lexicons": _stems("text_gateway/lexicons/"),
     }

@@ -13,6 +13,7 @@ from typing import Any, Mapping, Optional
 from redibis.pii.ner_backend import DEFAULT_NER_LABELS, _GLINER_PHRASE_BY_CANONICAL
 from redibis.pii.regex_catalog import CATALOG, PatternEntry
 from redibis.pii.regex_overrides import RegexOverrides
+from redibis.pii.text_rules import TextRuleOverlay, compile_text_rules
 from redibis.pii.thresholds import Thresholds
 
 _LANGUAGE_REGION: dict[str, str] = {
@@ -67,6 +68,8 @@ class RuleSet:
     faker_locales: Mapping[str, str] = field(default_factory=lambda: dict(_LANGUAGE_FAKER))
     # Retained so RegexRecognizer can rebuild Presidio with the same overrides.
     regex_overrides: Optional[RegexOverrides] = None
+    text_rules: Optional[TextRuleOverlay] = None
+    rules_source: tuple[str, ...] = ()
 
     def patterns_for_group(self, group: str, *, arabic: bool = False) -> dict[str, PatternEntry]:
         out: dict[str, PatternEntry] = {}
@@ -129,6 +132,9 @@ class RuleSet:
             "PASSPORT": "government_id",
             "SSN": "government_id",
             "EG_NATIONAL_ID": "government_id",
+            "SIM_PUK": "credential",
+            "VOUCHER": "financial",
+            "SUPPORT_TICKET": "internal_id",
         }
         rows = []
         for et in sorted(by_entity):
@@ -176,10 +182,38 @@ class RuleSetCompiler:
         ner_phrases: Optional[Mapping[str, str]] = None,
         context_tokens: Optional[Mapping[str, tuple[str, ...]]] = None,
         faker_locales: Optional[Mapping[str, str]] = None,
+        text_rules: Optional[TextRuleOverlay | Mapping[str, Any]] = None,
         ruleset_id: str = "builtin-default",
         version: str = "1.0.0",
+        merge_builtin_text_rules: bool = True,
+        rules_source: Optional[tuple[str, ...]] = None,
     ) -> RuleSet:
-        catalog = RuleSetCompiler.compile_patterns(regex_overrides)
+        if merge_builtin_text_rules:
+            overlay = compile_text_rules(text_rules)
+        elif isinstance(text_rules, TextRuleOverlay):
+            overlay = text_rules
+        elif text_rules:
+            overlay = TextRuleOverlay.from_dict(text_rules)
+        else:
+            overlay = compile_text_rules()
+        merged_overrides = regex_overrides
+        if overlay.patterns:
+            if merged_overrides is None:
+                merged_overrides = overlay.patterns
+            elif overlay.patterns.replace_all:
+                merged_overrides = overlay.patterns
+            else:
+                add = dict(merged_overrides.add or {})
+                add.update(overlay.patterns.add or {})
+                remove = list(dict.fromkeys(
+                    list(merged_overrides.remove or []) + list(overlay.patterns.remove or [])
+                ))
+                merged_overrides = RegexOverrides(
+                    add=add,
+                    remove=remove,
+                    replace_all=bool(merged_overrides.replace_all),
+                )
+        catalog = RuleSetCompiler.compile_patterns(merged_overrides)
         if context_tokens is not None:
             context = {k: tuple(v) for k, v in context_tokens.items()}
         else:
@@ -219,7 +253,10 @@ class RuleSetCompiler:
             default_region=default_region or "EG",
             phone_regions=regions,
             faker_locales=faker,
-            regex_overrides=regex_overrides,
+            regex_overrides=merged_overrides,
+            text_rules=overlay,
+            rules_source=rules_source
+            or (("builtin",) if merge_builtin_text_rules else ()),
         )
 
     @classmethod
@@ -241,6 +278,32 @@ class RuleSetCompiler:
         overrides = stack.regex_overrides
         if overrides is None and getattr(pii, "regex_overrides", None):
             overrides = RegexOverrides.from_dict(pii.regex_overrides)
+
+        gw = getattr(cfg, "text_gateway", None)
+        cfg_rules = getattr(gw, "rules", None) if gw is not None else None
+        named = dict(stack.text_gateway_rules or {})
+        sources_map = dict(getattr(stack, "text_gateway_rule_sources", None) or {})
+        pack_docs: list[Any] = []
+        pack_labels: list[str] = []
+        applied = [L for L in (stack.layers or []) if L.source != "builtin"]
+        top = applied[-1] if applied else (stack.layers[-1] if stack.layers else None)
+        for name, doc in named.items():
+            pack_docs.append(doc)
+            label = sources_map.get(name)
+            if label:
+                pack_labels.append(str(label))
+            elif top is not None:
+                pack_labels.append(f"pack:{top.id}@{top.version}:{name}")
+            else:
+                pack_labels.append(f"pack:{name}")
+        from redibis.pii.text_rules import compile_layered_text_rules
+
+        text_rules, sources = compile_layered_text_rules(
+            pack_docs=pack_docs,
+            pack_source_labels=pack_labels,
+            config_rules=cfg_rules,
+            include_builtin=True,
+        )
 
         region = getattr(pii, "default_region", None) or "EG"
         phone = dict(stack.phone_locale or {})
@@ -290,8 +353,11 @@ class RuleSetCompiler:
             ner_phrases=dict(stack.ner_phrases or {}),
             context_tokens=dict(stack.context_tokens) if stack.context_tokens else None,
             faker_locales=faker_locales,
+            text_rules=text_rules,
             ruleset_id=rid,
             version=ver,
+            merge_builtin_text_rules=False,
+            rules_source=sources,
         )
         # Replace phone_regions with pack-aware map (frozen → rebuild)
         return RuleSet(
@@ -307,6 +373,8 @@ class RuleSetCompiler:
             phone_regions=phone_regions,
             faker_locales=rs.faker_locales,
             regex_overrides=rs.regex_overrides,
+            text_rules=rs.text_rules,
+            rules_source=rs.rules_source,
         )
 
     @classmethod

@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import pytest
 from redibis.store.storage_backend import LocalBackend
@@ -9,10 +10,27 @@ from redibis.models import PIIDetection
 # Faster password hashing in the test process; production default remains 200_000.
 os.environ.setdefault("REDIBIS_PBKDF2_ROUNDS", "2000")
 
+# Capture before autouse fixtures drop host REDIBIS_* so live GLiNER tests can
+# still use an operator-exported weights directory.
+_HOST_NER_MODEL = os.environ.get("REDIBIS_NER_MODEL", "").strip()
+_HOST_MODELS_DIR = os.environ.get("REDIBIS_MODELS_DIR", "").strip()
+
+
+def host_ner_model_path() -> str | None:
+    """Existing GLiNER weights from the host shell, or repo ``models/``."""
+    candidates = [_HOST_NER_MODEL]
+    if _HOST_MODELS_DIR:
+        candidates.append(str(Path(_HOST_MODELS_DIR) / "gliner-multi-v2.1"))
+    candidates.append(str(Path(__file__).resolve().parents[1] / "models" / "gliner-multi-v2.1"))
+    for candidate in candidates:
+        if candidate and Path(candidate).exists():
+            return candidate
+    return None
+
 
 @pytest.fixture(autouse=True)
 def _clear_deployment_model_env(monkeypatch):
-    """Avoid host shell REDIBIS_* leaking into tests (e.g. export-airgap /models)."""
+    """Avoid host shell REDIBIS_* leaking into resolution-unit tests."""
     monkeypatch.delenv("REDIBIS_MODELS_DIR", raising=False)
     monkeypatch.delenv("REDIBIS_NER_MODEL", raising=False)
 

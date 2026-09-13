@@ -98,6 +98,7 @@ class ObfuscationPipeline:
                 validator=outcome.validator,
                 context_boost=span.context_boost,
                 is_proposal=outcome.is_proposal,
+                canonical=span.canonical,
             ))
 
         return self._merger.merge(candidates, text=text)

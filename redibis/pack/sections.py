@@ -50,6 +50,56 @@ def _masking_relpaths(pack: LoadedPack) -> list[str]:
     )
 
 
+def _text_gateway_relpaths(pack: LoadedPack, kind: str) -> list[str]:
+    prefix = {
+        "rules": "text_gateway/rules/",
+        "gazetteers": "text_gateway/gazetteers/",
+        "lexicons": "text_gateway/lexicons/",
+    }[kind]
+    return sorted(
+        rel
+        for rel in pack.files
+        if rel.startswith(prefix) and rel.endswith((".yaml", ".yml"))
+    )
+
+
+_FORBIDDEN_TEXT_GATEWAY_FIELDS = frozenset(
+    {
+        "llm",
+        "api_key",
+        "endpoint",
+        "endpoint_url",
+        "keys",
+        "seed",
+        "storage",
+        "source",
+        "master_key",
+    }
+)
+
+
+def validate_text_gateway_document(doc: Any, *, relpath: str) -> dict[str, Any]:
+    """Reject secrets/endpoints; return a deep-copied mapping."""
+    if doc is None:
+        return {}
+    if not isinstance(doc, dict):
+        raise PackValidationError(
+            f"{relpath} must be a mapping",
+            errors=[f"{relpath} must be a mapping"],
+        )
+    errors = [
+        f"excluded text_gateway field not allowed in pack: {relpath}:{key}"
+        for key in doc
+        if key in _FORBIDDEN_TEXT_GATEWAY_FIELDS and doc.get(key) not in (None, "", {}, [])
+    ]
+    if errors:
+        raise PackValidationError(
+            "text_gateway document contains forbidden keys",
+            errors=errors,
+        )
+    return copy.deepcopy(doc)
+
+
 def validate_masking_plan_document(doc: Any, *, relpath: str) -> dict[str, Any]:
     """Reject secrets loudly; return a sanitized template dict."""
     if not isinstance(doc, dict):
@@ -121,6 +171,9 @@ def stash_named_documents(
     root = assets_dir(stack_root, pack.manifest.identity)
     quality_out: dict[str, str] = {}
     masking_out: dict[str, str] = {}
+    rules_out: dict[str, str] = {}
+    gazetteers_out: dict[str, str] = {}
+    lexicons_out: dict[str, str] = {}
 
     for rel in _quality_relpaths(pack):
         name = Path(rel).stem
@@ -144,21 +197,63 @@ def stash_named_documents(
         )
         masking_out[name] = str(dest)
 
+    for rel in _text_gateway_relpaths(pack, "rules"):
+        name = Path(rel).stem
+        doc = validate_text_gateway_document(pack.yaml(rel), relpath=rel)
+        dest = root / "text_gateway" / "rules" / f"{name}.yaml"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(
+            yaml.safe_dump(doc, sort_keys=True, allow_unicode=True),
+            encoding="utf-8",
+        )
+        rules_out[name] = str(dest)
+
+    for rel in _text_gateway_relpaths(pack, "gazetteers"):
+        name = Path(rel).stem
+        doc = validate_text_gateway_document(pack.yaml(rel), relpath=rel)
+        dest = root / "text_gateway" / "gazetteers" / f"{name}.yaml"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(
+            yaml.safe_dump(doc, sort_keys=True, allow_unicode=True),
+            encoding="utf-8",
+        )
+        gazetteers_out[name] = str(dest)
+
+    for rel in _text_gateway_relpaths(pack, "lexicons"):
+        name = Path(rel).stem
+        doc = validate_text_gateway_document(pack.yaml(rel), relpath=rel)
+        dest = root / "text_gateway" / "lexicons" / f"{name}.yaml"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(
+            yaml.safe_dump(doc, sort_keys=True, allow_unicode=True),
+            encoding="utf-8",
+        )
+        lexicons_out[name] = str(dest)
+
+    any_stashed = bool(
+        quality_out or masking_out or rules_out or gazetteers_out or lexicons_out
+    )
     return {
         "quality_rulesets": quality_out,
         "masking_plans": masking_out,
-        "assets_root": str(root) if (quality_out or masking_out) else None,
+        "text_gateway_rules": rules_out,
+        "text_gateway_gazetteers": gazetteers_out,
+        "text_gateway_lexicons": lexicons_out,
+        "assets_root": str(root) if any_stashed else None,
     }
 
 
 def load_stashed_named_documents(
     stack_root: Path,
     identity: str,
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Load stashed quality/masking YAML for one pack identity."""
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Load stashed quality/masking/text-gateway YAML for one pack identity."""
     root = assets_dir(stack_root, identity)
     quality: dict[str, Any] = {}
     masking: dict[str, Any] = {}
+    rules: dict[str, Any] = {}
+    gazetteers: dict[str, Any] = {}
+    lexicons: dict[str, Any] = {}
     qdir = root / "quality" / "rulesets"
     if qdir.is_dir():
         for path in sorted(qdir.glob("*.yaml")) + sorted(qdir.glob("*.yml")):
@@ -167,7 +262,17 @@ def load_stashed_named_documents(
     if mdir.is_dir():
         for path in sorted(mdir.glob("*.yaml")) + sorted(mdir.glob("*.yml")):
             masking[path.stem] = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    return quality, masking
+
+    def _load_dir(directory: Path, dest: dict[str, Any]) -> None:
+        if not directory.is_dir():
+            return
+        for path in sorted(directory.glob("*.yaml")) + sorted(directory.glob("*.yml")):
+            dest[path.stem] = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+
+    _load_dir(root / "text_gateway" / "rules", rules)
+    _load_dir(root / "text_gateway" / "gazetteers", gazetteers)
+    _load_dir(root / "text_gateway" / "lexicons", lexicons)
+    return quality, masking, rules, gazetteers, lexicons
 
 
 def import_behavior_policies(

@@ -1,0 +1,165 @@
+{
+  "kind": "redibis.text_span_eval_dataset",
+  "schema_version": "1.2",
+  "redibis_version": "0.6.12",
+  "offset_unit": "unicode_codepoint",
+  "id": "sample.free_text_pii",
+  "normalization_profile": "v1",
+  "source": "tests/data/text_pii/corpora/sample.yaml",
+  "cases": [
+    {
+      "id": "email-en",
+      "text": "Contact alice@example.com please",
+      "language": "en",
+      "tags": [
+        "email"
+      ],
+      "expected_spans": [
+        {
+          "id": "s1",
+          "start": 8,
+          "end": 25,
+          "entity_type": "EMAIL_ADDRESS",
+          "grade": "strict"
+        }
+      ],
+      "forbidden_spans": []
+    },
+    {
+      "id": "phone-trailing-punct",
+      "text": "Call 01522345678.",
+      "language": "en",
+      "tags": [
+        "phone",
+        "trailing_punct"
+      ],
+      "expected_spans": [
+        {
+          "id": "s1",
+          "start": 5,
+          "end": 16,
+          "entity_type": "PHONE_NUMBER",
+          "grade": "strict",
+          "canonical": "01522345678",
+          "note": "trailing sentence period must not score as a miss"
+        }
+      ],
+      "forbidden_spans": []
+    },
+    {
+      "id": "spoken-phone",
+      "text": "رقم الموبايل صفر واحد خمسة اثنين",
+      "language": "ar",
+      "tags": [
+        "spoken_number",
+        "arabic"
+      ],
+      "expected_spans": [
+        {
+          "id": "s1",
+          "start": 13,
+          "end": 32,
+          "entity_type": "PHONE_NUMBER",
+          "grade": "advisory",
+          "canonical": "0152",
+          "spoken": true,
+          "defect": "short spoken fragment for scoring demos"
+        }
+      ],
+      "forbidden_spans": []
+    },
+    {
+      "id": "address-guards",
+      "text": "العنوان 15 شارع النيل عمارة 4، شقة 12",
+      "language": "ar",
+      "tags": [
+        "address",
+        "eg"
+      ],
+      "expected_spans": [
+        {
+          "id": "s1",
+          "start": 8,
+          "end": 37,
+          "entity_type": "LOCATION",
+          "grade": "strict",
+          "note": "5-part address"
+        }
+      ],
+      "forbidden_spans": [
+        {
+          "id": "f1",
+          "start": 28,
+          "end": 29,
+          "entity_type": "PHONE_NUMBER",
+          "grade": "strict",
+          "reason": "address building number"
+        },
+        {
+          "id": "f2",
+          "start": 35,
+          "end": 37,
+          "entity_type": "OTP",
+          "grade": "strict",
+          "reason": "address apartment number"
+        },
+        {
+          "id": "f3",
+          "start": 8,
+          "end": 10,
+          "entity_type": "PHONE_NUMBER",
+          "grade": "strict",
+          "reason": "address street number"
+        },
+        {
+          "id": "f4",
+          "start": 8,
+          "end": 10,
+          "entity_type": "OTP",
+          "grade": "strict",
+          "reason": "street number is not an OTP"
+        },
+        {
+          "id": "f5",
+          "start": 35,
+          "end": 37,
+          "entity_type": "PHONE_NUMBER",
+          "grade": "strict",
+          "reason": "apartment number is not a phone"
+        },
+        {
+          "id": "f6",
+          "start": 28,
+          "end": 29,
+          "entity_type": "EG_NATIONAL_ID",
+          "grade": "strict",
+          "reason": "building number is not a national id"
+        },
+        {
+          "id": "f7",
+          "start": 35,
+          "end": 37,
+          "entity_type": "VOUCHER",
+          "grade": "strict",
+          "reason": "apartment number is not a voucher"
+        },
+        {
+          "id": "f8",
+          "start": 8,
+          "end": 10,
+          "entity_type": "IMEI",
+          "grade": "strict",
+          "reason": "street number is not an IMEI"
+        },
+        {
+          "id": "f9",
+          "start": 35,
+          "end": 37,
+          "entity_type": "IMSI",
+          "grade": "strict",
+          "reason": "apartment number is not an IMSI"
+        }
+      ]
+    }
+  ]
+}

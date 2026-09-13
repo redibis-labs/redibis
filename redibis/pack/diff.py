@@ -111,6 +111,18 @@ def _thresholds_inventory(files: Mapping[str, bytes]) -> dict[str, Any]:
     return dict(thresholds) if isinstance(thresholds, dict) else {}
 
 
+def _text_gateway_inventory(files: Mapping[str, bytes], prefix: str) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for rel, data in files.items():
+        if not rel.startswith(prefix):
+            continue
+        if not rel.endswith((".yaml", ".yml")):
+            continue
+        doc = _yaml(data)
+        out[Path(rel).stem] = doc if doc is not None else {}
+    return out
+
+
 def _canon(value: Any) -> str:
     try:
         return json.dumps(value, sort_keys=True, default=str, ensure_ascii=False)
@@ -135,17 +147,31 @@ def inventory_from_files(files: Mapping[str, bytes]) -> dict[str, dict[str, Any]
         "ner_entities": _ner_inventory(files),
         "validators": _validators_inventory(files),
         "thresholds": _thresholds_inventory(files),
+        "text_gateway_rules": _text_gateway_inventory(files, "text_gateway/rules/"),
+        "text_gateway_gazetteers": _text_gateway_inventory(files, "text_gateway/gazetteers/"),
+        "text_gateway_lexicons": _text_gateway_inventory(files, "text_gateway/lexicons/"),
     }
+
+
+_INVENTORY_KEYS = (
+    "regex_patterns",
+    "custom_rules",
+    "ner_entities",
+    "validators",
+    "thresholds",
+    "text_gateway_rules",
+    "text_gateway_gazetteers",
+    "text_gateway_lexicons",
+)
 
 
 def diff_inventories(
     left: Mapping[str, dict[str, Any]],
     right: Mapping[str, dict[str, Any]],
 ) -> dict[str, dict[str, list[str]]]:
-    keys = ("regex_patterns", "custom_rules", "ner_entities", "validators", "thresholds")
     return {
         key: _section_diff(dict(left.get(key) or {}), dict(right.get(key) or {}))
-        for key in keys
+        for key in _INVENTORY_KEYS
     }
 
 
@@ -173,6 +199,9 @@ def format_pack_diff(
         "ner_entities": "NER entities",
         "validators": "validators",
         "thresholds": "thresholds",
+        "text_gateway_rules": "text-gateway rules",
+        "text_gateway_gazetteers": "text-gateway gazetteers",
+        "text_gateway_lexicons": "text-gateway lexicons",
     }
     any_change = False
     for key, title in labels.items():

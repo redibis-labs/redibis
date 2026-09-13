@@ -11,13 +11,15 @@ TEMPLATES = ROOT / "redibis" / "webapp" / "templates"
 
 def test_no_web_storage_or_innerhtml_of_user_text():
     js = (STATIC / "gateway.js").read_text(encoding="utf-8")
+    eval_js = (STATIC / "gateway_eval.js").read_text(encoding="utf-8")
     mjs = (STATIC / "gateway_render.mjs").read_text(encoding="utf-8")
-    blob = js + "\n" + mjs
+    blob = js + "\n" + eval_js + "\n" + mjs
     assert "localStorage" not in blob
     assert "sessionStorage" not in blob
     assert "indexedDB" not in blob
     # User text must be appended as text nodes, never assigned as HTML.
     assert "innerHTML" not in js
+    assert "innerHTML" not in eval_js
     assert "innerHTML" not in mjs
     assert "insertAdjacentHTML" not in blob
     assert "document.write" not in blob
@@ -91,6 +93,7 @@ def test_nav_surfaces_include_gateway_except_share():
         "reports_missing.html",
         "users.html",
         "gateway.html",
+        "gateway_eval.html",
     ):
         text = (templates / name).read_text(encoding="utf-8")
         assert "/gateway" in text, name
@@ -140,6 +143,7 @@ def test_llm_provider_and_guard_controls_are_present():
 def test_settings_has_text_gateway_models_tab():
     app = (STATIC / "app.js").read_text(encoding="utf-8")
     assert 'stab("gateway_models","Text Gateway")' in app
+    assert 'stab("text_rules","Text Rules")' in app
     assert "vSettingsGatewayModelsTab" in app
     assert "applySettingsGatewayModels" in app
     assert "testGatewayModelRole" in app
@@ -148,6 +152,58 @@ def test_settings_has_text_gateway_models_tab():
     assert "gateway.prompt_injection" in app
     assert "sglang" in app
     assert "GATEWAY_MODEL_ROLES" in app
+    assert "/api/pii/text/rules/publish" in app
+    assert "/api/pii/text/rules/promote" in app
+    assert "/api/rdbpack/versions" in app
+    assert "persisted_outside_pack" in app
+    assert "promotePersistedTextRules" in app
+    assert "Published pack versions" in app
+
+
+def test_evaluations_link_on_main_scan_nav():
+    index = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    settings = (TEMPLATES / "settings.html").read_text(encoding="utf-8")
+    assert 'href="/gateway/evaluations"' in index
+    assert "◈ Evaluations" in index
+    assert 'href="/gateway/evaluations"' in settings
+
+
+def test_evaluation_builder_page_and_health_refresh():
+    html = (TEMPLATES / "gateway_eval.html").read_text(encoding="utf-8")
+    js = (STATIC / "gateway_eval.js").read_text(encoding="utf-8")
+    gw = (STATIC / "gateway.js").read_text(encoding="utf-8")
+    app = (STATIC / "app.js").read_text(encoding="utf-8")
+    assert "/gateway/evaluations" in html
+    assert "/api/gateway/evaluations/run" in js
+    assert "/api/gateway/evaluations/run/stream" in js
+    assert "/api/gateway/evaluations/compare" in js
+    assert "/api/gateway/evaluations/corpus-patch" in js
+    assert "evActNumber" in html
+    assert "evEntityTable" in html
+    assert "evTagTable" in html
+    assert "overlayFromMatchClasses" in js or "overlayFromMatchClasses" in (STATIC / "gateway_render.mjs").read_text(encoding="utf-8")
+    assert "AbortController" in js
+    assert "beforeunload" in js
+    assert "Changing the text will clear expected spans" in js
+    assert "mouseup" not in js
+    assert "visibilitychange" in gw
+    assert "loadLlmRoutesRuntime" in app
+    assert "Object.assign({}, existing" in app
+    assert "Object.assign({}, current" in app
+    assert "await persistLlmSettingsToRegistry" in app
+    assert "await persistLlmCapabilityRoutes" in app
+    assert 'b("eval","Evaluation")' in app
+    assert "/eval/scaffold" in app
+    assert "/eval/run/stream" in app
+    assert "evalSessionId!==S.sid" in app
+    assert "cancelDataEval" in app
+    assert "privacy_classification" in app
+    assert "'description'" in app
+    assert "'tags'" in app
+    assert "Field differences" in app
+    assert "min F1" in app
+    assert "Role bindings saved, but provider endpoints" in app
+    assert "sample_values" not in app.split("function exportEvalDataset")[1].split("function runDataEval")[0]
 
 
 def test_gateway_health_check_never_reveals_credentials():

@@ -23,6 +23,7 @@ class Candidate:
     validator: str = ""
     context_boost: bool = False
     is_proposal: bool = False
+    canonical: str = ""
 
     def to_dict(self, *, return_text: bool = True) -> dict:
         d = {
@@ -36,6 +37,8 @@ class Candidate:
             "context_boost": self.context_boost,
             "is_proposal": self.is_proposal,
         }
+        if self.canonical:
+            d["canonical"] = self.canonical
         if return_text:
             d["text"] = self.text
         else:
@@ -59,6 +62,7 @@ class Detection:
     context_boost: bool = False
     is_proposal: bool = False
     evidence: tuple[Candidate, ...] = ()
+    canonical: str = ""
 
     def to_dict(self, *, return_text: bool = True) -> dict:
         d = {
@@ -73,6 +77,8 @@ class Detection:
             "context_boost": self.context_boost,
             "is_proposal": self.is_proposal,
         }
+        if self.canonical:
+            d["canonical"] = self.canonical
         if return_text:
             d["text"] = self.text
         else:
@@ -102,6 +108,11 @@ class DetectionResult:
     # (e.g. NER model attached but failed to load). Distinct from an engine
     # simply not being requested, and from a valid zero-hit run.
     engines_unavailable: Mapping[str, str] = field(default_factory=dict)
+    provenance_uuid: str = ""
+    provenance_degraded: bool = False
+    provenance_degraded_reason: str = ""
+    run_uuid: str = ""
+    provenance: Optional[Mapping[str, object]] = None
 
     @property
     def spans(self) -> tuple[Detection, ...]:
@@ -112,7 +123,7 @@ class DetectionResult:
 
     def to_dict(self, *, return_text: bool = True) -> dict:
         spans = [d.to_dict(return_text=return_text) for d in self.detections]
-        return {
+        d: dict = {
             "kind": self.kind,
             "spans": spans,
             "detections": spans,
@@ -125,7 +136,15 @@ class DetectionResult:
             "truncated": self.truncated,
             "offset_unit": self.offset_unit,
             "engines_unavailable": dict(self.engines_unavailable),
+            "provenance_uuid": self.provenance_uuid,
+            "provenance_degraded": self.provenance_degraded,
+            "run_uuid": self.run_uuid,
         }
+        if self.provenance_degraded_reason:
+            d["provenance_degraded_reason"] = self.provenance_degraded_reason
+        if self.provenance:
+            d["provenance"] = dict(self.provenance)
+        return d
 
 
 # Design-doc alias

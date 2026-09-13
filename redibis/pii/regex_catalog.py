@@ -1060,13 +1060,28 @@ CATALOG: dict[str, PatternEntry] = {
         unvalidated_reason = "shape is the evidence",
     ),
     "puk_with_label": PatternEntry(
-        pattern            = r"(?i)\b(?:puk|personal\s*unlock(?:ing)?\s*key)\s*[:=]?\s*\d{8}\b",
+        pattern            = (
+            r"(?i)\b(?:puk|personal\s*unlock(?:ing)?\s*key)"
+            r"(?:\s+\w+){0,4}\s*[:=]?\s*\d{8}\b"
+        ),
         entity_type        = "SIM_PUK",
         recognizer_group   = "free_text",
         script             = "latin",
         context_hints      = ("puk","sim","unlock","notes"),
         presidio_score     = 0.92,
         unvalidated_reason = "shape is the evidence",
+    ),
+    "scan_support_ticket": PatternEntry(
+        pattern            = r"\bSR-\d{3,12}\b",
+        entity_type        = "SUPPORT_TICKET",
+        recognizer_group   = "free_text",
+        script             = "latin",
+        context_hints      = ("ticket","تذكرة","sr","support","complaint"),
+        presidio_score     = 0.88,
+        unvalidated_reason = (
+            "SR-prefixed support ticket IDs are strong shape evidence in "
+            "telecom call-center transcripts."
+        ),
     ),
     "cvv_with_label": PatternEntry(
         pattern            = r"(?i)\b(?:cvv|cvc|cvv2|security\s*code)\s*[:=]?\s*\d{3,4}\b",

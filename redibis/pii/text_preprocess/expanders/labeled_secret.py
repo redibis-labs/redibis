@@ -36,7 +36,7 @@ _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     (
         "SIM_PUK",
         re.compile(
-            r"(?i)(?<!\w)(?:puk|رمز\s*الـ?\s*puk)\s*[:=]?\s*(\d{8})(?!\w)"
+            r"(?i)(?<!\w)(?:puk|رمز\s*الـ?\s*puk)(?:\s+\w+){0,4}\s*[:=]?\s*(\d{8})(?!\w)"
         ),
     ),
 ]

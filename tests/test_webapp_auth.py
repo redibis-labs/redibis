@@ -13,6 +13,13 @@ from pathlib import Path
 
 import pytest
 
+def test_json_auth_backend_import_does_not_need_sqlite3():
+    import redibis.store.auth_backend as auth_backend
+
+    assert getattr(auth_backend, "sqlite3", None) is None
+    assert callable(auth_backend.JsonAuthBackend)
+
+
 fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 

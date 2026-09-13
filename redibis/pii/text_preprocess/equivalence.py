@@ -8,11 +8,13 @@ from redibis.pii.scan.result import Candidate
 
 
 def _canonical_of(c: Candidate) -> str:
+    if getattr(c, "canonical", ""):
+        return c.canonical
     # Prefer validator-backed recognizer metadata stashed in recognizer field
-    # after pipeline tagging: "kind|canonical".
+    # after pipeline tagging: "kind|canonical" (merged: kinds…|canonical).
     rec = c.recognizer or ""
     if "|" in rec:
-        return rec.split("|", 1)[1]
+        return rec.rsplit("|", 1)[-1]
     # Fall back to digit-stripped surface text.
     import re
     return re.sub(r"\D", "", c.text or "")
@@ -94,6 +96,7 @@ class VariantEquivalenceMerger:
                         validator=s.validator or c.validator,
                         context_boost=s.context_boost or c.context_boost,
                         is_proposal=s.is_proposal and c.is_proposal,
+                        canonical=canon,
                     )
                     merged_into = selected[i]
                     break
@@ -127,6 +130,7 @@ class VariantEquivalenceMerger:
                     validator=s.validator or o.validator,
                     context_boost=s.context_boost or o.context_boost,
                     is_proposal=False if (s.validator or o.validator) else (s.is_proposal and o.is_proposal),
+                    canonical=s_canon or o_canon,
                 )
                 absorbed.add(i)
                 break

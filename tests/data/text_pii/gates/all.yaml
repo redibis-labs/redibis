@@ -1,0 +1,13 @@
+micro:
+  value_f1: 0.50
+  strict_f1: 0.40
+by_entity:
+  EMAIL_ADDRESS:
+    value_recall: 0.50
+guard_violations_max: 0
+class_budgets:
+  superset_max: 0.80
+  subset_max: 0.50
+advisory: report_only
+regression:
+  max_drop: 0.50

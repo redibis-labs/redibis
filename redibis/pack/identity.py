@@ -30,6 +30,9 @@ CONTENTS_SUMMARY_KEYS: tuple[str, ...] = (
     "behavior_rules",
     "quality_rules",
     "masking_rules",
+    "text_gateway_rules",
+    "text_gateway_gazetteers",
+    "text_gateway_lexicons",
 )
 
 
@@ -68,6 +71,12 @@ def infer_pack_kind(contents: PackContents, *, pack_id: str = "") -> str:
         return "locale"
     if contents.quality or contents.masking:
         return "policy"
+    if (
+        contents.text_gateway_rules
+        or contents.text_gateway_gazetteers
+        or contents.text_gateway_lexicons
+    ):
+        return "text_gateway"
     if contents.ner:
         return "ner"
     if contents.config:
@@ -238,6 +247,12 @@ def count_pack_contents(
                 cols = doc.get("columns") or []
                 if isinstance(cols, list):
                     counts["masking_rules"] += len(cols)
+        if rel.startswith("text_gateway/rules/") and rel.endswith((".yaml", ".yml")):
+            counts["text_gateway_rules"] += 1
+        if rel.startswith("text_gateway/gazetteers/") and rel.endswith((".yaml", ".yml")):
+            counts["text_gateway_gazetteers"] += 1
+        if rel.startswith("text_gateway/lexicons/") and rel.endswith((".yaml", ".yml")):
+            counts["text_gateway_lexicons"] += 1
 
     return counts
 

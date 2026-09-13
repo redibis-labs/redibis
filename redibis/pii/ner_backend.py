@@ -43,6 +43,9 @@ _GLINER_PHRASE_BY_CANONICAL: dict[str, str] = {
     "CREDIT_CARD": "credit card",
     "ORG": "organization",
     "ORGANIZATION": "organization",
+    "VOUCHER": "recharge voucher pin",
+    "SUPPORT_TICKET": "support ticket number",
+    "SIM_PUK": "puk code",
 }
 
 

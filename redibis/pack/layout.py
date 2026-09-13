@@ -52,6 +52,28 @@ def validate_layout(manifest: PackManifest, paths: set[str]) -> None:
         if expected not in paths and alt not in paths:
             errors.append(f"contents.classification references missing file: {expected}")
 
+    for name in contents.text_gateway_rules:
+        expected = f"text_gateway/rules/{name}.yaml"
+        alt = f"text_gateway/rules/{name}.yml"
+        if expected not in paths and alt not in paths:
+            errors.append(f"contents.text_gateway_rules references missing file: {expected}")
+
+    for name in contents.text_gateway_gazetteers:
+        expected = f"text_gateway/gazetteers/{name}.yaml"
+        alt = f"text_gateway/gazetteers/{name}.yml"
+        if expected not in paths and alt not in paths:
+            errors.append(
+                f"contents.text_gateway_gazetteers references missing file: {expected}"
+            )
+
+    for name in contents.text_gateway_lexicons:
+        expected = f"text_gateway/lexicons/{name}.yaml"
+        alt = f"text_gateway/lexicons/{name}.yml"
+        if expected not in paths and alt not in paths:
+            errors.append(
+                f"contents.text_gateway_lexicons references missing file: {expected}"
+            )
+
     if contents.ner_weights:
         weight_paths = [
             p for p in paths
@@ -88,6 +110,7 @@ def validate_layout(manifest: PackManifest, paths: set[str]) -> None:
         "ner",
         "assets",
         "classification",
+        "text_gateway",
     }
     for rel in sorted(paths):
         top = rel.split("/", 1)[0]

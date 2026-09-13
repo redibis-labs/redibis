@@ -464,11 +464,12 @@ def _digit_blobs(text: str) -> set[str]:
 
 
 def _local_ner_model_path() -> str | None:
+    from tests.conftest import host_ner_model_path
+
     path = os.environ.get("REDIBIS_NER_MODEL", "").strip()
     if path and Path(path).exists():
         return path
-    default = Path(__file__).resolve().parents[1] / "models" / "gliner-multi-v2.1"
-    return str(default) if default.exists() else None
+    return host_ner_model_path()
 
 
 @pytest.fixture

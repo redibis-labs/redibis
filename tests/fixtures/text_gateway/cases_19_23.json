@@ -1,0 +1,98 @@
+{
+  "kind": "redibis.text_span_eval_dataset",
+  "schema_version": "1.0",
+  "offset_unit": "unicode_codepoint",
+  "id": "gateway-cases-19-23",
+  "cases": [
+    {
+      "id": "case-19",
+      "text": "Agent: مساء الخير، معاك أحمد من قسم المبيعات، أقدر أساعدك إزاي؟\nCaller: مساء النور، كنت عايز أعمل migrate للخط بتاعي من باقة الكنترول للـ postpaid لو سمحت.\nAgent: تمام يا فندم، الخط اللي بنكلم عليه 01011223344؟\nCaller: أيوه بالظبط، واسمي مصطفى كمال محمود.\nAgent: تمام يا أستاذ مصطفى، هيتم رفع الـ request وهيوصلك رسالة بالتأكيد.",
+      "language": "ar",
+      "expected_spans": [
+        {
+          "start": 198,
+          "end": 209,
+          "entity_type": "PHONE_NUMBER"
+        },
+        {
+          "start": 238,
+          "end": 254,
+          "entity_type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": "case-20",
+      "text": "Agent: بكلم حضرتك بخصوص الـ request الخاص بتغيير الـ router لـ VDSL.\nCaller: أيوه أنا طلبت router جديد، هو هيوصل إمتى؟\nAgent: هيوصل بكرا يا فندم، بس محتاجين نأكد الـ delivery address.\nCaller: العنوان 15 شارع المعادي الجديد، متفرع من شارع النصر، عمارة 4، شقة 12.\nAgent: تمام، هخلي المندوب يكلمك على رقم زيرو خمستاشر، اتنين اتنين، تلاتة أربعة خمسة، ستة سبعة تمانية.\nCaller: تمام شكراً.",
+      "language": "ar",
+      "expected_spans": [
+        {
+          "start": 200,
+          "end": 260,
+          "entity_type": "LOCATION"
+        },
+        {
+          "start": 302,
+          "end": 362,
+          "entity_type": "PHONE_NUMBER"
+        }
+      ]
+    },
+    {
+      "id": "case-21",
+      "text": "Agent: الدعم الفني للكروت والشحن، تحت أمرك.\nCaller: جبت scratch card بـ 100 جنيه وبحاول أشحنه بيديني invalid code، مش عارف ليه.\nAgent: ولا يهمك يا فندم، مليني الـ 14 رقم اللي على الكارت لو سمحت.\nCaller: واحد اتنين تلاتة، أربعة خمسة ستة، سبعة تمانية تسعة، زيرو واحد، اتنين تلاتة أربعة.\nAgent: والرقم اللي بتشحنله 01233445566؟\nCaller: مظبوط.",
+      "language": "ar",
+      "expected_spans": [
+        {
+          "start": 203,
+          "end": 283,
+          "entity_type": "VOUCHER"
+        },
+        {
+          "start": 312,
+          "end": 323,
+          "entity_type": "PHONE_NUMBER"
+        }
+      ]
+    },
+    {
+      "id": "case-22",
+      "text": "Agent: أهلاً بيك في خدمة العملاء، إزاي أساعدك؟\nCaller: التليفون بتاع ابني عمل lock وطالب الـ PUK code عشان دخل الباسورد غلط.\nAgent: تمام، لتأكيد البيانات، ممكن الـ National ID بتاع صاحب الخط؟\nCaller: اتنين تسعة زيرو، واحد واحد اتنين اتنين، زيرو واحد، زيرو اتنين، تلاتة أربعة خمسة.\nAgent: شكراً لحضرتك، الـ PUK code هو 12345678.",
+      "language": "ar",
+      "expected_spans": [
+        {
+          "start": 200,
+          "end": 279,
+          "entity_type": "EG_NATIONAL_ID"
+        },
+        {
+          "start": 318,
+          "end": 326,
+          "entity_type": "SIM_PUK"
+        }
+      ]
+    },
+    {
+      "id": "case-23",
+      "text": "Agent: قسم المتابعة والشكاوى معاك.\nCaller: أنا بتابع الـ ticket رقم SR-45099، النت عندي بطيء جداً بقاله أسبوع.\nAgent: ثواني بفتح الـ profile... الخط مسجل باسم ياسمين طارق؟\nCaller: أيوه أنا.\nAgent: الـ technical team شغال عليها حالياً في السنترال، ممكن رقم contact تاني عشان نبلغك بالـ update؟\nCaller: كلموني على زيرو حداشر، خمسة خمسة، زيرو زيرو، اتنين تلاتة، واحد واحد.",
+      "language": "ar",
+      "expected_spans": [
+        {
+          "start": 68,
+          "end": 76,
+          "entity_type": "SUPPORT_TICKET"
+        },
+        {
+          "start": 159,
+          "end": 170,
+          "entity_type": "PERSON"
+        },
+        {
+          "start": 312,
+          "end": 368,
+          "entity_type": "PHONE_NUMBER"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="referrer" content="same-origin"/>
+  <title>Redibis — Evaluation Builder</title>
+  <link rel="stylesheet" href="/static/app.css?v={{ css_v }}"/>
+  <link rel="stylesheet" href="/static/gateway.css?v={{ css_v }}"/>
+  <link rel="icon" type="image/png" href="/static/logo.png"/>
+</head>
+<body class="gateway-page">
+  <nav class="nav">
+    <a class="nav-left" href="/" aria-label="Open scan console">
+      <img src="/static/logo.png" alt="R" class="nav-logo-img" onerror="this.style.display='none'"/>
+      <div class="nav-brand">Redibis</div>
+      <div class="nav-tagline">evaluation builder</div>
+    </a>
+    <div id="navTabs" class="nav-tabs"></div>
+    <div class="nav-right">
+      <a class="nav-link" href="/">◈ Scan</a>
+      <a class="nav-link" href="/v2">◈ Contracts</a>
+      <a class="nav-link" href="/reports">◈ Reports</a>
+      <a class="nav-link" href="/gateway">◈ Gateway</a>
+      <a class="nav-link" href="/gateway/evaluations">◈ Evaluations</a>
+      <a class="nav-link" href="/docs" target="_blank">◉ API Docs</a>
+      {% if user and user.role == 'admin' %}
+      <a class="nav-link" href="/users">👤 Users</a>
+      {% endif %}
+      {% include "_user_menu.html" %}
+    </div>
+  </nav>
+
+  <div class="page gw">
+    <header class="gw-head">
+      <h1>Evaluation Builder</h1>
+      <p class="gw-sub">
+        Paste unstructured text, highlight spans, and assign expected PII types.
+        Datasets stay in this browser tab — download JSON to score Gateway accuracy later.
+      </p>
+    </header>
+
+    <div class="gw-grid">
+      <section class="gw-main">
+        <div id="gwBanner" class="gw-banners" hidden role="status"></div>
+        <div id="gwHealthBanner" class="gw-banners" hidden role="status"></div>
+        <div id="gwProgress" class="gw-progress" hidden>
+          <div class="gw-progress-track">
+            <div id="gwProgressFill" class="gw-progress-fill"
+                 role="progressbar" aria-valuemin="0" aria-valuemax="100"
+                 aria-valuenow="0" aria-label="Evaluation progress"></div>
+          </div>
+          <div class="gw-progress-row">
+            <div id="gwProgressStage" class="gw-progress-stage" aria-live="polite">Starting…</div>
+            <button id="evCancel" type="button" class="btn btn-ghost btn-sm">Stop</button>
+          </div>
+        </div>
+
+        <div id="evProv" class="gw-card gw-prov" hidden></div>
+        <div class="gw-eval-filters" id="evFilters" hidden>
+          <label>Class <select id="evFilterClass"><option value="">all</option></select></label>
+          <label>Entity <select id="evFilterEntity"><option value="">all</option></select></label>
+          <label>Tag <select id="evFilterTag"><option value="">all</option></select></label>
+          <label class="gw-check"><input id="evMismatches" type="checkbox"/> mismatches only</label>
+          <label class="gw-check"><input id="evNearMiss" type="checkbox"/> near-misses only</label>
+        </div>
+        <textarea id="evText" class="gw-input"
+                  placeholder="Paste a case here, then highlight expected PII…"
+                  spellcheck="false" autocomplete="off"
+                  autocapitalize="off" autocorrect="off"
+                  maxlength="{{ ui_max_chars }}"></textarea>
+        <div id="evResult" class="gw-result" hidden
+             role="region" tabindex="-1"
+             aria-label="Case text with expected or scored spans"></div>
+
+        <div class="gw-bar">
+          <label>Language
+            <select id="evLang">
+              <option value="en">English</option>
+              <option value="ar">Arabic</option>
+            </select>
+          </label>
+          <label>Expected type
+            <select id="evEntity"></select>
+          </label>
+          <button id="evAddSpan" type="button" class="btn">Classify selection</button>
+          <span class="gw-spacer"></span>
+          <span id="evCount" class="gw-count">0 / {{ ui_max_chars }}</span>
+        </div>
+        <div class="gw-bar">
+          <label>Engines
+            <select id="evEngines">
+              <option value="both">Both</option>
+              <option value="regex">Regex only</option>
+              <option value="ner">NER only</option>
+              <option value="phone">Phone</option>
+            </select>
+          </label>
+          <label>Min score
+            <input id="evMinScore" type="number" min="0" max="1" step="0.05" value="0.35"/>
+          </label>
+          <label class="gw-check">
+            <input id="evUseLlm" type="checkbox"/> Use LLM refiner
+          </label>
+          <button id="evRun" type="button" class="btn">Run evaluation</button>
+        </div>
+      </section>
+
+      <aside class="gw-side">
+        <div class="gw-card">
+          <h2>Cases</h2>
+          <div id="evCases" class="gw-eval-cases"></div>
+          <button id="evAddCase" type="button" class="btn btn-ghost" style="width:100%;margin-top:8px">Add case</button>
+        </div>
+        <div class="gw-card">
+          <h2>Expected spans</h2>
+          <p class="gw-hint">Select text in the pane, choose a type, then classify. Offsets are Unicode code points.</p>
+          <div id="evSpans" class="gw-eval-span-list gw-empty">No spans yet.</div>
+        </div>
+        <div class="gw-card" id="evMetricsCard" hidden>
+          <h2>Accuracy</h2>
+          <div id="evMetrics" class="gw-eval-kpis"></div>
+        </div>
+        <div class="gw-card" id="evClassCard" hidden>
+          <h2>Match classes</h2>
+          <div id="evClassDist"></div>
+        </div>
+        <div class="gw-card" id="evSpanTableCard" hidden>
+          <h2>Span table</h2>
+          <div id="evSpanTable"></div>
+          <div id="evWhy" class="gw-hint" hidden></div>
+          <div class="gw-eval-actions">
+            <button id="evActExclude" type="button" class="btn btn-ghost btn-sm" disabled>+ exclude term</button>
+            <button id="evActCue" type="button" class="btn btn-ghost btn-sm" disabled>+ context cue</button>
+            <button id="evActNumber" type="button" class="btn btn-ghost btn-sm" disabled>+ number rule</button>
+            <button id="evActAccept" type="button" class="btn btn-ghost btn-sm" disabled>accept as expected</button>
+            <button id="evActAdvisory" type="button" class="btn btn-ghost btn-sm" disabled>mark advisory</button>
+            <button id="evActPatch" type="button" class="btn btn-ghost btn-sm" disabled>Download corpus patch</button>
+          </div>
+        </div>
+        <div class="gw-card" id="evEntityCard" hidden>
+          <h2>Per entity</h2>
+          <div id="evEntityTable"></div>
+        </div>
+        <div class="gw-card" id="evTagCard" hidden>
+          <h2>Per tag</h2>
+          <div id="evTagTable"></div>
+        </div>
+        <div class="gw-card">
+          <h2>Compare runs</h2>
+          <input id="evRunA" type="text" placeholder="run uuid A" style="width:100%;margin-bottom:6px"/>
+          <input id="evRunB" type="text" placeholder="run uuid B" style="width:100%;margin-bottom:6px"/>
+          <button id="evCompare" type="button" class="btn btn-ghost" style="width:100%">Compare</button>
+          <div id="evCompareOut" class="gw-hint"></div>
+        </div>
+        <div class="gw-card">
+          <h2>Dataset</h2>
+          <input id="evFile" type="file" accept="application/json,.json" hidden/>
+          <button id="evImport" type="button" class="btn btn-ghost" style="width:100%">Import JSON</button>
+          <button id="evDownload" type="button" class="btn btn-ghost" style="width:100%">Download dataset</button>
+          <button id="evDownloadReport" type="button" class="btn btn-ghost" style="width:100%" disabled>Download report</button>
+          <button id="evClear" type="button" class="btn btn-red" style="width:100%">Clear</button>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div id="gwTip" class="gw-tip" hidden role="tooltip"></div>
+  <div class="footer-strip">redibis · easily govern · Apache-2.0 license</div>
+
+  <script>
+    window.REDIBIS_USER = {% if user %}{"username":"{{ user.username }}","role":"{{ user.role }}"}{% else %}null{% endif %};
+    window.GW_MAX_CHARS = {{ ui_max_chars }};
+    window.GW_EVAL_MAX_CASES = {{ eval_max_cases }};
+    window.REDIBIS_VERSION = {{ (redibis_version or "")|tojson }};
+  </script>
+  <script src="/static/auth.js"></script>
+  <script type="module" src="/static/gateway_eval.js?v={{ js_v }}"></script>
+</body>
+</html>

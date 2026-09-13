@@ -96,6 +96,7 @@ class SpanResolver:
             context_boost=c.context_boost,
             is_proposal=c.is_proposal,
             evidence=(c,),
+            canonical=c.canonical or "",
         )
 
 

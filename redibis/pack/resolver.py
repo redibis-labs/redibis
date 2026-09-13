@@ -276,6 +276,16 @@ def _apply_loaded_pack(
                 stack.prompt_templates[Path(rel).name] = text
         if rel.startswith("behavior/") and rel.endswith((".yaml", ".yml")):
             stack.behavior_policy_paths.append(rel)
+        if rel.startswith("text_gateway/rules/") and rel.endswith((".yaml", ".yml")):
+            stem = Path(rel).stem
+            stack.text_gateway_rules[stem] = pack.yaml(rel)
+            stack.text_gateway_rule_sources[stem] = (
+                f"pack:{layer.id}@{layer.version}:{stem}"
+            )
+        if rel.startswith("text_gateway/gazetteers/") and rel.endswith((".yaml", ".yml")):
+            stack.text_gateway_gazetteers[Path(rel).stem] = pack.yaml(rel)
+        if rel.startswith("text_gateway/lexicons/") and rel.endswith((".yaml", ".yml")):
+            stack.text_gateway_lexicons[Path(rel).stem] = pack.yaml(rel)
 
     stack.layers.append(layer)
     stack.warnings.extend(pack.warnings)

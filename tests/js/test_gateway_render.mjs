@@ -10,6 +10,7 @@ import {
   classifyBanners,
   renderHighlights,
   paintBanners,
+  overlayEvalSpans,
 } from "../../redibis/webapp/static/gateway_render.mjs";
 
 function fakeDocument() {
@@ -99,6 +100,27 @@ describe("overlap segmentation", () => {
     const mid = segments.find((s) => s.start === 4 && s.end === 6);
     assert.ok(mid);
     assert.equal(classOf(mid.top.entity_type), "contact");
+  });
+});
+
+describe("evaluation overlay", () => {
+  it("tags exact hits, misses, and extra predictions", () => {
+    const overlay = overlayEvalSpans(
+      [{ start: 0, end: 5, entity_type: "PERSON" }],
+      [
+        { start: 0, end: 5, entity_type: "PERSON" },
+        { start: 6, end: 8, entity_type: "EMAIL_ADDRESS" },
+      ],
+      { matches: [{ expected_index: 0, predicted_index: 0 }] },
+    );
+    assert.equal(overlay.filter((s) => s.eval_kind === "tp").length, 1);
+    assert.equal(overlay.filter((s) => s.eval_kind === "fp").length, 1);
+    const missed = overlayEvalSpans(
+      [{ start: 0, end: 5, entity_type: "PERSON" }],
+      [],
+      { matches: [] },
+    );
+    assert.equal(missed[0].eval_kind, "fn");
   });
 });
 

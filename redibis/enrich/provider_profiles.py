@@ -27,6 +27,7 @@ from redibis.enrich.llm_logging import redact
 from redibis.enrich.providers import (
     EnrichmentError,
     _DEFAULT_FILE,
+    _local_openai_compat_needs_placeholder,
     _normalize_endpoint_and_key,
     _read_providers,
     _validated_api_base,
@@ -206,7 +207,17 @@ def list_profiles(config_path: Optional[str] = None) -> list[dict]:
             "model_prefix": model_prefix,
             "default_model_bare": default_bare,
             "known_models": known_models,
-            "needs_key": False if kind == "demo" else bool(api_key_env or cfg.get("api_key")),
+            "needs_key": (
+                False
+                if kind == "demo"
+                or _local_openai_compat_needs_placeholder(
+                    provider_name=name,
+                    residency=str(cfg.get("residency") or ""),
+                    api_base=cfg.get("api_base"),
+                    litellm_model=str(litellm_model or ""),
+                )
+                else bool(api_key_env or cfg.get("api_key"))
+            ),
             "api_key_env": api_key_env,
             "api_key_env_set": env_set,
             "api_key_saved": False,  # custom profiles never persist keys

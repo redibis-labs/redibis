@@ -72,6 +72,12 @@ def build_pack_files(
     if "config/redibis.yaml" in files:
         validate_pack_config(parse_yaml_bytes(files["config/redibis.yaml"]))
 
+    from redibis.pack.sections import validate_text_gateway_document
+
+    for rel, data in files.items():
+        if rel.startswith("text_gateway/") and rel.endswith((".yaml", ".yml")):
+            validate_text_gateway_document(parse_yaml_bytes(data), relpath=rel)
+
     # Refuse local / raw_trained training corpora or model stamps (ArtifactResidencyGate).
     from redibis.training.residency import ArtifactResidencyGate
 
@@ -82,9 +88,28 @@ def build_pack_files(
     md = manifest_payload.get("metadata")
     if isinstance(md, dict):
         # Omit unset identity fields so pre-UUID golden packs keep a stable SHA.
-        for key in ("uuid", "family_id", "parent_uuid"):
+        for key in (
+            "uuid",
+            "family_id",
+            "parent_uuid",
+            "eval_run_uuid",
+            "eval_gate_summary",
+        ):
             if not md.get(key):
                 md.pop(key, None)
+        if md.get("eval_gate_passed") is None:
+            md.pop("eval_gate_passed", None)
+    contents = manifest_payload.get("contents")
+    if isinstance(contents, dict):
+        # Empty text-gateway lists are a new section; omit them so existing
+        # golden packs keep a stable SHA until a pack actually ships rules.
+        for key in (
+            "text_gateway_rules",
+            "text_gateway_gazetteers",
+            "text_gateway_lexicons",
+        ):
+            if not contents.get(key):
+                contents.pop(key, None)
     manifest_payload["checksum"] = None
     files[MANIFEST_NAME] = dump_canonical_yaml(manifest_payload)
     files[README_NAME] = _as_bytes(README_NAME, readme)

@@ -64,7 +64,7 @@ SENSITIVE_ENTITIES: frozenset[str] = frozenset({
     "CREDIT_CARD", "CRYPTO_WALLET", "GDPR_SPECIAL_CATEGORY",
     "EG_TAX_ID", "IBAN_CODE",
     # secrets / credentials — higher risk than plain "personal"
-    "OTP", "SIM_PUK",
+    "OTP", "SIM_PUK", "VOUCHER",
 })
 
 #: Entity types that map to the ``pii_indirect`` classification level.
@@ -96,6 +96,7 @@ NON_PII_ENTITIES: frozenset[str] = frozenset({
 PERSONAL_ENTITIES: frozenset[str] = frozenset({
     "PHONE_NUMBER", "EMAIL_ADDRESS", "PERSON", "DATE_TIME", "GENDER",
     "LOCATION", "MAC_ADDRESS", "IMEI", "IMSI", "ICCID",
+    "SUPPORT_TICKET",
     "UTILITY_ACCOUNT", "EG_VEHICLE_PLATE", "SOCIAL_PROFILE_URL",
 })
 
@@ -129,6 +130,11 @@ CANONICAL_ENTITY: dict[str, str] = {
     "PWD": "PASSWORD_HASH",
     "PWD_HASH": "PASSWORD_HASH",
     "JWT_TOKEN": "JWT",
+    "SCRATCH_CARD": "VOUCHER",
+    "SCRATCH_CARD_PIN": "VOUCHER",
+    "RECHARGE_VOUCHER": "VOUCHER",
+    "TICKET": "SUPPORT_TICKET",
+    "INTERNAL_ID": "SUPPORT_TICKET",
 }
 
 

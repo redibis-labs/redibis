@@ -589,6 +589,10 @@ def _run_pii(args) -> int:
 
     if args.pii_action == "text":
         return _run_pii_text(args)
+    if args.pii_action == "eval":
+        return _run_pii_eval(args)
+    if args.pii_action == "eval-build":
+        return _run_pii_eval_build(args)
     if args.pii_action == "deid":
         return _run_pii_deid(args)
     if args.pii_action in ("calibrate-nid", "calibrate"):
@@ -820,6 +824,67 @@ def _run_pii_calibrate_nid(args) -> int:
     return 0
 
 
+def _record_cli_run(result, *, text: str, kind: str) -> None:
+    try:
+        from redibis.pii.run_store import get_run_store, record_run
+
+        store = get_run_store()
+        uid = getattr(result, "provenance_uuid", "") or ""
+        prov = store.get_provenance(uid) if uid else None
+        record_run(
+            kind=kind,
+            provenance=prov,
+            text=text,
+            char_count=int(getattr(result, "char_count", 0) or 0),
+            outcome={"entity_counts": dict(getattr(result, "entity_counts", {}) or {})},
+            actor="cli",
+            run_uuid=getattr(result, "run_uuid", None) or None,
+            store=store,
+        )
+    except Exception:
+        pass
+
+
+def _print_provenance_footer(result, args) -> None:
+    uid = getattr(result, "provenance_uuid", "") or ""
+    run_uid = getattr(result, "run_uuid", "") or ""
+    degraded = bool(getattr(result, "provenance_degraded", False))
+    bits = []
+    if uid:
+        bits.append(f"provenance_uuid={uid}")
+    if run_uid:
+        bits.append(f"run_uuid={run_uid}")
+    if degraded:
+        bits.append("provenance_degraded=true")
+    if bits:
+        print("  " + "  ".join(bits))
+    out = getattr(args, "provenance_out", None)
+    if not out:
+        return
+    from pathlib import Path
+
+    payload = getattr(result, "provenance", None)
+    if not payload:
+        try:
+            from redibis.pii.run_store import get_run_store
+
+            rec = get_run_store().get_provenance(uid) if uid else None
+            payload = rec.to_dict() if rec is not None else {
+                "provenance_uuid": uid,
+                "provenance_degraded": degraded,
+                "provenance_degraded_reason": getattr(
+                    result, "provenance_degraded_reason", ""
+                ),
+            }
+        except Exception:
+            payload = {"provenance_uuid": uid}
+    Path(out).write_text(
+        __import__("json").dumps(payload, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    print(f"  wrote provenance to {out}")
+
+
 def _pii_text_input(args) -> str:
     """Resolve text from positional / --file / stdin."""
     if getattr(args, "file", None):
@@ -878,6 +943,253 @@ def _run_pii_text(args) -> int:
             f"{s.score:>6.2f} {s.engine:<8} {txt}{prop}"
         )
     print(f"\n{len(result.detections)} span(s)  engines={list(result.engines_ran)}")
+    _record_cli_run(result, text=text, kind="cli_scan")
+    _print_provenance_footer(result, args)
+    return 0
+
+
+def _run_pii_eval_build(args) -> int:
+    """``redibis pii eval-build`` — corpus YAML (values) → dataset JSON (offsets)."""
+    from pathlib import Path
+
+    from redibis.pii.eval.builder import CorpusBuildError, build_path
+
+    source = Path(args.corpus)
+    dest = Path(args.out)
+    if not source.exists():
+        print(f"pii eval-build: corpus path not found: {source}", file=sys.stderr)
+        return 2
+    try:
+        written = build_path(source, dest, recursive=bool(getattr(args, "recursive", True)))
+    except CorpusBuildError as exc:
+        print(f"pii eval-build: {exc}", file=sys.stderr)
+        return 1
+    except Exception as exc:
+        print(f"pii eval-build: {exc}", file=sys.stderr)
+        return 2
+    print(f"pii eval-build: wrote {len(written)} dataset(s) to {dest}")
+    for path in written:
+        print(f"  {path}")
+    return 0
+
+
+def _eval_service_and_options(args, cfg):
+    """Pin rules/pack for a reproducible eval run."""
+    from redibis.pii.eval.pinning import (
+        EvalPinError,
+        effective_overlay_and_checksum,
+        resolve_pack_stack,
+        resolve_text_rules,
+    )
+    from redibis.services.text_pii_service import TextPIIService
+
+    stored = None
+    try:
+        from redibis.config import load_global_settings_optional
+
+        stored = load_global_settings_optional().get("pii_text_rules")
+    except Exception:
+        stored = None
+    gw = getattr(cfg, "text_gateway", None)
+    gw_rules = getattr(gw, "rules", None) if gw is not None else None
+    try:
+        overlay, rules_source, merge_builtin = resolve_text_rules(
+            rules_path=getattr(args, "rules", None),
+            rules_defaults=bool(getattr(args, "rules_defaults", False)),
+            draft_rules_path=getattr(args, "draft_rules", None),
+            config_overlay=gw_rules,
+            stored_overlay=stored,
+        )
+        pack_stack, pack_header = resolve_pack_stack(
+            pack=getattr(args, "pack", None),
+            pack_stack=getattr(args, "pack_stack", None),
+            redibis_config=cfg,
+        )
+    except EvalPinError as exc:
+        raise SystemExit(f"pii eval: {exc}") from exc
+    effective, checksum = effective_overlay_and_checksum(overlay, merge_builtin=merge_builtin)
+    pinned = bool(
+        getattr(args, "rules", None)
+        or getattr(args, "rules_defaults", False)
+        or getattr(args, "draft_rules", None)
+    )
+    svc = TextPIIService(
+        redibis_config=cfg,
+        text_rules_overlay=effective if pinned else overlay,
+        skip_stored_text_rules=pinned,
+        merge_builtin_text_rules=False if pinned else merge_builtin,
+        pack_stack=pack_stack,
+    )
+    gw_cfg = getattr(cfg, "text_gateway", None)
+    options = {
+        "language": getattr(args, "language", None) or "en",
+        "engines": args.engines,
+        "min_score": args.min_score,
+        "use_llm": bool(args.use_llm),
+        "llm_provider": args.llm_provider or "",
+        "llm_model": args.llm_model or "",
+        "preprocess_obfuscation": not bool(args.no_preprocess),
+        "preprocess_expanders": list(getattr(gw_cfg, "obfuscation_expanders", None) or []),
+        "overlap_iou": args.overlap_iou,
+        "normalization": getattr(args, "normalization", None) or "v1",
+        "tiers": getattr(args, "tier", None) or "strict,value,overlap,type",
+        "run_uuid": getattr(args, "run_uuid", None) or "",
+        "label": getattr(args, "label", None) or "",
+        "rules_checksum": checksum,
+        "rules_source": rules_source,
+        "pack_stack_header": pack_header,
+    }
+    return svc, options
+
+
+def _run_pii_eval(args) -> int:
+    """``redibis pii eval`` — score a file or folder of use-case JSON files."""
+    import json
+    from pathlib import Path
+
+    from redibis.config import RedibisConfig
+    from redibis.pii.eval import (
+        BATCH_REPORT_KIND,
+        evaluate_path,
+        evaluate_with_service,
+        render_report_html,
+    )
+    from redibis.pii.eval.gates import (
+        GateError,
+        apply_gates_to_report,
+        format_gate_failure,
+        load_gate_file,
+    )
+    from redibis.pii.eval.registry import put_run
+
+    source = Path(args.dataset)
+    if not source.exists():
+        print(f"pii eval: dataset path not found: {source}", file=sys.stderr)
+        return 2
+
+    cfg = RedibisConfig.from_yaml(args.config) if getattr(args, "config", None) else RedibisConfig()
+    try:
+        svc, options = _eval_service_and_options(args, cfg)
+    except SystemExit as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+    try:
+        if source.is_dir():
+            report = evaluate_path(
+                svc,
+                source,
+                options=options,
+                recursive=bool(getattr(args, "recursive", False)),
+                fail_fast=bool(getattr(args, "fail_fast", False)),
+            )
+        else:
+            report = evaluate_with_service(
+                svc,
+                json.loads(source.read_text(encoding="utf-8")),
+                options=options,
+            )
+    except FileNotFoundError as exc:
+        print(f"pii eval: {exc}", file=sys.stderr)
+        return 2
+    except json.JSONDecodeError as exc:
+        print(f"pii eval: cannot read dataset: {exc}", file=sys.stderr)
+        return 2
+    except Exception as exc:
+        print(f"pii eval: {exc}", file=sys.stderr)
+        return 2
+
+    gates = None
+    baseline = None
+    gate_path = getattr(args, "gate_file", None)
+    if gate_path:
+        try:
+            gates = load_gate_file(gate_path)
+        except Exception as exc:
+            print(f"pii eval: {exc}", file=sys.stderr)
+            return 2
+    baseline_path = getattr(args, "baseline", None) or ((gates or {}).get("regression") or {}).get("baseline")
+    if baseline_path:
+        try:
+            baseline = json.loads(Path(baseline_path).read_text(encoding="utf-8"))
+        except Exception as exc:
+            print(f"pii eval: cannot read baseline: {exc}", file=sys.stderr)
+            return 2
+    if gates:
+        try:
+            apply_gates_to_report(report, gates, baseline=baseline)
+        except GateError as exc:
+            print(f"pii eval: {exc}", file=sys.stderr)
+            return 2
+    put_run(report)
+    prov_block = report.get("provenance") or {}
+    print(
+        f"pii eval: provenance_uuid={prov_block.get('provenance_uuid') or ''}  "
+        f"run_uuid={prov_block.get('run_uuid') or ''}",
+        file=sys.stderr,
+    )
+    if prov_block.get("rules_unpinned") or prov_block.get("warning"):
+        print(
+            "pii eval: WARNING unpinned rules (config+stored). "
+            "Pin with --rules or --rules-defaults before comparing machines.",
+            file=sys.stderr,
+        )
+    prov_out = getattr(args, "provenance_out", None)
+    if prov_out:
+        try:
+            from redibis.pii.run_store import get_run_store
+
+            rec = get_run_store().get_provenance(str(prov_block.get("provenance_uuid") or ""))
+            payload = rec.to_dict() if rec is not None else prov_block
+            Path(prov_out).write_text(
+                json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+        except Exception as exc:
+            print(f"pii eval: --provenance-out failed: {exc}", file=sys.stderr)
+
+    out_dir = getattr(args, "out_dir", None)
+    out_path = getattr(args, "out", None)
+    html_path = getattr(args, "html", None)
+    rendered = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
+    try:
+        if out_dir:
+            dest = Path(out_dir)
+            dest.mkdir(parents=True, exist_ok=True)
+            (dest / "evaluation-report.json").write_text(rendered, encoding="utf-8")
+            (dest / "evaluation-report.html").write_text(
+                render_report_html(report), encoding="utf-8"
+            )
+        if out_path:
+            Path(out_path).write_text(rendered, encoding="utf-8")
+        if html_path:
+            Path(html_path).write_text(render_report_html(report), encoding="utf-8")
+        if not (out_dir or out_path or html_path):
+            print(rendered, end="")
+    except OSError as exc:
+        print(f"pii eval: cannot write report: {exc}", file=sys.stderr)
+        return 2
+
+    exact_f1 = float(((report.get("exact") or {}).get("micro") or {}).get("f1") or 0.0)
+    failed = int(report.get("failed_count") or 0) if report.get("kind") == BATCH_REPORT_KIND else 0
+    evaluated = int(report.get("evaluated_count") or report.get("case_count") or 0)
+    if report.get("kind") == BATCH_REPORT_KIND and evaluated < 1:
+        print("pii eval: no evaluation datasets succeeded", file=sys.stderr)
+        return 1
+    if failed:
+        print(f"pii eval: {failed} file(s) failed", file=sys.stderr)
+        return 1
+    if args.min_exact_f1 is not None and exact_f1 < args.min_exact_f1:
+        print(
+            f"pii eval: exact micro F1 {exact_f1:.4f} is below "
+            f"{args.min_exact_f1:.4f}",
+            file=sys.stderr,
+        )
+        return 1
+    verdict = report.get("gates") or {}
+    if verdict and not verdict.get("passed", True):
+        print(format_gate_failure(verdict), file=sys.stderr)
+        return 1
     return 0
 
 
@@ -933,6 +1245,8 @@ def _run_pii_deid(args) -> int:
         print(out_text)
     if getattr(args, "json", False):
         print(json.dumps(deid.to_dict(), indent=2, ensure_ascii=False), file=sys.stderr)
+    _record_cli_run(_result, text=text, kind="cli_deid")
+    _print_provenance_footer(_result, args)
     return 0
 
 
@@ -2354,6 +2668,105 @@ def main(argv: Optional[list[str]] = None):
     p_pii_text.add_argument("--redact", action="store_true", help="print text with [ENTITY] replacements")
     p_pii_text.add_argument("--no-text", action="store_true", help="omit matched substrings in JSON")
     p_pii_text.add_argument("--config", help="redibis.yaml")
+    p_pii_text.add_argument(
+        "--provenance-out",
+        help="write the full ScanProvenance record to this JSON file",
+    )
+
+    p_pii_eval = pii_sub.add_parser(
+        "eval", help="batch scan and score a portable text-span evaluation dataset"
+    )
+    p_pii_eval.add_argument(
+        "--dataset",
+        required=True,
+        help="evaluation dataset JSON file or a folder of use-case JSON files",
+    )
+    p_pii_eval.add_argument("-o", "--out", help="write the JSON evaluation report")
+    p_pii_eval.add_argument(
+        "--out-dir",
+        help="write evaluation-report.json and evaluation-report.html into this directory",
+    )
+    p_pii_eval.add_argument("--html", help="write a standalone HTML report")
+    p_pii_eval.add_argument(
+        "--recursive",
+        action="store_true",
+        help="when --dataset is a folder, include nested *.json files",
+    )
+    p_pii_eval.add_argument(
+        "--fail-fast",
+        action="store_true",
+        help="stop after the first invalid or failing file",
+    )
+    p_pii_eval.add_argument("--language", default="en", help="fallback case language")
+    p_pii_eval.add_argument(
+        "--engines", default="both", help="regex|ner|both|phone or comma list"
+    )
+    p_pii_eval.add_argument("--min-score", type=float, default=0.35)
+    p_pii_eval.add_argument("--use-llm", action="store_true")
+    p_pii_eval.add_argument("--llm-provider", default="")
+    p_pii_eval.add_argument("--llm-model", default="")
+    p_pii_eval.add_argument(
+        "--no-preprocess",
+        action="store_true",
+        help="disable Gateway spoken/obfuscated text preprocessing",
+    )
+    p_pii_eval.add_argument(
+        "--overlap-iou",
+        type=float,
+        default=0.5,
+        help="secondary overlap-match IoU threshold",
+    )
+    p_pii_eval.add_argument(
+        "--min-exact-f1",
+        type=float,
+        help="exit 1 when exact micro F1 is below this CI threshold",
+    )
+    p_pii_eval.add_argument("--config", help="redibis.yaml")
+    p_pii_eval.add_argument(
+        "--rules",
+        help="pin Text Gateway rules YAML (skips persisted global_settings overlay)",
+    )
+    p_pii_eval.add_argument(
+        "--rules-defaults",
+        action="store_true",
+        help="pin shipped text-rule defaults only (no persisted overlay)",
+    )
+    p_pii_eval.add_argument(
+        "--draft-rules",
+        help="draft overlay merged on top of the pinned/base rules (never writes production)",
+    )
+    p_pii_eval.add_argument(
+        "--pack",
+        help="pack directory/archive path, or id@version from the pack store",
+    )
+    p_pii_eval.add_argument("--pack-stack", help="YAML listing pack layers or a pack folder")
+    p_pii_eval.add_argument("--normalization", default="v1", help="normalization profile id")
+    p_pii_eval.add_argument(
+        "--tier",
+        default="strict,value,overlap,type",
+        help="comma-separated scoring tiers to compute and emit (strict,value,overlap,type)",
+    )
+    p_pii_eval.add_argument("--gate-file", help="per-entity / class-budget thresholds YAML")
+    p_pii_eval.add_argument("--baseline", help="previous evaluation-report.json for regression delta")
+    p_pii_eval.add_argument("--run-uuid", help="explicit run uuid (otherwise generated)")
+    p_pii_eval.add_argument("--label", default="", help="human label stored in provenance")
+    p_pii_eval.add_argument(
+        "--provenance-out",
+        help="write the full ScanProvenance record to this JSON file",
+    )
+
+    p_pii_eval_build = pii_sub.add_parser(
+        "eval-build",
+        help="convert authored corpora (values) into portable span datasets (offsets)",
+    )
+    p_pii_eval_build.add_argument("--corpus", required=True, help="corpus YAML file or directory")
+    p_pii_eval_build.add_argument("--out", required=True, help="output directory for dataset JSON")
+    p_pii_eval_build.add_argument(
+        "--recursive",
+        action="store_true",
+        default=True,
+        help="include nested corpus files (default on)",
+    )
 
     p_pii_deid = pii_sub.add_parser("deid", help="scan free text and apply a de-id policy")
     p_pii_deid.add_argument("text", nargs="?", help="text to de-identify (or '-' for stdin)")
@@ -2368,6 +2781,10 @@ def main(argv: Optional[list[str]] = None):
     p_pii_deid.add_argument("-o", "--out", help="write de-identified text to file")
     p_pii_deid.add_argument("--json", action="store_true", help="emit audit JSON on stderr")
     p_pii_deid.add_argument("--config", help="redibis.yaml")
+    p_pii_deid.add_argument(
+        "--provenance-out",
+        help="write the full ScanProvenance record to this JSON file",
+    )
 
     p_pii_cal = pii_sub.add_parser(
         "calibrate-nid",
@@ -2744,6 +3161,9 @@ def main(argv: Optional[list[str]] = None):
     from redibis.cli.rdbpack_cmd import register_rdbpack_commands
     register_rdbpack_commands(sub)
 
+    from redibis.cli.eval_cmd import register_eval_commands
+    register_eval_commands(sub)
+
     from redibis.cli.dataset_cmd import register_dataset_commands
     register_dataset_commands(sub)
 
@@ -2944,6 +3364,9 @@ def main(argv: Optional[list[str]] = None):
     if args.cmd == "rdbpack":
         from redibis.cli.rdbpack_cmd import run_rdbpack
         return run_rdbpack(args)
+    if args.cmd == "eval":
+        from redibis.cli.eval_cmd import run_eval
+        return run_eval(args)
     if args.cmd == "dataset":
         from redibis.cli.dataset_cmd import run_dataset
         return run_dataset(args)

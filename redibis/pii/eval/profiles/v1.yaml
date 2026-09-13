@@ -1,0 +1,13 @@
+profile: v1
+all: [trim, collapse_whitespace, strip_edge_punct]
+digit_family: [fold_arabic_indic, digits_only]
+# fold_ar already folds alef, teh marbuta, diacritics, and tatweel.
+# Independent steps (strip_diacritics, unify_alef, unify_teh_marbuta, strip_tatweel)
+# exist for a v2 profile that wants a subset — they are not no-ops of each other.
+arabic_text:
+  - fold_ar
+  - strip_zero_width
+  - unify_yeh
+email: [casefold, strip_spaces]
+mac_ip: [casefold, strip_spaces]
+never_normalize_across_families: true
