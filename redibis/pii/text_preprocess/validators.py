@@ -11,6 +11,7 @@ from redibis.pii.text_preprocess.surface import ValidationOutcome
 
 _PHONE_HINTS = frozenset({
     "phone", "mobile", "msisdn", "موبايل", "هاتف", "تليفون", "تواصل", "رقم",
+    "line", "connected", "landline",
 })
 _NID_HINTS = frozenset({
     "nid", "national", "قومي", "هوية", "رقم_قومي", "الرقم_القومي",
@@ -27,6 +28,16 @@ _OTP_HINTS = frozenset({"otp", "كود", "رمز", "تأكيد", "تحقق"})
 _EXPIRY_HINTS = frozenset({"صلاحية", "انتهاء", "expiry", "expiration", "شهر"})
 _PARTIAL_CARD_HINTS = frozenset({"آخر", "اخر", "أول", "اول", "bin"})
 _AGE_HINTS = frozenset({"age", "years", "سنة", "سنوات", "عمر", "سني"})
+
+
+def _looks_ipv4(value: str) -> bool:
+    parts = (value or "").split(".")
+    if len(parts) != 4:
+        return False
+    try:
+        return all(p.isdigit() and 0 <= int(p) <= 255 for p in parts)
+    except ValueError:
+        return False
 
 
 def _label_blob(label: str, entity_hint: str) -> str:
@@ -55,6 +66,7 @@ class DigitRouterValidator:
     entity_types = frozenset({
         "PHONE_NUMBER", "EG_NATIONAL_ID", "IMEI", "IMSI", "ICCID", "CREDIT_CARD",
         "CVV", "OTP", "CREDIT_CARD_EXPIRATION", "VOUCHER", "SIM_PUK",
+        "IP_ADDRESS", "PASSPORT", "EG_TAX_ID",
     })
 
     def validate(
@@ -74,6 +86,9 @@ class DigitRouterValidator:
         hint = (entity_hint or "").upper().replace(" ", "_")
         nid_context = hint in {"EG_NATIONAL_ID", "NATIONAL_ID"} or _has_any(blob, _NID_HINTS)
         phone_context = hint in {"PHONE_NUMBER", "PHONE", "MSISDN"} or _has_any(blob, _PHONE_HINTS)
+        imei_context = hint == "IMEI" or _has_any(blob, _IMEI_HINTS)
+        imsi_context = hint == "IMSI" or _has_any(blob, _IMSI_HINTS)
+        iccid_context = hint == "ICCID" or _has_any(blob, _ICCID_HINTS)
         card_context = hint in {"CREDIT_CARD", "PAN"} or _has_any(blob, _CARD_HINTS)
         cvv_context = hint == "CVV" or _has_any(blob, _CVV_HINTS)
         otp_context = hint == "OTP" or _has_any(blob, _OTP_HINTS)
@@ -81,6 +96,39 @@ class DigitRouterValidator:
             blob, _EXPIRY_HINTS
         )
         partial_context = _has_any(blob, _PARTIAL_CARD_HINTS)
+
+        if hint == "IP_ADDRESS" or _looks_ipv4(raw):
+            if _looks_ipv4(raw):
+                return ValidationOutcome(
+                    ok=True,
+                    validator="ipv4_spoken",
+                    entity_type="IP_ADDRESS",
+                    score=0.86,
+                    is_proposal=False,
+                    reason="spoken_ipv4",
+                )
+
+        if hint == "PASSPORT" and re.fullmatch(r"[A-Za-z]\d{8}", raw or ""):
+            return ValidationOutcome(
+                ok=True,
+                validator="passport_spoken",
+                entity_type="PASSPORT",
+                score=0.84,
+                is_proposal=False,
+                reason="spoken_passport",
+            )
+
+        if hint == "EG_TAX_ID" and (
+            len(digits) == 9 or re.fullmatch(r"\d{3}-\d{3}-\d{3}", raw or "")
+        ):
+            return ValidationOutcome(
+                ok=True,
+                validator="tax_id_spoken",
+                entity_type="EG_TAX_ID",
+                score=0.84,
+                is_proposal=False,
+                reason="spoken_tax_id",
+            )
 
         if hint in {"VOUCHER", "SCRATCH_CARD", "SCRATCH_CARD_PIN"} and 10 <= len(digits) <= 16:
             return ValidationOutcome(
@@ -149,25 +197,11 @@ class DigitRouterValidator:
                     reason="context_nid_unvalidated",
                 )
 
-        if phone_context and not nid_context and not card_context:
-            phone = self._validate_phone(digits, ctx)
-            if phone.ok:
-                return phone
-            if _has_any(blob, _PHONE_HINTS) and 8 <= len(digits) <= 15:
-                return ValidationOutcome(
-                    ok=True,
-                    validator="",
-                    entity_type="PHONE_NUMBER",
-                    score=0.45,
-                    is_proposal=True,
-                    reason="context_phone_unvalidated",
-                )
-
-        if hint == "IMEI" or _has_any(blob, _IMEI_HINTS):
+        if imei_context:
             imei = self._validate_imei(digits)
             if imei.ok:
                 return imei
-            if _has_any(blob, _IMEI_HINTS) and len(digits) == 15:
+            if len(digits) == 15:
                 return ValidationOutcome(
                     ok=True,
                     validator="",
@@ -177,15 +211,32 @@ class DigitRouterValidator:
                     reason="context_imei_unvalidated",
                 )
 
-        if hint == "IMSI" or _has_any(blob, _IMSI_HINTS):
+        if imsi_context:
             imsi = self._validate_imsi(digits)
             if imsi.ok:
                 return imsi
 
-        if hint == "ICCID" or _has_any(blob, _ICCID_HINTS):
+        if iccid_context:
             iccid = self._validate_iccid(digits)
             if iccid.ok:
                 return iccid
+
+        if phone_context and not nid_context and not card_context and not imei_context:
+            phone = self._validate_phone(digits, ctx)
+            if phone.ok:
+                return phone
+            # 15 digits is IMEI/PAN length — do not steal those as unvalidated phones.
+            if (
+                hint in {"PHONE_NUMBER", "PHONE", "MSISDN"} or _has_any(blob, _PHONE_HINTS)
+            ) and 8 <= len(digits) <= 13:
+                return ValidationOutcome(
+                    ok=True,
+                    validator="",
+                    entity_type="PHONE_NUMBER",
+                    score=0.45,
+                    is_proposal=True,
+                    reason="context_phone_unvalidated",
+                )
 
         if card_context or partial_context or hint == "CREDIT_CARD":
             card = self._validate_card(digits)
@@ -212,6 +263,20 @@ class DigitRouterValidator:
                     )
 
         # Length / structure cascade (validated only — no unlabeled proposals).
+        # 15–19 digits with a phone/card cue are almost always a PAN that the
+        # nearest-label window tagged as PHONE_NUMBER (e.g. "رقم الكارت").
+        if 15 <= len(digits) <= 19 and hint in {"PHONE_NUMBER", "CREDIT_CARD", "PAN"} and not imei_context:
+            card = self._validate_card(digits)
+            if card.ok:
+                return card
+            return ValidationOutcome(
+                ok=True,
+                validator="",
+                entity_type="CREDIT_CARD",
+                score=0.5,
+                is_proposal=True,
+                reason="length_card_unvalidated",
+            )
         phone = self._validate_phone(digits, ctx)
         if phone.ok and not phone.is_proposal:
             return phone
@@ -386,7 +451,9 @@ class AgeRangeValidator:
 @register_text_validator("labeled_secret")
 class LabeledSecretValidator:
     name = "labeled_secret"
-    entity_types = frozenset({"PASSWORD_HASH", "API_KEY", "SECRET", "OTP", "SIM_PUK"})
+    entity_types = frozenset({
+        "PASSWORD_HASH", "API_KEY", "SECRET", "OTP", "SIM_PUK", "IMEI",
+    })
 
     def validate(
         self,
@@ -400,6 +467,18 @@ class LabeledSecretValidator:
         if not value or len(value) < 4:
             return ValidationOutcome(ok=False, reason="secret_short")
         hint = (entity_hint or "SECRET").upper().replace(" ", "_")
+        if hint == "IMEI":
+            digits = re.sub(r"\D", "", value)
+            if len(digits) == 15:
+                return ValidationOutcome(
+                    ok=True,
+                    validator="labeled_imei",
+                    entity_type="IMEI",
+                    score=0.82,
+                    is_proposal=True,
+                    reason="labeled_imei",
+                )
+            return ValidationOutcome(ok=False, reason="imei_length")
         if hint not in self.entity_types:
             hint = "SECRET"
         return ValidationOutcome(

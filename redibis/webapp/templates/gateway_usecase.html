@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="referrer" content="same-origin"/>
+  <title>Redibis — Use case</title>
+  <link rel="stylesheet" href="/static/app.css?v={{ css_v }}"/>
+  <link rel="stylesheet" href="/static/gateway.css?v={{ css_v }}"/>
+  <link rel="icon" type="image/png" href="/static/logo.png"/>
+</head>
+<body class="gateway-page">
+  <nav class="nav">
+    <a class="nav-left" href="/" aria-label="Open scan console">
+      <img src="/static/logo.png" alt="R" class="nav-logo-img" onerror="this.style.display='none'"/>
+      <div class="nav-brand">Redibis</div>
+      <div class="nav-tagline">use case</div>
+    </a>
+    <div id="navTabs" class="nav-tabs"></div>
+    <div class="nav-right">
+      <a class="nav-link" href="/">◈ Scan</a>
+      <a class="nav-link" href="/gateway">◈ Gateway</a>
+      <a class="nav-link" href="/gateway/evaluations">◈ Evaluations</a>
+      <a class="nav-link" href="/gateway/usecases">◈ Use cases</a>
+      <a class="nav-link" href="/docs" target="_blank">◉ API Docs</a>
+      {% if user and user.role == 'admin' %}
+      <a class="nav-link" href="/users">👤 Users</a>
+      {% endif %}
+      {% include "_user_menu.html" %}
+    </div>
+  </nav>
+
+  <div class="page gw gw-usecase">
+    <header class="gw-head">
+      <h1 id="ucTitle">Use case</h1>
+      <p class="gw-sub">Author expected spans, edit context and rules, then run without leaving this page. Download is always available — no run required.</p>
+    </header>
+
+    <div id="gwBanner" class="gw-banners" hidden role="status"></div>
+
+    <div id="ucListPane" class="gw-card" hidden>
+      <h2>Saved use cases</h2>
+      <div id="ucList" class="gw-eval-cases"></div>
+      <div class="gw-bar">
+        <label>Name <input id="ucNewName" type="text" placeholder="Router delivery — EG"/></label>
+        <button id="ucCreate" type="button" class="btn">New use case</button>
+        <label class="btn btn-ghost">Import
+          <input id="ucImportList" type="file" accept="application/json,.json" hidden/>
+        </label>
+      </div>
+    </div>
+
+    <div id="ucEditor" hidden>
+      <div class="gw-actions-bar">
+        <span id="ucVersion" class="gw-count">v—</span>
+        <span class="gw-spacer"></span>
+        <button id="ucDownload" type="button" class="btn btn-ghost">Download asset</button>
+        <label class="btn btn-ghost">Import
+          <input id="ucImport" type="file" accept="application/json,.json" hidden/>
+        </label>
+        <button id="ucSave" type="button" class="btn">Save</button>
+        <button id="ucRun" type="button" class="btn">Run</button>
+      </div>
+
+      <div class="gw-grid gw-usecase-grid">
+        <section class="gw-main">
+          <label class="gw-field">Name
+            <input id="ucName" type="text"/>
+          </label>
+          <textarea id="ucText" class="gw-input" spellcheck="false" autocomplete="off"
+                    autocapitalize="off" autocorrect="off"
+                    maxlength="{{ ui_max_chars }}"
+                    placeholder="Paste the transcript…"
+                    dir="auto"></textarea>
+          <div id="ucOverlay" class="gw-result gw-usecase-overlay" dir="auto"
+               role="region" tabindex="0"
+               aria-label="Use-case text for marking spans"></div>
+          <div class="gw-bar">
+            <label>Entity
+              <select id="ucEntity"></select>
+            </label>
+            <button id="ucMarkExpected" type="button" class="btn btn-sm">Mark expected</button>
+            <button id="ucMarkForbidden" type="button" class="btn btn-ghost btn-sm">Mark forbidden</button>
+            <span id="ucCount" class="gw-count"></span>
+          </div>
+          <div id="ucSpans" class="gw-eval-span-list"></div>
+        </section>
+
+        <aside class="gw-side">
+          <div class="gw-card">
+            <h2>Context</h2>
+            <label class="gw-field">Source <input id="ucSource" type="text" placeholder="call_center"/></label>
+            <label class="gw-field">Speakers <input id="ucSpeakers" type="text" placeholder="Agent, Caller"/></label>
+            <label class="gw-field">Expect entities <input id="ucExpect" type="text" placeholder="LOCATION, PHONE_NUMBER"/></label>
+            <label class="gw-field">Language
+              <select id="ucLang">
+                <option value="ar">Arabic</option>
+                <option value="en">English</option>
+              </select>
+            </label>
+            <label class="gw-field">Tags <input id="ucTags" type="text" placeholder="address, spoken_number"/></label>
+          </div>
+          <div class="gw-card">
+            <h2>Rule edits</h2>
+            <p class="gw-hint">Draft only — Save keeps them with this asset. Run uses them without writing production rules.</p>
+            <label class="gw-field">Exclude terms <input id="ucExclude" type="text" placeholder="agent, caller"/></label>
+            <label class="gw-field">Quantity units <input id="ucUnits" type="text" placeholder="جنيه, GB"/></label>
+            <label class="gw-field">LOCATION triggers <input id="ucLocTriggers" type="text" placeholder="العنوان, address"/></label>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-strip">redibis · easily govern · Apache-2.0 license</div>
+  <script>
+    window.REDIBIS_USER = {% if user %}{"username":"{{ user.username }}","role":"{{ user.role }}"}{% else %}null{% endif %};
+    window.GW_MAX_CHARS = {{ ui_max_chars }};
+    window.GW_USECASE_ID = {{ (uc_id or "")|tojson }};
+  </script>
+  <script src="/static/auth.js"></script>
+  <script type="module" src="/static/gateway_usecase.js?v={{ js_v }}"></script>
+</body>
+</html>

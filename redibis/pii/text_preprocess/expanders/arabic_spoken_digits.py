@@ -60,12 +60,15 @@ def _build_lexicon() -> tuple:
     partial_labels = list(data.get("partial_card_labels") or [])
     voucher_labels = list(data.get("voucher_labels") or [])
     puk_labels = list(data.get("puk_labels") or [])
+    tax_labels = list(data.get("tax_labels") or [])
+    ip_labels = list(data.get("ip_labels") or [])
+    passport_labels = list(data.get("passport_labels") or [])
     return (
         digit_map, teen_map, tens_map, hundreds_map, plurals_map,
         connectors, thousands,
         phone_labels, nid_labels, card_labels, cvv_labels,
         otp_labels, expiry_labels, partial_labels,
-        voucher_labels, puk_labels,
+        voucher_labels, puk_labels, tax_labels, ip_labels, passport_labels,
     )
 
 
@@ -86,9 +89,63 @@ def _build_lexicon() -> tuple:
     _PARTIAL_LABELS,
     _VOUCHER_LABELS,
     _PUK_LABELS,
+    _TAX_LABELS,
+    _IP_LABELS,
+    _PASSPORT_LABELS,
 ) = _build_lexicon()
 
+# Spoken separators / confirmation tokens inside a single run.
+_SKIP_SEPS = {
+    "-", "–", "—", "/",
+    fold_ar("كابيتال"), "capital", fold_ar("حرف"),
+}
+_DASH_WORDS = {fold_ar("داش"), "dash"}
+_DOT_SEPS = {fold_ar("دوت"), "dot"}
+_LETTER_MAP = {
+    fold_ar("إيه"): "A",
+    fold_ar("ايه"): "A",
+    fold_ar("اي"): "A",
+    "a": "A",
+    fold_ar("بي"): "B",
+    fold_ar("باء"): "B",
+    "b": "B",
+    fold_ar("سي"): "C",
+    "c": "C",
+}
+
 _STRIP_EDGE = re.compile(r"^[\(\[\{«\"'،,.;:!?؟]+|[\)\]\}»\"'،,.;:!?؟]+$")
+_SPAN_LEAD = " \t\r\n:：=-–—"
+_SPAN_TRAIL = re.compile(r"[\s.،,;:!?؟…»«\"')\]]+$")
+
+
+def _looks_ipv4(canonical: str) -> bool:
+    parts = (canonical or "").split(".")
+    if len(parts) != 4:
+        return False
+    try:
+        return all(p.isdigit() and 0 <= int(p) <= 255 for p in parts)
+    except ValueError:
+        return False
+
+
+def _passport_near(text: str, start: int, end: int) -> bool:
+    return bool(label_near(text, start, end, _PASSPORT_LABELS, radius=140))
+
+
+def _trim_spoken_span(text: str, start: int, end: int) -> tuple[int, int]:
+    """Drop leading/trailing punctuation glued onto the last spoken token."""
+    if start is None or end is None or end <= start or not text:
+        return start, end
+    surface = text[start:end]
+    lead = len(surface) - len(surface.lstrip(_SPAN_LEAD))
+    core = _SPAN_TRAIL.sub("", surface[lead:])
+    if not core:
+        return start, end
+    new_start = start + lead
+    new_end = new_start + len(core)
+    if new_end <= new_start:
+        return start, end
+    return new_start, new_end
 
 
 def _clean_token(tok: str) -> str:
@@ -135,8 +192,12 @@ def _parse_addend(
         right = _clean_token(tokens[idx + 2][0])
         if mid in _CONNECTORS and right in _TENS_MAP:
             return int(_DIGIT_MAP[cleaned]) + int(_TENS_MAP[right]), 3
+        if mid in _CONNECTORS and right in _TEEN_MAP:
+            return int(_DIGIT_MAP[cleaned]) + int(_TEEN_MAP[right]), 3
     if cleaned in _TENS_MAP:
         return int(_TENS_MAP[cleaned]), 1
+    if cleaned in _TEEN_MAP:
+        return int(_TEEN_MAP[cleaned]), 1
     if cleaned in _DIGIT_MAP:
         return int(_DIGIT_MAP[cleaned]), 1
     return None
@@ -269,12 +330,31 @@ def _classify_run(
     """Return (entity_hint, label, context_boost)."""
     digits_only = re.sub(r"\D", "", canonical)
     n = len(digits_only)
+    letters = re.sub(r"[^A-Za-z]", "", canonical)
+    if n == 9:
+        tax_label = label_near(text, start, end, _TAX_LABELS, radius=140)
+        if tax_label:
+            return "EG_TAX_ID", tax_label, True
+    if _looks_ipv4(canonical) or canonical.count(".") == 3:
+        ip_label = label_near(text, start, end, _IP_LABELS, radius=120)
+        return "IP_ADDRESS", ip_label, True
+    if letters and n == 8 and re.fullmatch(r"[A-Za-z]\d{8}", canonical):
+        pass_label = label_near(text, start, end, _PASSPORT_LABELS, radius=140)
+        if pass_label:
+            return "PASSPORT", pass_label, True
+    if canonical.count("-") == 2 and n == 9:
+        tax_label = label_near(text, start, end, _TAX_LABELS, radius=140)
+        if tax_label:
+            return "EG_TAX_ID", tax_label, True
     hint, label = _nearest_labeled(
         text,
         start,
         end,
         [
             ("CVV", _CVV_LABELS, 60),
+            ("PASSPORT", _PASSPORT_LABELS, 120),
+            ("EG_TAX_ID", _TAX_LABELS, 120),
+            ("IP_ADDRESS", _IP_LABELS, 100),
             ("OTP", _OTP_LABELS, 80),
             ("SIM_PUK", _PUK_LABELS, 100),
             ("VOUCHER", _VOUCHER_LABELS, 160),
@@ -288,6 +368,10 @@ def _classify_run(
     # Structural overrides when length strongly indicates a type.
     if hint == "CVV" and not (3 <= n <= 4):
         hint, label = "", ""
+    if hint == "OTP" and n == 8:
+        puk_label = label_near(text, start, end, _PUK_LABELS, radius=100)
+        if puk_label:
+            hint, label = "SIM_PUK", puk_label
     if hint == "OTP" and not (4 <= n <= 8):
         hint, label = "", ""
     if hint == "CREDIT_CARD_EXPIRATION" and n not in (3, 4):
@@ -296,6 +380,16 @@ def _classify_run(
         hint, label = "", ""
     if hint == "VOUCHER" and not (10 <= n <= 16):
         hint, label = "", ""
+    if hint == "EG_TAX_ID" and n != 9:
+        hint, label = "", ""
+    if hint == "PASSPORT" and not (n == 8 and letters):
+        hint, label = "", ""
+    if hint == "IP_ADDRESS" and not _looks_ipv4(canonical):
+        hint, label = "", ""
+    if n >= 15:
+        card_label = label_near(text, start, end, _CARD_LABELS, radius=140)
+        if card_label and hint in {"", "PHONE_NUMBER", "CREDIT_CARD"}:
+            return "CREDIT_CARD", card_label, True
     if n == 14:
         voucher_label = label_near(text, start, end, _VOUCHER_LABELS, radius=200)
         if voucher_label and hint in {"", "CREDIT_CARD", "PHONE_NUMBER"}:
@@ -350,11 +444,14 @@ class ArabicSpokenDigitsExpander:
         while i < len(tokens):
             emitted = False
             for prefer_teens in (True, False):
-                run = self._consume_run(tokens, i, prefer_teens=prefer_teens)
+                run = self._consume_run(
+                    tokens, i, text, prefer_teens=prefer_teens,
+                )
                 if run is None:
                     continue
                 start, end, canonical, consumed = run
-                n = len(canonical)
+                start, end = _trim_spoken_span(text, start, end)
+                n = len(re.sub(r"[^A-Za-z0-9]", "", canonical))
                 if n < self.min_digits_short or n > self.max_digits:
                     continue
                 hint, label, boost = _classify_run(
@@ -405,11 +502,13 @@ class ArabicSpokenDigitsExpander:
         self,
         tokens: list[tuple[str, int, int]],
         start_idx: int,
+        text: str,
         *,
         prefer_teens: bool,
     ) -> Optional[tuple[int, int, str, int]]:
         first_tok = tokens[start_idx][0]
-        if _clean_token(first_tok).isdigit():
+        first_clean = _clean_token(first_tok)
+        if first_clean.isdigit():
             return None
 
         digits: list[str] = []
@@ -420,9 +519,41 @@ class ArabicSpokenDigitsExpander:
         idx = start_idx
 
         while idx < len(tokens):
+            tok_start, tok_end = tokens[idx][1], tokens[idx][2]
             cleaned = _clean_token(tokens[idx][0])
-            if not cleaned:
-                # Arabic comma / punctuation between spoken groups
+            if not cleaned or cleaned in _SKIP_SEPS:
+                idx += 1
+                consumed += 1
+                continue
+            if cleaned in _DASH_WORDS:
+                if digits:
+                    digits.append("-")
+                    last_end = tok_end
+                    idx += 1
+                    consumed += 1
+                    continue
+                break
+            if cleaned in _DOT_SEPS:
+                if digits:
+                    digits.append(".")
+                    last_end = tok_end
+                    idx += 1
+                    consumed += 1
+                    continue
+                break
+            if cleaned in _LETTER_MAP:
+                probe_start = tok_start if first_start is None else first_start
+                if _passport_near(text, probe_start, tok_end):
+                    if first_start is None:
+                        first_start = tok_start
+                    last_end = tok_end
+                    digits.append(_LETTER_MAP[cleaned])
+                    spoken_atoms += 1
+                    idx += 1
+                    consumed += 1
+                    continue
+            if cleaned.isdigit() and len(cleaned) > 1:
+                # Parenthetical confirmation of a spoken value, e.g. (15).
                 idx += 1
                 consumed += 1
                 continue
@@ -447,7 +578,8 @@ class ArabicSpokenDigitsExpander:
             consumed += n_tok
             idx += n_tok
 
-            if sum(len(d) for d in digits) >= self.max_digits:
+            payload = re.sub(r"[^A-Za-z0-9]", "", "".join(digits))
+            if len(payload) >= self.max_digits:
                 break
 
         if first_start is None or last_end is None:
@@ -456,6 +588,7 @@ class ArabicSpokenDigitsExpander:
         # One compound atom is enough (سبعمية وتمنية → 708, تلات ألاف → 3000).
         if spoken_atoms < 1:
             return None
-        if len(canonical) < self.min_digits_short:
+        payload = re.sub(r"[^A-Za-z0-9]", "", canonical)
+        if len(payload) < self.min_digits_short:
             return None
         return first_start, last_end, canonical, consumed

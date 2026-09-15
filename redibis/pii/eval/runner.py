@@ -43,6 +43,7 @@ def _scan_case(svc: Any, case: Mapping[str, Any], options: Mapping[str, Any]) ->
         "entities": list(options.get("entities") or []),
         "llm_provider": options.get("llm_provider") or "",
         "llm_model": options.get("llm_model") or "",
+        "llm_api_key": options.get("llm_api_key") or "",
         "preprocess_obfuscation": bool(options.get("preprocess_obfuscation", True)),
         "preprocess_expanders": list(options.get("preprocess_expanders") or []),
     }

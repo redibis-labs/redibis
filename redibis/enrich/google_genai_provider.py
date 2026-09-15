@@ -70,7 +70,6 @@ class GoogleGenAIProvider(EnrichmentProvider):
         from redibis.enrich.llm_logging import (
             build_model_call_record,
             emit_llm_log,
-            is_llm_debug_enabled,
             prompt_meta,
             record_llm_call,
             redact,
@@ -99,7 +98,15 @@ class GoogleGenAIProvider(EnrichmentProvider):
         if types is not None and config_kwargs:
             config = types.GenerateContentConfig(**config_kwargs)
 
-        started_debug = is_llm_debug_enabled()
+        import time
+
+        pmeta = prompt_meta(system_prompt, user_prompt)
+        _secrets = [self.api_key or ""]
+        resp = None
+        text = ""
+        status = "ok"
+        err = ""
+        t0 = time.perf_counter()
         try:
             if config is not None:
                 resp = client.models.generate_content(
@@ -109,31 +116,36 @@ class GoogleGenAIProvider(EnrichmentProvider):
                 )
             else:
                 resp = client.models.generate_content(model=model, contents=user_prompt)
+            text = getattr(resp, "text", None) or ""
+            if not text and getattr(resp, "candidates", None):
+                try:
+                    parts = resp.candidates[0].content.parts
+                    text = "".join(getattr(p, "text", "") or "" for p in parts)
+                except Exception:
+                    text = ""
         except Exception as exc:
-            raise EnrichmentError(f"google-genai call failed: {exc}") from exc
-
-        text = getattr(resp, "text", None) or ""
-        if not text and getattr(resp, "candidates", None):
-            # Fallback extraction for SDK variants
-            try:
-                parts = resp.candidates[0].content.parts
-                text = "".join(getattr(p, "text", "") or "" for p in parts)
-            except Exception:
-                text = ""
-
-        if started_debug:
-            try:
-                record = build_model_call_record(
-                    provider=self.name,
-                    model_id=model,
-                    system_prompt=redact(system_prompt),
-                    user_prompt=redact(user_prompt),
-                    response_text=redact(text),
-                    meta=prompt_meta(system_prompt, user_prompt),
-                )
-                emit_llm_log(record)
-                record_llm_call(record)
-            except Exception:
-                pass
+            status = "error"
+            err = str(exc)
+            raise EnrichmentError(
+                redact(f"google-genai call failed: {exc}", secrets=_secrets)
+            ) from exc
+        finally:
+            latency_ms = (time.perf_counter() - t0) * 1000
+            rec = build_model_call_record(
+                self,
+                model,
+                resp if status == "ok" else None,
+                latency_ms=latency_ms,
+                status=status,
+                error=err,
+                system_prompt_len=pmeta["system_prompt_len"],
+                user_prompt_len=pmeta["user_prompt_len"],
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                response=text,
+                error_secrets=_secrets,
+            )
+            record_llm_call(rec)
+            emit_llm_log(rec, error=redact(err, secrets=_secrets))
 
         return (text or "").strip()

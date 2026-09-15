@@ -1,9 +1,11 @@
-"""Golden coverage for Text Gateway cases 19–23 (regex + preprocess)."""
+"""Golden coverage for Text Gateway cases 19–23 (exact boundaries)."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+
+import pytest
 
 from redibis.pii.eval.span_metrics import DATASET_KIND, validate_dataset
 from redibis.pii.rules.ruleset import RuleSetCompiler
@@ -11,6 +13,21 @@ from redibis.pii.scan.result import TextScanConfig
 from redibis.pii.scan.text_scanner import TextScanner
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "text_gateway" / "cases_19_23.json"
+
+BENCH = TextScanConfig(
+    engines="regex",
+    language="ar",
+    min_score=0.2,
+    preprocess_obfuscation=True,
+    resolve="priority",
+)
+GATEWAY = TextScanConfig(
+    engines="both",
+    language="ar",
+    min_score=0.35,
+    preprocess_obfuscation=True,
+    resolve="priority",
+)
 
 
 def _dataset() -> dict:
@@ -28,16 +45,6 @@ def _scanner() -> TextScanner:
     return TextScanner(ruleset=RuleSetCompiler.default())
 
 
-def _cfg() -> TextScanConfig:
-    return TextScanConfig(
-        engines="regex",
-        language="ar",
-        min_score=0.2,
-        preprocess_obfuscation=True,
-        resolve="priority",
-    )
-
-
 def test_fixture_is_portable_eval_dataset():
     raw = _dataset()
     assert raw["kind"] == DATASET_KIND
@@ -45,64 +52,91 @@ def test_fixture_is_portable_eval_dataset():
     assert len(normalized["cases"]) == 5
 
 
-def _has_span(result, text: str, needle: str, entity: str) -> bool:
+def _find_span(result, start: int, end: int, entity: str):
     for d in result.detections:
-        if d.entity_type != entity or d.start is None or d.end is None:
-            continue
-        if text[d.start:d.end] == needle:
-            return True
-        if needle in (d.text or ""):
-            return True
-    return False
+        if d.entity_type == entity and d.start == start and d.end == end:
+            return d
+    return None
 
 
-def _assert_expected(case_id: str, *, extra_check=None):
-    row = _case(case_id)
+def _assert_expected(case_id, *, cfg, extra_check=None, case=None):
+    row = case or _case(case_id)
     text = row["text"]
-    result = _scanner().scan(text, _cfg())
-    missing = []
+    result = _scanner().scan(text, cfg)
+    missing, drifted = [], []
     for span in row["expected_spans"]:
-        needle = text[span["start"]:span["end"]]
-        if not _has_span(result, text, needle, span["entity_type"]):
-            missing.append((span["entity_type"], needle))
-    assert not missing, (
-        missing,
-        [(d.entity_type, d.text, d.recognizer) for d in result.detections],
-    )
+        if _find_span(result, span["start"], span["end"], span["entity_type"]):
+            continue
+        near = [
+            d
+            for d in result.detections
+            if d.entity_type == span["entity_type"]
+            and d.start is not None
+            and d.end is not None
+            and max(0, min(d.end, span["end"]) - max(d.start, span["start"])) > 0
+        ]
+        (drifted if near else missing).append(
+            (
+                span["entity_type"],
+                text[span["start"]:span["end"]],
+                [(d.start, d.end, text[d.start:d.end]) for d in near],
+            )
+        )
+    assert not missing, ("NOT DETECTED", missing)
+    assert not drifted, ("BOUNDARY DRIFT", drifted)
     if extra_check:
         extra_check(text, result)
+    return result
 
 
-def test_case_19_phone_and_arabic_name():
+@pytest.mark.parametrize("cfg,label", [(BENCH, "bench"), (GATEWAY, "gateway")])
+def test_case_19_phone_and_arabic_name(cfg, label):
     def _no_agent(text, result):
         agents = [
-            d for d in result.detections
+            d
+            for d in result.detections
             if (d.text or "").strip().rstrip(":").casefold() == "agent"
         ]
         assert not agents
+        if cfg.engines == "both":
+            assert "ner" in (result.engines_unavailable or {}) or "ner" in result.engines_ran
 
-    _assert_expected("case-19", extra_check=_no_agent)
-
-
-def test_case_20_full_address_and_spoken_phone():
-    _assert_expected("case-20")
+    _assert_expected("case-19", cfg=cfg, extra_check=_no_agent)
 
 
-def test_case_21_voucher_not_nid_and_phone_not_price():
+@pytest.mark.parametrize("cfg,label", [(BENCH, "bench"), (GATEWAY, "gateway")])
+def test_case_20_full_address_and_spoken_phone(cfg, label):
+    _assert_expected("case-20", cfg=cfg)
+
+
+@pytest.mark.parametrize("cfg,label", [(BENCH, "bench"), (GATEWAY, "gateway")])
+def test_case_21_voucher_not_nid_and_phone_not_price(cfg, label):
     def _no_price(text, result):
         prices = [
-            d for d in result.detections
-            if d.text and "100" in d.text
+            d
+            for d in result.detections
+            if d.text
+            and "100" in d.text
             and "جنيه" in text[max(0, (d.start or 0) - 2):(d.end or 0) + 8]
         ]
         assert not prices
 
-    _assert_expected("case-21", extra_check=_no_price)
+    _assert_expected("case-21", cfg=cfg, extra_check=_no_price)
 
 
-def test_case_22_spoken_nid_and_puk():
-    _assert_expected("case-22")
+@pytest.mark.parametrize("cfg,label", [(BENCH, "bench"), (GATEWAY, "gateway")])
+def test_case_22_spoken_nid_and_puk(cfg, label):
+    _assert_expected("case-22", cfg=cfg)
 
 
-def test_case_23_ticket_name_and_spoken_phone():
-    _assert_expected("case-23")
+@pytest.mark.parametrize("cfg,label", [(BENCH, "bench"), (GATEWAY, "gateway")])
+def test_case_23_ticket_name_and_spoken_phone(cfg, label):
+    _assert_expected("case-23", cfg=cfg)
+
+
+def test_widened_gold_fails_as_boundary_drift():
+    row = json.loads(json.dumps(_case("case-20")))
+    row["expected_spans"][0]["end"] = int(row["expected_spans"][0]["end"]) + 5
+    with pytest.raises(AssertionError) as exc:
+        _assert_expected("case-20", cfg=BENCH, case=row)
+    assert "BOUNDARY DRIFT" in str(exc.value)

@@ -628,13 +628,13 @@ async function renderEnrich(){
         <div><label>api_base</label><input id="cpBase" placeholder="http://localhost:30000/v1"/>
           <small class="hint">Must end with <code>/v1</code>.</small></div>
         <div><label>Model id</label>
-          <input id="cpModel" list="cpModelList" placeholder="Qwen/Qwen2.5-14B-Instruct"/>
+          <input id="cpModel" list="cpModelList" placeholder="Qwen/Qwen2.5-14B-Instruct-AWQ"/>
           <datalist id="cpModelList"></datalist>
           <button type="button" class="btn-sm" style="margin-top:4px" onclick="refreshCustomModels()">Fetch /models</button>
         </div>
         <div id="cpRawWrap" style="display:none;grid-column:1/-1">
           <label>LiteLLM model string</label>
-          <input id="cpLitellm" placeholder="openai/Qwen/Qwen2.5-14B-Instruct"/>
+          <input id="cpLitellm" placeholder="openai/Qwen/Qwen2.5-14B-Instruct-AWQ"/>
         </div>
         <div><label>api_key_env</label><input id="cpKeyEnv" placeholder="SGLANG_API_KEY"/>
           <small class="hint">Local servers still need a non-empty key — set any dummy, e.g. <code>sk-local</code>.</small></div>
@@ -1117,7 +1117,7 @@ function applyCustomPreset(key){
   const p = presets[key] || (key==="sglang_qwen" ? {
     name:"sglang-qwen", description:"SGLang-hosted Qwen (local)",
     api_base:"http://localhost:30000/v1", api_key_env:"SGLANG_API_KEY",
-    litellm_model:"openai/Qwen/Qwen2.5-14B-Instruct", model_prefix:"openai",
+    litellm_model:"openai/Qwen/Qwen2.5-14B-Instruct-AWQ", model_prefix:"openai",
     supports_json:true, params:{temperature:0.2,max_tokens:4096,timeout:120},
   } : {name:"", description:"OpenAI-compatible local server", api_base:"", api_key_env:"OPENAI_API_KEY",
     litellm_model:"openai/", model_prefix:"openai", supports_json:true,
@@ -1129,7 +1129,7 @@ function applyCustomPreset(key){
   if($("cpLitellm")) $("cpLitellm").value = p.litellm_model || "";
   if($("cpModel")){
     const bare = (p.litellm_model||"").replace(/^openai\//,"");
-    $("cpModel").value = key==="openai_compatible" ? "" : (bare || "Qwen/Qwen2.5-14B-Instruct");
+    $("cpModel").value = key==="openai_compatible" ? "" : (bare || "Qwen/Qwen2.5-14B-Instruct-AWQ");
   }
   if($("cpSupportsJson")) $("cpSupportsJson").checked = p.supports_json !== false;
   if($("cpParams")) $("cpParams").value = JSON.stringify(p.params||{}, null, 2);

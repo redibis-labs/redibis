@@ -36,12 +36,18 @@ const llmProviderWrap = $("gwLlmProviderWrap");
 const llmProviderEl = $("gwLlmProvider");
 const llmModelWrap = $("gwLlmModelWrap");
 const llmModelEl = $("gwLlmModel");
+const llmKeyWrap = $("gwLlmKeyWrap");
+const llmKeyEl = $("gwLlmKey");
 const checkToxicityEl = $("gwCheckToxicity");
 const checkInjectionEl = $("gwCheckInjection");
 const guardHintEl = $("gwGuardHint");
 const healthBannerEl = $("gwHealthBanner");
 const safetyCard = $("gwSafetyCard");
 const safetyEl = $("gwSafety");
+const llmCard = $("gwLlmCard");
+const llmEl = $("gwLlm");
+const llmDownloadBtn = $("gwLlmDownload");
+const llmDownloadBarBtn = $("gwLlmDownloadBar");
 const progressEl = $("gwProgress");
 const progressFillEl = $("gwProgressFill");
 const progressStageEl = $("gwProgressStage");
@@ -83,7 +89,30 @@ function updateCount() {
   countEl.textContent = n.toLocaleString() + " / " + MAX.toLocaleString();
 }
 
+function looksLikeHfModel(id) {
+  const m = (id || "").trim();
+  if (!m || m.indexOf(" ") >= 0 || m.indexOf("/") < 0) return false;
+  const head = m.split("/")[0].toLowerCase();
+  return ["gemini", "openai", "anthropic", "ollama", "hosted_vllm", "openrouter", "azure"].indexOf(head) < 0;
+}
+
+function preferLocalProviderForHfModel() {
+  if (!llmProviderEl) return;
+  const model = (llmModelEl && llmModelEl.value.trim()) || "";
+  if (!looksLikeHfModel(model)) return;
+  const cur = llmProviderEl.value || "";
+  if (cur && cur !== "gemini" && cur !== "google_genai") return;
+  for (const name of ["sglang", "sglang-qwen", "vllm"]) {
+    const hit = Array.from(llmProviderEl.options).some((o) => o.value === name);
+    if (hit) {
+      llmProviderEl.value = name;
+      return;
+    }
+  }
+}
+
 function scanPayload() {
+  preferLocalProviderForHfModel();
   return {
     text: sourceText,
     language: langEl.value,
@@ -94,6 +123,7 @@ function scanPayload() {
     entities: [],
     llm_provider: (useLlmEl && useLlmEl.checked && llmProviderEl.value) || "",
     llm_model: (useLlmEl && useLlmEl.checked && llmModelEl.value.trim()) || "",
+    llm_api_key: (useLlmEl && useLlmEl.checked && llmKeyEl && llmKeyEl.value.trim()) || "",
     check_toxicity: !!(checkToxicityEl && checkToxicityEl.checked),
     check_prompt_injection: !!(checkInjectionEl && checkInjectionEl.checked),
   };
@@ -157,6 +187,15 @@ async function loadHealth() {
     opt.appendChild(document.createTextNode(bits.filter(Boolean).join(" · ")));
     llmProviderEl.appendChild(opt);
   }
+  const defaultLlm = (health && health.default_llm) || {};
+  if (llmModelEl && defaultLlm.model && !llmModelEl.value.trim()) {
+    llmModelEl.value = defaultLlm.model;
+  }
+  if (defaultLlm.provider) {
+    const has = Array.from(llmProviderEl.options).some((o) => o.value === defaultLlm.provider);
+    if (has) llmProviderEl.value = defaultLlm.provider;
+  }
+  preferLocalProviderForHfModel();
 
   const banners = [];
   const ner = (health && health.engines && health.engines.ner) || {};
@@ -172,7 +211,6 @@ async function loadHealth() {
       text: "No NER model configured — only regex/phone patterns will run. Names and free-text addresses will not be detected.",
     });
   }
-  const defaultLlm = (health && health.default_llm) || {};
   const llm = (health && health.engines && health.engines.llm) || {};
   const label = [defaultLlm.provider || llm.role_provider, defaultLlm.model].filter(Boolean).join(" / ");
   if (defaultLlm.status === "missing_credentials") {
@@ -309,6 +347,9 @@ function renderSummary(env) {
   const full = env.provenance || {};
   if (full.stack_uuid) kv.push(["stack", full.stack_uuid]);
   if (full.ner_backend) kv.push(["ner", full.ner_backend]);
+  const llm = env.llm || {};
+  kv.push(["llm used", llm.used ? "yes" : "no"]);
+  if (llm.skip_reason) kv.push(["llm skip", llm.skip_reason]);
   for (const [k, v] of kv) {
     const dt = document.createElement("dt");
     dt.appendChild(document.createTextNode(k));
@@ -326,6 +367,7 @@ function renderSummary(env) {
     metaEl.appendChild(dd);
   }
   metaCard.hidden = false;
+  renderLlmLog(env);
 }
 
 function renderSafety(env) {
@@ -366,6 +408,74 @@ function renderSafety(env) {
     safetyEl.appendChild(row);
   }
   safetyCard.hidden = false;
+}
+
+function appendKv(parent, key, value) {
+  const dt = document.createElement("dt");
+  dt.appendChild(document.createTextNode(key));
+  const dd = document.createElement("dd");
+  dd.appendChild(document.createTextNode(value || "—"));
+  parent.appendChild(dt);
+  parent.appendChild(dd);
+}
+
+function renderLlmLog(env) {
+  if (!llmCard || !llmEl) return;
+  const llm = env && env.llm;
+  llmEl.textContent = "";
+  if (!llm) {
+    llmCard.hidden = true;
+    if (llmDownloadBarBtn) llmDownloadBarBtn.hidden = true;
+    return;
+  }
+  const dl = document.createElement("dl");
+  dl.className = "gw-kv";
+  appendKv(dl, "used", llm.used ? "yes" : "no");
+  appendKv(dl, "requested", llm.requested ? "yes" : "no");
+  appendKv(dl, "pii refiner", llm.pii_refiner_ran ? "ran" : "did not run");
+  appendKv(dl, "calls", String(llm.call_count || 0));
+  appendKv(dl, "provider", (llm.providers || []).join(", "));
+  appendKv(dl, "model", (llm.models || []).join(", "));
+  if (llm.skip_reason) appendKv(dl, "why not", llm.skip_reason);
+  llmEl.appendChild(dl);
+  (llm.calls || []).forEach((call) => {
+    const wrap = document.createElement("div");
+    wrap.className = "gw-llm-call";
+    const head = document.createElement("div");
+    head.className = "gw-llm-call-head";
+    const bits = [
+      call.provider || "llm",
+      call.model_id || "",
+      call.status || "",
+      call.latency_ms != null ? Math.round(call.latency_ms) + "ms" : "",
+    ].filter(Boolean);
+    head.appendChild(document.createTextNode(bits.join(" · ")));
+    wrap.appendChild(head);
+    [
+      ["system", call.system_prompt],
+      ["user", call.user_prompt],
+      ["response", call.response],
+    ].forEach(([label, text]) => {
+      if (text == null || text === "") return;
+      const lab = document.createElement("div");
+      lab.className = "gw-llm-label";
+      lab.appendChild(document.createTextNode(label));
+      const pre = document.createElement("pre");
+      pre.className = "gw-llm-pre";
+      pre.appendChild(document.createTextNode(String(text)));
+      wrap.appendChild(lab);
+      wrap.appendChild(pre);
+    });
+    if (call.error) {
+      const err = document.createElement("div");
+      err.className = "gw-hint";
+      err.appendChild(document.createTextNode(String(call.error)));
+      wrap.appendChild(err);
+    }
+    llmEl.appendChild(wrap);
+  });
+  llmCard.hidden = false;
+  if (llmDownloadBarBtn) llmDownloadBarBtn.hidden = false;
 }
 
 function selectFor(value) {
@@ -516,6 +626,9 @@ function resetAll() {
   policyEl.textContent = "";
   safetyEl.textContent = "";
   safetyCard.hidden = true;
+  if (llmEl) llmEl.textContent = "";
+  if (llmCard) llmCard.hidden = true;
+  if (llmDownloadBarBtn) llmDownloadBarBtn.hidden = true;
   hideTip();
   paintBanners(bannerEl, []);
   metaCard.hidden = true;
@@ -733,7 +846,19 @@ function downloadJson() {
   const blob = new Blob([JSON.stringify(lastEnvelope, null, 2)], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "gateway-scan.json";
+  const stem = String((lastEnvelope.run_uuid || lastEnvelope.llm && lastEnvelope.llm.run_id) || "result").slice(0, 12);
+  a.download = "gateway-scan-" + stem + ".json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function downloadLlmLog() {
+  if (!lastEnvelope || !lastEnvelope.llm) return;
+  const blob = new Blob([JSON.stringify(lastEnvelope.llm, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  const stem = String(lastEnvelope.llm.run_id || lastEnvelope.run_uuid || "run").slice(0, 12);
+  a.download = "llm-log-" + stem + ".json";
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -742,12 +867,15 @@ function syncLlmSelectors() {
   const on = !!(useLlmEl && useLlmEl.checked);
   llmProviderWrap.hidden = !on;
   llmModelWrap.hidden = !on;
+  if (llmKeyWrap) llmKeyWrap.hidden = !on;
 }
 
 input.addEventListener("input", updateCount);
 scanBtn.addEventListener("click", runScan);
 $("gwCancelScan").addEventListener("click", cancelScan);
 useLlmEl.addEventListener("change", syncLlmSelectors);
+if (llmModelEl) llmModelEl.addEventListener("change", preferLocalProviderForHfModel);
+if (llmModelEl) llmModelEl.addEventListener("blur", preferLocalProviderForHfModel);
 editBtn.addEventListener("click", () => {
   resetMaskPreview();
   input.value = sourceText;
@@ -762,6 +890,8 @@ if (policyAllRedactBtn) {
 clearBtn.addEventListener("click", resetAll);
 deidBtn.addEventListener("click", copyDeidentified);
 downloadBtn.addEventListener("click", downloadJson);
+if (llmDownloadBtn) llmDownloadBtn.addEventListener("click", downloadLlmLog);
+if (llmDownloadBarBtn) llmDownloadBarBtn.addEventListener("click", downloadLlmLog);
 window.addEventListener("beforeunload", () => {
   cancelScan();
   input.value = "";

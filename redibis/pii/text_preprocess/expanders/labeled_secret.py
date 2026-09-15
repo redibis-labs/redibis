@@ -39,6 +39,12 @@ _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
             r"(?i)(?<!\w)(?:puk|رمز\s*الـ?\s*puk)(?:\s+\w+){0,4}\s*[:=]?\s*(\d{8})(?!\w)"
         ),
     ),
+    (
+        "IMEI",
+        re.compile(
+            r"(?i)(?<!\w)(?:imei(?:\s+number)?)\s*(?:is|:)?\s*(\d{15})\b"
+        ),
+    ),
 ]
 
 

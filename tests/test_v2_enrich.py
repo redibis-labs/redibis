@@ -251,6 +251,47 @@ def test_normalize_model_id_maps_display_names():
     assert normalize_model_id("claude opus 4.8") == "claude-opus-4-8"
     assert normalize_model_id("anthropic/claude-opus-4-8", model_prefix="anthropic") == "claude-opus-4-8"
     assert normalize_model_id("qwen2.5") == "qwen2.5"
+    assert (
+        normalize_model_id("Qwen/Qwen2.5-14B-Instruct-AWQ", model_prefix="openai")
+        == "Qwen/Qwen2.5-14B-Instruct-AWQ"
+    )
+    assert (
+        normalize_model_id("openai/Qwen/Qwen2.5-14B-Instruct-AWQ", model_prefix="openai")
+        == "Qwen/Qwen2.5-14B-Instruct-AWQ"
+    )
+    assert (
+        normalize_model_id("Qwen/Qwen2.5-14B-Instruct-AWQ", model_prefix="gemini")
+        == "Qwen/Qwen2.5-14B-Instruct-AWQ"
+    )
+
+
+def test_sglang_default_is_qwen_awq():
+    rows = {p["name"]: p for p in list_providers()}
+    sglang = rows["sglang"]
+    assert sglang["default_model_bare"] == "Qwen/Qwen2.5-14B-Instruct-AWQ"
+    assert sglang["api_key_env"] == "SGLANG_API_KEY"
+    p = get_provider("sglang", model="Qwen/Qwen2.5-14B-Instruct-AWQ")
+    assert p._effective_model() == "openai/Qwen/Qwen2.5-14B-Instruct-AWQ"
+
+
+def test_gemini_plus_huggingface_id_reroutes_to_sglang():
+    from redibis.enrich.providers import LiteLLMProvider, looks_like_huggingface_model
+
+    assert looks_like_huggingface_model("Qwen/Qwen2.5-14B-Instruct-AWQ")
+    assert looks_like_huggingface_model("gemini/Qwen/Qwen2.5-14B-Instruct-AWQ")
+    assert not looks_like_huggingface_model("gemini-3.5-flash")
+    assert not looks_like_huggingface_model("gemini/gemini-3.5-flash")
+
+    p = get_provider("gemini", model="Qwen/Qwen2.5-14B-Instruct-AWQ")
+    assert p.name == "sglang"
+    assert p._effective_model() == "openai/Qwen/Qwen2.5-14B-Instruct-AWQ"
+
+    stuck = LiteLLMProvider(
+        model="Qwen/Qwen2.5-14B-Instruct-AWQ",
+        model_prefix="gemini",
+        litellm_model="gemini/gemini-3.5-flash",
+    )
+    assert stuck._effective_model() == "openai/Qwen/Qwen2.5-14B-Instruct-AWQ"
 
 
 def test_get_provider_normalizes_model_override():
@@ -356,16 +397,20 @@ def test_enrich_body_accepts_null_model_from_ui():
     assert body.provider == "demo"
 
 
-def test_enrich_body_defaults_to_gemini():
+def test_enrich_body_defaults_to_configured_provider(monkeypatch):
     from redibis.webapp.backend import EnrichBody
 
+    monkeypatch.setattr(
+        "redibis.webapp.backend.load_global_settings",
+        lambda: {"llm_defaults": {"provider": "sglang"}},
+    )
     body = EnrichBody(
         model=None,
         endpoint_url=None,
         api_key=None,
         system_prompt="test",
     )
-    assert body.provider == "gemini"
+    assert body.provider == "sglang"
 
 
 def test_get_provider_reroutes_key_like_endpoint_to_api_key():

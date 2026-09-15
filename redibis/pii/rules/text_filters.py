@@ -19,13 +19,18 @@ _SPEAKER_TURN = re.compile(
     re.IGNORECASE,
 )
 _TRAIL_PUNCT = re.compile(r"[\s.،,;:!?؟»\"']+$")
+_TRAIL_FILLER = re.compile(r"(?:\s+(?:صح|right|yes))+$", re.IGNORECASE)
 _LEAD_SEP = re.compile(r"^[\s:：=\-–—]+")
+_EDGE_TRIM = re.compile(r"^[\s:：=\-–—]+|[\s.،,;:!?؟…»«\"']+$")
+_NO_TRIM_ENTITIES = frozenset({"EMAIL_ADDRESS", "URL", "IP_ADDRESS", "MAC_ADDRESS"})
+_LEAD_STRIP = " \t\r\n:：=-–—"
 _NAME_CUE_PREFIX = re.compile(
-    r"^(?:اسمي|واسمي|باسم)\s+",
+    r"^(?:واسم المفوض|اسم المفوض|اسمي|واسمي|باسم|اسمها|اسمه|معاك|معك|it['’]s|it is|i am|i['’]m|name is)\s+",
+    re.IGNORECASE,
 )
 _ADDRESS_HEAD = re.compile(
-    r"(?i)^\s*(?:\d+|شارع|طريق|عمارة|شقة|حي|مدينة|villa|street|st\.?|"
-    r"building|apt\.?|apartment|flat)"
+    r"(?i)(?:\d+|شارع|(?<!عن )طريق|عمارة|شقة|حي|مدينة|قدام|واحة|الكيلو|"
+    r"villa|street|st\.?|building|apt\.?|apartment|flat)"
 )
 _CANON_DIGITS = re.compile(r"\D+")
 
@@ -179,28 +184,29 @@ class ContextSpanExtender:
     @staticmethod
     def _clause_after(text: str, after: int) -> Optional[tuple[int, int]]:
         start = after
-        if start < len(text) and text[start] in " \t:：=-–—":
-            while start < len(text) and text[start] in " \t:：=-–—":
-                start += 1
+        while start < len(text) and text[start] in " \t:：=-–—":
+            start += 1
         if start >= len(text):
             return None
         speaker = _SPEAKER_TURN.search(text, start)
         end = speaker.start() if speaker else len(text)
-        # Stop at a line break that begins a new speaker-less sentence after a period.
-        period = text.find(".", start)
-        newline = text.find("\n", start)
-        if 0 <= period < end and (newline < 0 or period <= newline):
-            end = period
-        elif 0 <= newline < end:
-            end = newline
-        clause = text[start:end]
+        stops = [p for p in (text.find(".", start), text.find("؟", start), text.find("!", start), text.find("\n", start)) if p >= 0]
+        if stops:
+            stop = min(stops)
+            if stop < end:
+                end = stop
+        remainder = text[start:end]
+        head = _ADDRESS_HEAD.search(remainder)
+        if not head:
+            return None
+        clause_start = start + head.start()
+        clause = remainder[head.start():]
         trimmed = _TRAIL_PUNCT.sub("", clause)
+        trimmed = _TRAIL_FILLER.sub("", trimmed)
+        trimmed = _TRAIL_PUNCT.sub("", trimmed)
         if not trimmed.strip():
             return None
-        if not _ADDRESS_HEAD.search(trimmed):
-            return None
-        end = start + len(trimmed)
-        return start, end
+        return clause_start, clause_start + len(trimmed)
 
 
 class NumberContextClassifier:
@@ -284,6 +290,12 @@ class NumberContextClassifier:
         return False
 
     def _reclassify(self, text: str, cand: Candidate, surface: str) -> Candidate:
+        if cand.entity_type in {
+            "IP_ADDRESS", "EMAIL_ADDRESS", "PASSPORT", "EG_TAX_ID",
+            "ORGANIZATION", "GDPR_SPECIAL_CATEGORY", "LOCATION", "PERSON",
+            "CVV", "CREDIT_CARD_EXPIRATION", "IMEI",
+        }:
+            return cand
         digits = _canonical_digits(surface)
         if cand.recognizer and "|" in cand.recognizer:
             _, _, tail = cand.recognizer.partition("|")
@@ -347,17 +359,46 @@ class NumberContextClassifier:
         return best
 
 
+class BoundaryNormalizer:
+    """Trim edge punctuation/whitespace from every span, per entity family.
+
+    Runs after all producers so it fixes regex, NER and preprocess spans alike.
+    Entity types whose value legitimately ends in punctuation are exempt.
+    """
+
+    name = "boundary_normalize"
+
+    def apply(self, candidates: Sequence[Candidate], text: str) -> list[Candidate]:
+        out: list[Candidate] = []
+        for cand in candidates:
+            if cand.start is None or cand.end is None or cand.entity_type in _NO_TRIM_ENTITIES:
+                out.append(cand)
+                continue
+            surface = text[cand.start:cand.end]
+            lead = len(surface) - len(surface.lstrip(_LEAD_STRIP))
+            trail = len(surface) - len(_EDGE_TRIM.sub("", surface[lead:])) - lead
+            start, end = cand.start + lead, cand.end - trail
+            if end <= start:
+                continue
+            if (start, end) == (cand.start, cand.end):
+                out.append(cand)
+                continue
+            out.append(replace(cand, start=start, end=end, text=text[start:end]))
+        return out
+
+
 def apply_text_rule_filters(
     candidates: Iterable[Candidate],
     text: str,
     overlay: Optional[TextRuleOverlay],
 ) -> list[Candidate]:
-    """Extender → number policy → exclusions."""
+    """Extender → number policy → exclusions → boundary trim."""
     ov = _overlay(overlay)
     stage = list(candidates)
     stage = ContextSpanExtender(ov).apply(stage, text)
     stage = NumberContextClassifier(ov).apply(stage, text)
     stage = TermExclusionFilter(ov).apply(stage, text)
+    stage = BoundaryNormalizer().apply(stage, text)
     return stage
 
 

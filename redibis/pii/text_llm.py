@@ -111,10 +111,12 @@ class LlmTextRefiner:
         redibis_config: Any = None,
         provider: Any = None,
         allow_cloud: bool = False,
+        api_key: Optional[str] = None,
     ):
         self._cfg = redibis_config
         self._provider = provider
         self._allow_cloud = allow_cloud
+        self._api_key = (api_key or "").strip() or None
 
     def propose_spans(
         self,
@@ -222,7 +224,7 @@ class LlmTextRefiner:
             "pii.text_refiner",
             gs=gs,
             agents_cfg=agents_cfg,
-            api_key=(getattr(llm, "api_key", None) or None) if llm else None,
+            api_key=self._api_key or ((getattr(llm, "api_key", None) or None) if llm else None),
             endpoint_url=(getattr(llm, "endpoint_url", None) or None) if llm else None,
         )
         self._assert_local_provider(binding.provider)
@@ -257,7 +259,9 @@ class LlmTextRefiner:
         self._assert_local_provider(provider_name)
         model = getattr(llm, "model_name", "") if llm else ""
         endpoint = getattr(llm, "endpoint_url", None) if llm else None
-        prov = get_provider(provider_name, model=model, endpoint_url=endpoint)
+        prov = get_provider(
+            provider_name, model=model, endpoint_url=endpoint, api_key=self._api_key,
+        )
         model_id = model or provider_name or "pii-text-llm"
         return prov, model_id
 

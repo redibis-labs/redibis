@@ -19,6 +19,8 @@ _GROUPED = re.compile(
     r")"
     r"(?!\w)"
 )
+_SHORT_CVV = re.compile(r"\(\s*([\d٠-٩۰-۹]{3,4})\s*\)")
+_CVV_LABELS = ["cvv", "cvc", "سي في", "سي في في", "الضهر", "ظهر"]
 
 _PHONE_LABELS = ["موبايل", "هاتف", "تليفون", "phone", "mobile", "msisdn", "رقم"]
 _NID_LABELS = ["قومي", "هوية", "national id", "nid", "الرقم القومي"]
@@ -55,5 +57,19 @@ class ParenthesizedDigitsExpander:
                 entity_hint=hint,
                 context_boost=bool(phone_label or nid_label),
                 label=phone_label or nid_label,
+            ))
+        for m in _SHORT_CVV.finditer(text):
+            if not label_near(text, m.start(), m.end(), _CVV_LABELS, radius=80):
+                continue
+            digits = re.sub(r"\D", "", fold_indic_digits(m.group(1)))
+            out.append(SurfaceSpan(
+                start=m.start(1),
+                end=m.end(1),
+                surface=text[m.start(1):m.end(1)],
+                canonical=digits,
+                variant_kind=self.name,
+                entity_hint="CVV",
+                context_boost=True,
+                label="cvv",
             ))
         return out

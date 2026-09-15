@@ -199,13 +199,15 @@ class TextScanner:
                 logger.debug("equivalence merge skipped: %s", exc)
 
         overlay = getattr(self.ruleset, "text_rules", None)
-        if overlay is not None:
-            try:
-                from redibis.pii.rules.text_filters import apply_text_rule_filters
+        try:
+            from redibis.pii.rules.text_filters import BoundaryNormalizer, apply_text_rule_filters
 
+            if overlay is not None:
                 candidates = apply_text_rule_filters(candidates, raw, overlay)
-            except Exception as exc:
-                logger.warning("text rule filters skipped: %s", exc)
+            else:
+                candidates = BoundaryNormalizer().apply(candidates, raw)
+        except Exception as exc:
+            logger.warning("text rule filters skipped: %s", exc)
 
         detections = self._resolver.resolve(
             candidates,

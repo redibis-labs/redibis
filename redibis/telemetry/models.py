@@ -45,6 +45,11 @@ class ModelCallRecord:
     error: str = ""
     system_prompt_len: int = 0
     user_prompt_len: int = 0
+    system_prompt: str = ""
+    user_prompt: str = ""
+    response: str = ""
+    prompt_hash: str = ""
+    transcript_truncated: bool = False
     model_role: str = ""
     routing_revision: int = 0
     run_id: str = ""

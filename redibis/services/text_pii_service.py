@@ -233,7 +233,11 @@ class TextPIIService:
     ) -> DetectionResult:
         from dataclasses import replace
 
+        from redibis.enrich.llm_logging import current_llm_call_context
         from redibis.pii.eval.provenance import new_run_uuid
+
+        ctx_run = str((current_llm_call_context() or {}).get("run_id") or "")
+        run_uuid = new_run_uuid(ctx_run or None)
 
         try:
             prov = self.scan_provenance(scan_config)
@@ -243,7 +247,7 @@ class TextPIIService:
                 result,
                 provenance_degraded=True,
                 provenance_degraded_reason=str(exc),
-                run_uuid=new_run_uuid(),
+                run_uuid=run_uuid,
             )
         try:
             from redibis.pii.run_store import get_run_store
@@ -256,7 +260,7 @@ class TextPIIService:
             provenance_uuid=prov.provenance_uuid,
             provenance_degraded=prov.provenance_degraded,
             provenance_degraded_reason=prov.provenance_degraded_reason,
-            run_uuid=new_run_uuid(),
+            run_uuid=run_uuid,
             provenance=prov.to_dict() if include_full else None,
         )
 
@@ -335,6 +339,7 @@ class TextPIIService:
         progress_cb: Optional[Callable[[str, dict], None]] = None,
         llm_provider: str = "",
         llm_model: str = "",
+        llm_api_key: str = "",
         preprocess_obfuscation: Optional[bool] = None,
         preprocess_expanders: Optional[list[str]] = None,
         include_provenance: bool = False,
@@ -365,8 +370,15 @@ class TextPIIService:
             preprocess_expanders=tuple(preprocess_expanders or ()),
         )
         llm_override = None
+        key = (llm_api_key or "").strip() or None
         if use_llm and (llm_provider or "").strip():
-            llm_override = self._build_llm_override(llm_provider.strip(), (llm_model or "").strip())
+            llm_override = self._build_llm_override(
+                llm_provider.strip(), (llm_model or "").strip(), api_key=key,
+            )
+        elif use_llm and key:
+            from redibis.pii.text_llm import LlmTextRefiner
+
+            llm_override = LlmTextRefiner(redibis_config=self._cfg, api_key=key)
         result = self._scanner.scan(text, cfg, progress_cb=progress_cb, llm_override=llm_override)
         result = self._stamp_provenance(
             result,
@@ -388,7 +400,7 @@ class TextPIIService:
         )
         return result
 
-    def _build_llm_override(self, provider_name: str, model: str):
+    def _build_llm_override(self, provider_name: str, model: str, *, api_key: Optional[str] = None):
         """Build a one-off refiner bound to a request-selected provider.
 
         Validated against the same provider registry used everywhere else
@@ -400,7 +412,7 @@ class TextPIIService:
         from redibis.pii.text_llm import LlmTextRefiner
 
         try:
-            provider = get_provider(provider_name, model=model)
+            provider = get_provider(provider_name, model=model, api_key=api_key)
         except (ValueError, EnrichmentError) as exc:
             raise TextPIIServiceError(f"unknown llm_provider {provider_name!r}: {exc}") from exc
         refiner = LlmTextRefiner(redibis_config=self._cfg, provider=provider)

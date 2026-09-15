@@ -129,6 +129,12 @@ def test_false_positive_teen_year_not_phone(scanner):
     assert not phones
 
 
+def test_spaced_email_does_not_swallow_clean_address(ar_ctx):
+    text = "Contact alice@example.com please"
+    spans = SpacedEmailExpander().expand(text, ar_ctx)
+    assert not any("Contact" in (s.surface or "") for s in spans)
+
+
 def test_spaced_email_verbal(ar_ctx):
     text = "email me at john at example dot com please"
     spans = SpacedEmailExpander().expand(text, ar_ctx)
@@ -194,6 +200,25 @@ def test_equivalence_merger_combines_same_canonical():
     merged = VariantEquivalenceMerger().merge(cands, text=text)
     assert len(merged) == 1
     assert merged[0].start == 0 and merged[0].end == 15
+
+
+def test_equivalence_merger_does_not_widen_to_label_prefix():
+    text = "الـ PUK code هو 12345678."
+    cands = [
+        Candidate(
+            "SIM_PUK", 0.9, "preprocess", 16, 24, "12345678",
+            recognizer="labeled_secret|12345678",
+        ),
+        Candidate(
+            "SIM_PUK", 0.8, "regex", 4, 24, "PUK code هو 12345678",
+            recognizer="TelcoCatalog_puk_with_label",
+        ),
+    ]
+    merged = VariantEquivalenceMerger().merge(cands, text=text)
+    puk = [c for c in merged if c.entity_type == "SIM_PUK"]
+    assert len(puk) == 1
+    assert (puk[0].start, puk[0].end) == (16, 24)
+    assert puk[0].text == "12345678"
 
 
 def test_emoji_offsets_with_spoken(scanner):
@@ -367,3 +392,94 @@ def test_spoken_grouped_phone_case20_style(ar_ctx):
     assert any(s.canonical == "01522345678" for s in spans), [
         (s.canonical, s.entity_hint) for s in spans
     ]
+
+
+def test_dictated_span_excludes_trailing_period():
+    import json
+    from pathlib import Path
+
+    fx = Path("tests/fixtures/text_gateway/cases_19_23.json")
+    case = next(
+        c for c in json.loads(fx.read_text(encoding="utf-8"))["cases"] if c["id"] == "case-20"
+    )
+    text = case["text"]
+    gold = next(s for s in case["expected_spans"] if s["entity_type"] == "PHONE_NUMBER")
+
+    result = TextScanner(ruleset=RuleSetCompiler.default()).scan(
+        text,
+        TextScanConfig(
+            engines="regex",
+            language="ar",
+            min_score=0.2,
+            preprocess_obfuscation=True,
+        ),
+    )
+    phones = [d for d in result.detections if d.entity_type == "PHONE_NUMBER"]
+    assert phones, "dictated phone not detected at all"
+    assert (phones[0].start, phones[0].end) == (gold["start"], gold["end"])
+    assert not text[phones[0].start:phones[0].end].endswith(".")
+
+
+def test_boundary_normalizer_skips_ipv6_and_drops_punctuation_only():
+    from redibis.pii.rules.text_filters import BoundaryNormalizer
+    from redibis.pii.scan.result import Candidate
+
+    text = "host [2001:db8::1] ..."
+    start = text.index("[2001:db8::1]")
+    end = start + len("[2001:db8::1]")
+    ipv6 = Candidate("IP_ADDRESS", 0.9, "regex", start, end, text[start:end])
+    punct_start = text.rindex("...")
+    punct = Candidate("PHONE_NUMBER", 0.9, "regex", punct_start, punct_start + 3, "...")
+    out = BoundaryNormalizer().apply([ipv6, punct], text)
+    assert (out[0].start, out[0].end) == (start, end)
+    assert all(c.entity_type != "PHONE_NUMBER" for c in out)
+
+
+def test_digit_router_does_not_propose_unlabeled_15_digit_as_card():
+    from redibis.pii.rules.recognizers import RecognizeContext
+    from redibis.pii.text_preprocess.validators import DigitRouterValidator
+
+    ctx = RecognizeContext(language="en", arabic=False, group="free_text")
+    out = DigitRouterValidator().validate(
+        "358190102938475", ctx=ctx, entity_hint="", label=""
+    )
+    assert not out.ok or out.entity_type != "CREDIT_CARD"
+
+
+def test_digit_router_phone_hinted_16_digit_is_card():
+    from redibis.pii.rules.recognizers import RecognizeContext
+    from redibis.pii.text_preprocess.validators import DigitRouterValidator
+
+    ctx = RecognizeContext(language="ar", arabic=True, group="free_text")
+    out = DigitRouterValidator().validate(
+        "5420379154208693", ctx=ctx, entity_hint="PHONE_NUMBER", label="رقم"
+    )
+    assert out.ok
+    assert out.entity_type == "CREDIT_CARD"
+
+
+def test_digit_router_imei_near_phone_cue_stays_imei():
+    from redibis.pii.rules.recognizers import RecognizeContext
+    from redibis.pii.text_preprocess.validators import DigitRouterValidator
+
+    ctx = RecognizeContext(language="ar", arabic=True, group="free_text")
+    out = DigitRouterValidator().validate(
+        "358912098765435",
+        ctx=ctx,
+        entity_hint="IMEI",
+        label="IMEI بتاع التليفون",
+    )
+    assert out.ok
+    assert out.entity_type == "IMEI"
+
+
+def test_digit_cluster_prefers_imei_over_phone_cue():
+    from redibis.pii.rules.recognizers import RecognizeContext
+    from redibis.pii.text_preprocess.expanders.digit_cluster import DigitClusterExpander
+
+    text = "الـ IMEI بتاع التليفون مكتوب 358912098765435"
+    ctx = RecognizeContext(language="ar", arabic=True, group="free_text")
+    spans = DigitClusterExpander().expand(text, ctx)
+    imei = [s for s in spans if "358912098765435" in s.canonical]
+    assert imei
+    assert imei[0].entity_hint == "IMEI"

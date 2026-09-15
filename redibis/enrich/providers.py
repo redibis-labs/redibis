@@ -60,6 +60,16 @@ _MODEL_ALIASES: dict[str, str] = {
     "gpt 4o mini": "gpt-4o-mini",
 }
 
+# First-path segment that LiteLLM treats as a vendor, not a HuggingFace org.
+_LITELLM_VENDOR_PREFIXES = frozenset({
+    "openai", "anthropic", "gemini", "ollama", "hosted_vllm", "openrouter",
+    "azure", "vertex_ai", "bedrock", "huggingface", "together_ai", "groq",
+})
+_CLOUD_PROVIDERS_HF_REROUTE = frozenset({
+    "gemini", "google_genai", "google", "google-genai", "vertex_ai",
+})
+_LOCAL_HF_FALLBACKS = ("sglang", "sglang-qwen", "vllm")
+
 # Anthropic Claude 4.7+ rejects temperature / top_p / top_k in the request body.
 _SAMPLING_PARAM_KEYS = ("temperature", "top_p", "top_k")
 _NO_SAMPLING_MODEL_MARKERS = ("-4-7", "-4-8")
@@ -196,14 +206,21 @@ def normalize_model_id(model: str, *, model_prefix: str = "") -> str:
         return m
 
     # ``anthropic/claude-opus-4-8`` → ``claude-opus-4-8``
+    # ``hosted_vllm/Qwen/Qwen2.5-14B-Instruct-AWQ`` → ``Qwen/Qwen2.5-14B-Instruct-AWQ``
+    # HuggingFace org/name ids (``Qwen/…``) are kept — they are not vendor prefixes.
     if "/" in m:
-        prefix, bare = m.split("/", 1)
-        if not model_prefix or prefix == model_prefix:
-            m = bare.strip()
+        head, rest = m.split("/", 1)
+        prefix = (model_prefix or "").strip()
+        if (prefix and head == prefix) or (not prefix and head.lower() in _LITELLM_VENDOR_PREFIXES):
+            m = rest.strip()
 
     alias_key = re.sub(r"[\s_]+", " ", m.lower()).strip()
     if alias_key in _MODEL_ALIASES:
         return _MODEL_ALIASES[alias_key]
+
+    # Org/name and other slash ids must not be slugified (would become gemini/qwen-…).
+    if "/" in m and " " not in m:
+        return m
 
     # Already a bare API id (no spaces) — keep casing for non-Claude models.
     if " " not in m and re.fullmatch(r"[\w.@:-]+", m):
@@ -212,6 +229,44 @@ def normalize_model_id(model: str, *, model_prefix: str = "") -> str:
     # Slugify display names: ``Claude Opus 4.8`` → ``claude-opus-4-8``
     slug = re.sub(r"[^a-z0-9]+", "-", m.lower()).strip("-")
     return slug or m
+
+
+def looks_like_huggingface_model(model: str) -> bool:
+    """True for org/name weights ids such as ``Qwen/Qwen2.5-14B-Instruct-AWQ``.
+
+    LiteLLM vendor prefixes (``gemini/…``, ``openai/…``) are stripped first so
+    a mistaken ``gemini/Qwen/…`` still counts as a HuggingFace id.
+    """
+    raw = (model or "").strip()
+    if not raw or " " in raw:
+        return False
+    if "/" in raw:
+        head, rest = raw.split("/", 1)
+        if head.lower() in _LITELLM_VENDOR_PREFIXES:
+            raw = rest.strip()
+    if "/" not in raw:
+        return False
+    org = raw.split("/", 1)[0]
+    return bool(org) and org.lower() not in _LITELLM_VENDOR_PREFIXES
+
+
+def reroute_cloud_provider_for_hf_model(
+    name: str, model: str, cfgs: Mapping,
+) -> str:
+    """Map Gemini/Vertex + a HuggingFace id onto a local OpenAI-compatible server.
+
+    ``gemini/Qwen/…`` is not a Gemini model; LiteLLM would call Vertex and 404.
+    """
+    key = (name or "").strip().lower()
+    if key not in _CLOUD_PROVIDERS_HF_REROUTE:
+        return key
+    if not looks_like_huggingface_model(model):
+        return key
+    available = {str(n).lower() for n in (cfgs or {})}
+    for candidate in _LOCAL_HF_FALLBACKS:
+        if candidate in available:
+            return candidate
+    return key
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -276,8 +331,13 @@ class LiteLLMProvider(EnrichmentProvider):
         if not self.model:
             return self.litellm_model
         bare = normalize_model_id(self.model, model_prefix=self.model_prefix)
-        if self.model_prefix and not bare.startswith(self.model_prefix + "/"):
-            return f"{self.model_prefix}/{bare}"
+        prefix = (self.model_prefix or "").strip()
+        # Never send HuggingFace org/name ids through Gemini/Vertex.
+        if looks_like_huggingface_model(bare) or looks_like_huggingface_model(self.model):
+            if prefix.lower() in _CLOUD_PROVIDERS_HF_REROUTE or prefix.lower() == "google":
+                prefix = "openai"
+        if prefix and not bare.startswith(prefix + "/"):
+            return f"{prefix}/{bare}"
         return bare
 
     def complete(self, system_prompt: str, user_prompt: str, *,
@@ -405,6 +465,8 @@ class LiteLLMProvider(EnrichmentProvider):
                 api_base=api_base,
                 system_prompt_len=pmeta["system_prompt_len"],
                 user_prompt_len=pmeta["user_prompt_len"],
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
                 error_secrets=_secrets,
             )
             record_llm_call(rec)
@@ -536,6 +598,9 @@ class DemoEnrichmentProvider(EnrichmentProvider):
             status="ok",
             system_prompt_len=pmeta["system_prompt_len"],
             user_prompt_len=pmeta["user_prompt_len"],
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            response=out,
         )
         record_llm_call(rec)
         emit_llm_log(rec)
@@ -695,6 +760,7 @@ def get_provider(name: str, *, model: str = "", api_key: Optional[str] = None,
     """Build a provider from the JSON registry by name."""
     cfgs = load_provider_configs(config_path)
     key = _PROVIDER_ALIASES.get((name or "").lower(), (name or "").lower())
+    key = reroute_cloud_provider_for_hf_model(key, model, cfgs)
     cfg = cfgs.get(key)
     if cfg is None:
         raise ValueError(

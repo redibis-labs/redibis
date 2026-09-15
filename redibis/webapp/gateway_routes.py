@@ -14,10 +14,11 @@ from __future__ import annotations
 import json
 import logging
 import time
+from contextlib import contextmanager
 from typing import Any, Optional
 
 from fastapi import HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from redibis import __version__ as REDIBIS_VERSION
@@ -48,6 +49,8 @@ KEY_FIELDS = (
     "keys",
     "run_key_ref",
     "run_key_ref",
+    "api_key",
+    "llm_api_key",
 )
 
 _get_service = text_pii_service_from_env
@@ -67,6 +70,7 @@ class GatewayScanBody(BaseModel):
     # validated against the shared provider registry (never a raw endpoint).
     llm_provider: str = ""
     llm_model: str = ""
+    llm_api_key: str = Field(default="", max_length=2048)
     # Opt-in safety analysers — heuristic checks are free; an LLM judge is
     # additionally used only when the corresponding gateway.* capability
     # role is configured (Settings → LLM → Capability roles).
@@ -97,6 +101,7 @@ class GatewayEvaluationBody(BaseModel):
     use_llm: bool = False
     llm_provider: str = ""
     llm_model: str = ""
+    llm_api_key: str = Field(default="", max_length=2048)
     overlap_iou: float = Field(default=0.5, gt=0.0, le=1.0)
     draft_rules: Optional[dict] = None
     pack: str = ""
@@ -110,6 +115,42 @@ class GatewayEvaluationBody(BaseModel):
 class CorpusPatchBody(BaseModel):
     dataset: dict[str, Any]
     actions: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class UseCaseCreateBody(BaseModel):
+    name: str = "untitled"
+    text: str = ""
+    language: str = "ar"
+    tags: list[str] = Field(default_factory=list)
+    author: str = ""
+    notes: str = ""
+    context: dict[str, Any] = Field(default_factory=dict)
+    expected_spans: list[dict[str, Any]] = Field(default_factory=list)
+    forbidden_spans: list[dict[str, Any]] = Field(default_factory=list)
+    rule_edits: dict[str, Any] = Field(default_factory=dict)
+
+
+class UseCaseSaveBody(BaseModel):
+    name: Optional[str] = None
+    text: Optional[str] = None
+    language: Optional[str] = None
+    tags: Optional[list[str]] = None
+    author: Optional[str] = None
+    notes: Optional[str] = None
+    context: Optional[dict[str, Any]] = None
+    expected_spans: Optional[list[dict[str, Any]]] = None
+    forbidden_spans: Optional[list[dict[str, Any]]] = None
+    rule_edits: Optional[dict[str, Any]] = None
+
+
+class UseCaseRunBody(BaseModel):
+    draft_rules: Optional[dict[str, Any]] = None
+    context: Optional[dict[str, Any]] = None
+    engines: str = "both"
+    min_score: float = Field(default=0.35, ge=0.0, le=1.0)
+    language: str = ""
+    use_llm: bool = False
+    persist: bool = True
 
 
 def _svc() -> TextPIIService:
@@ -143,10 +184,45 @@ def _no_store(response) -> None:
     response.headers["Pragma"] = "no-cache"
 
 
-def _json_no_store(payload: dict) -> JSONResponse:
-    resp = JSONResponse(payload)
+def _json_no_store(payload: dict, *, status_code: int = 200) -> JSONResponse:
+    resp = JSONResponse(payload, status_code=status_code)
     _no_store(resp)
     return resp
+
+
+def _usecase_store():
+    from redibis.pii.usecase_store import UseCaseStore
+
+    return UseCaseStore()
+
+
+def _usecase_http_error(exc: Exception) -> HTTPException:
+    from redibis.pii.usecase_store import UseCaseValidationError
+
+    if isinstance(exc, UseCaseValidationError):
+        return HTTPException(
+            status_code=422,
+            detail={"message": str(exc), "span_id": exc.span_id, "value": exc.value},
+        )
+    return HTTPException(status_code=400, detail=str(exc))
+
+
+def _dataset_from_usecase(uc, *, language: str = "") -> dict:
+    from redibis.pii.eval.span_metrics import DATASET_KIND, SCHEMA_VERSION_1_2
+
+    return {
+        "kind": DATASET_KIND,
+        "schema_version": SCHEMA_VERSION_1_2,
+        "id": uc.id,
+        "cases": [{
+            "id": uc.id,
+            "text": uc.text,
+            "language": language or uc.language or "ar",
+            "tags": list(uc.tags),
+            "expected_spans": [dict(s) for s in uc.expected_spans],
+            "forbidden_spans": [dict(s) for s in uc.forbidden_spans],
+        }],
+    }
 
 
 def _call(fn, *args, **kwargs):
@@ -250,6 +326,79 @@ def envelope(
     if d.get("provenance"):
         out["provenance"] = d["provenance"]
     return out
+
+
+def _llm_trace(
+    *,
+    run_id: str,
+    requested: bool,
+    result: Any,
+    include_transcripts: bool,
+) -> dict:
+    """Admin-facing LLM usage + transcripts for this Gateway run.
+
+    Explorers still learn whether a model ran (``used`` / ``call_count``) but
+    never receive prompt or response bodies.
+    """
+    from redibis.enrich.llm_logging import get_recent_llm_calls
+
+    d = result.to_dict(return_text=True) if result is not None and hasattr(result, "to_dict") else {}
+    engines = list(_pick(d, "engines_ran", default=[]) or [])
+    unavailable = dict(_pick(d, "engines_unavailable", default={}) or {})
+    rid = (run_id or "").strip()
+    calls = get_recent_llm_calls(
+        run_id=rid,
+        limit=200,
+        include_transcripts=include_transcripts,
+    ) if rid else []
+    pii_ran = "llm" in engines
+    skip = str(unavailable.get("llm") or "")
+    used = pii_ran or any((c.get("status") or "") == "ok" for c in calls)
+    if not requested and not calls and not pii_ran:
+        skip = skip or "not requested"
+    return {
+        "requested": bool(requested),
+        "used": bool(used),
+        "pii_refiner_ran": pii_ran,
+        "skip_reason": "" if used else skip,
+        "call_count": len(calls),
+        "run_id": rid,
+        "providers": sorted({str(c.get("provider") or "") for c in calls if c.get("provider")}),
+        "models": sorted({str(c.get("model_id") or "") for c in calls if c.get("model_id")}),
+        "calls": calls,
+    }
+
+
+@contextmanager
+def _gateway_llm_run():
+    from redibis.enrich.llm_logging import llm_call_context
+    from redibis.pii.eval.provenance import new_run_uuid
+
+    run_id = new_run_uuid()
+    with llm_call_context(run_id=run_id, model_role="gateway"):
+        yield run_id
+
+
+def _attach_llm_trace(
+    payload: dict,
+    *,
+    request: Request,
+    requested: bool,
+    result: Any,
+    run_id: str,
+) -> dict:
+    from redibis.webapp.pii_text_routes import role_may_see_full_provenance
+
+    include = role_may_see_full_provenance(request)
+    if not payload.get("run_uuid"):
+        payload["run_uuid"] = run_id
+    payload["llm"] = _llm_trace(
+        run_id=run_id or str(payload.get("run_uuid") or ""),
+        requested=requested,
+        result=result,
+        include_transcripts=include,
+    )
+    return payload
 
 
 def _guard_role_health(role: str, *, llm_enabled: bool) -> dict:
@@ -425,6 +574,7 @@ def _scan_kwargs(body: GatewayScanBody, max_chars: int) -> dict:
         "max_chars": max_chars,
         "llm_provider": body.llm_provider,
         "llm_model": body.llm_model,
+        "llm_api_key": (body.llm_api_key or "").strip(),
         "preprocess_obfuscation": preprocess,
         "preprocess_expanders": expanders,
     }
@@ -515,10 +665,11 @@ def _prepare_evaluation(body: GatewayEvaluationBody, actor: str) -> tuple[dict, 
                 None,
             )
             if metadata is not None and not provider_is_credential_ready(metadata):
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"LLM provider {body.llm_provider!r} is missing credentials",
-                )
+                if not (body.llm_api_key or "").strip():
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"LLM provider {body.llm_provider!r} is missing credentials",
+                    )
         else:
             readiness = _text_refiner_health(cfg, providers)
             if not readiness.get("ready"):
@@ -534,6 +685,7 @@ def _prepare_evaluation(body: GatewayEvaluationBody, actor: str) -> tuple[dict, 
         "use_llm": body.use_llm,
         "llm_provider": body.llm_provider,
         "llm_model": body.llm_model,
+        "llm_api_key": (body.llm_api_key or "").strip(),
         "max_chars": UI_MAX_CHARS,
         "overlap_iou": body.overlap_iou,
         "preprocess_obfuscation": bool(
@@ -648,6 +800,70 @@ def register_gateway_routes(
                 ui_max_chars=UI_MAX_CHARS,
                 eval_max_cases=EVAL_MAX_CASES,
                 redibis_version=REDIBIS_VERSION,
+            ),
+        )
+        _no_store(resp)
+        return resp
+
+    @app.get("/gateway/usecases", response_class=HTMLResponse)
+    async def gateway_usecase_list_page(request: Request):
+        resp = templates.TemplateResponse(
+            request=request,
+            name="gateway_usecase.html",
+            context=page_context_fn(
+                request,
+                js_v=asset_v_fn("gateway_usecase.js"),
+                css_v=asset_v_fn("gateway.css"),
+                ui_max_chars=UI_MAX_CHARS,
+                uc_id="",
+            ),
+        )
+        _no_store(resp)
+        return resp
+
+    @app.get("/gateway/usecases/{uc_id}", response_class=HTMLResponse)
+    async def gateway_usecase_page(request: Request, uc_id: str):
+        resp = templates.TemplateResponse(
+            request=request,
+            name="gateway_usecase.html",
+            context=page_context_fn(
+                request,
+                js_v=asset_v_fn("gateway_usecase.js"),
+                css_v=asset_v_fn("gateway.css"),
+                ui_max_chars=UI_MAX_CHARS,
+                uc_id=uc_id,
+            ),
+        )
+        _no_store(resp)
+        return resp
+
+    @app.get("/gateway/runs/{run_uuid}", response_class=HTMLResponse)
+    async def gateway_run_page(request: Request, run_uuid: str):
+        from redibis.pii.eval.registry import get_run
+        from redibis.pii.eval.report_html import render_report_body, report_css
+
+        report = get_run(run_uuid)
+        report_body = ""
+        usecase_id = ""
+        if report is not None:
+            try:
+                report_body = render_report_body(report)
+            except Exception as exc:
+                logger.warning("gateway run report render failed: %s", exc)
+            usecase_id = str((report.get("usecase") or {}).get("id") or "")
+        resp = templates.TemplateResponse(
+            request=request,
+            name="gateway_run.html",
+            context=page_context_fn(
+                request,
+                js_v=asset_v_fn("gateway_run.js"),
+                css_v=asset_v_fn("gateway.css"),
+                ui_max_chars=UI_MAX_CHARS,
+                run_uuid=run_uuid,
+                usecase_id=usecase_id,
+                report_css=report_css(),
+                report_body=report_body,
+                report_missing=report is None,
             ),
         )
         _no_store(resp)
@@ -836,6 +1052,191 @@ def register_gateway_routes(
         result["draft_rules"] = draft_rules_from_actions(body.actions)
         return _json_no_store(result)
 
+    @app.get("/api/gateway/usecases")
+    async def gateway_usecases_list(tag: str = "", limit: int = 100) -> Any:
+        store = _usecase_store()
+        return _json_no_store({"usecases": store.list(tag=tag, limit=limit)})
+
+    @app.post("/api/gateway/usecases")
+    async def gateway_usecases_create(request: Request, body: UseCaseCreateBody) -> Any:
+        from redibis.pii.usecase_store import usecase_from_payload
+
+        store = _usecase_store()
+        try:
+            draft, relocated = usecase_from_payload(
+                body.model_dump(),
+                author=_actor(request),
+            )
+            saved = store.save(draft)
+        except Exception as exc:
+            raise _usecase_http_error(exc) from exc
+        payload = saved.to_dict()
+        if relocated:
+            payload["relocated"] = relocated
+        return _json_no_store(payload, status_code=201)
+
+    @app.post("/api/gateway/usecases/import")
+    async def gateway_usecases_import(request: Request) -> Any:
+        from redibis.pii.usecase_store import usecase_from_payload
+
+        ctype = (request.headers.get("content-type") or "").lower()
+        try:
+            if "multipart/form-data" in ctype:
+                form = await request.form()
+                upload = form.get("file")
+                if upload is None:
+                    raise HTTPException(status_code=400, detail="file is required")
+                raw = await upload.read()
+                payload = json.loads(raw.decode("utf-8"))
+            else:
+                payload = await request.json()
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"invalid use-case asset: {exc}") from exc
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="use-case asset must be a JSON object")
+        store = _usecase_store()
+        existing = None
+        uc_id = str(payload.get("id") or "").strip()
+        if uc_id:
+            try:
+                existing = store.get(uc_id)
+            except Exception:
+                existing = None
+        try:
+            draft, relocated = usecase_from_payload(
+                payload, existing=existing, author=_actor(request)
+            )
+            saved = store.save(draft)
+        except Exception as exc:
+            raise _usecase_http_error(exc) from exc
+        out = saved.to_dict()
+        if relocated:
+            out["relocated"] = relocated
+        return _json_no_store(out, status_code=201 if existing is None else 200)
+
+    @app.get("/api/gateway/usecases/{uc_id}")
+    async def gateway_usecases_get(uc_id: str, version: Optional[int] = None) -> Any:
+        try:
+            uc = _usecase_store().get(uc_id, version=version)
+        except Exception as exc:
+            raise _usecase_http_error(exc) from exc
+        if uc is None:
+            raise HTTPException(status_code=404, detail="unknown use case")
+        return _json_no_store(uc.to_dict())
+
+    @app.put("/api/gateway/usecases/{uc_id}")
+    async def gateway_usecases_save(
+        request: Request, uc_id: str, body: UseCaseSaveBody
+    ) -> Any:
+        from redibis.pii.usecase_store import usecase_from_payload
+
+        store = _usecase_store()
+        try:
+            existing = store.get(uc_id)
+        except Exception as exc:
+            raise _usecase_http_error(exc) from exc
+        if existing is None:
+            raise HTTPException(status_code=404, detail="unknown use case")
+        incoming = existing.to_dict()
+        for key, value in body.model_dump(exclude_unset=True).items():
+            incoming[key] = value
+        incoming["id"] = uc_id
+        try:
+            draft, relocated = usecase_from_payload(
+                incoming, existing=existing, author=_actor(request)
+            )
+            saved = store.save(draft)
+        except Exception as exc:
+            raise _usecase_http_error(exc) from exc
+        payload = saved.to_dict()
+        if relocated:
+            payload["relocated"] = relocated
+        return _json_no_store(payload)
+
+    @app.delete("/api/gateway/usecases/{uc_id}")
+    async def gateway_usecases_delete(uc_id: str) -> Any:
+        try:
+            ok = _usecase_store().delete(uc_id)
+        except Exception as exc:
+            raise _usecase_http_error(exc) from exc
+        if not ok:
+            raise HTTPException(status_code=404, detail="unknown use case")
+        return _json_no_store({"deleted": True, "id": uc_id})
+
+    @app.get("/api/gateway/usecases/{uc_id}/download")
+    async def gateway_usecases_download(uc_id: str, version: Optional[int] = None) -> Any:
+        try:
+            uc = _usecase_store().get(uc_id, version=version)
+        except Exception as exc:
+            raise _usecase_http_error(exc) from exc
+        if uc is None:
+            raise HTTPException(status_code=404, detail="unknown use case")
+        body = json.dumps(uc.to_dict(), indent=2, ensure_ascii=False) + "\n"
+        resp = Response(content=body.encode("utf-8"), media_type="application/json")
+        resp.headers["Content-Disposition"] = (
+            f'attachment; filename="{uc.id}-v{uc.version}.json"'
+        )
+        _no_store(resp)
+        return resp
+
+    @app.post("/api/gateway/usecases/{uc_id}/run")
+    async def gateway_usecases_run(
+        request: Request, uc_id: str, body: UseCaseRunBody
+    ) -> Any:
+        from starlette.concurrency import run_in_threadpool
+
+        from redibis.pii.eval.registry import put_run
+
+        try:
+            uc = _usecase_store().get(uc_id)
+        except Exception as exc:
+            raise _usecase_http_error(exc) from exc
+        if uc is None:
+            raise HTTPException(status_code=404, detail="unknown use case")
+        language = body.language or uc.language or "ar"
+        dataset = _dataset_from_usecase(uc, language=language)
+        total_chars = len(uc.text or "")
+        if total_chars > UI_MAX_CHARS:
+            raise HTTPException(
+                status_code=413,
+                detail=f"use case exceeds {UI_MAX_CHARS} characters",
+            )
+        draft = body.draft_rules if body.draft_rules is not None else dict(uc.rule_edits or {})
+        options = {
+            "language": language,
+            "engines": body.engines,
+            "min_score": body.min_score,
+            "use_llm": body.use_llm,
+            "llm_provider": "",
+            "llm_model": "",
+            "llm_api_key": "",
+            "max_chars": UI_MAX_CHARS,
+            "overlap_iou": 0.5,
+            "preprocess_obfuscation": True,
+            "preprocess_expanders": [],
+            "normalization": "v1",
+            "tiers": "strict,value,overlap,type",
+            "label": f"usecase:{uc.id}@v{uc.version}",
+            "run_uuid": "",
+            "draft_rules": draft or None,
+            "pack": "",
+            "persist": bool(body.persist),
+        }
+        report = await run_in_threadpool(_run_evaluation, dataset, options)
+        report["usecase"] = {
+            "id": uc.id,
+            "version": uc.version,
+            "name": uc.name,
+            "context": body.context if body.context is not None else dict(uc.context or {}),
+        }
+        run_uuid = put_run(report)
+        return _json_no_store({
+            "run_uuid": run_uuid,
+            "report_url": f"/gateway/runs/{run_uuid}",
+        })
+
     @app.post("/api/gateway/scan")
     async def gateway_scan(
         request: Request,
@@ -851,14 +1252,22 @@ def register_gateway_routes(
         kwargs["include_provenance"] = (
             str(provenance).lower() == "full" and role_may_see_full_provenance(request)
         )
-        result = _call(_svc().scan, text, **kwargs)
-        guards = _run_guards(body, text, cfg)
+        with _gateway_llm_run() as run_id:
+            result = _call(_svc().scan, text, **kwargs)
+            guards = _run_guards(body, text, cfg)
         payload = envelope(
             result,
             truncated=truncated,
             original_char_count=original_n,
             guards=guards,
             redibis_config=cfg,
+        )
+        _attach_llm_trace(
+            payload,
+            request=request,
+            requested=bool(body.use_llm),
+            result=result,
+            run_id=run_id,
         )
         try:
             from redibis.webapp.pii_text_routes import _record_result
@@ -910,24 +1319,33 @@ def register_gateway_routes(
                 )
 
             def _do_scan():
-                return _svc().scan(
-                    text, progress_cb=_on_stage, **_scan_kwargs(body, UI_MAX_CHARS)
-                )
-
-            async def _run():
-                try:
-                    result = await run_in_threadpool(_do_scan)
+                with _gateway_llm_run() as run_id:
+                    result = _svc().scan(
+                        text, progress_cb=_on_stage, **_scan_kwargs(body, UI_MAX_CHARS)
+                    )
                     # Guards may call an external LLM (network I/O) when the
                     # matching text_gateway.*_llm_enabled flag is set — keep
                     # that off the event loop too, or the "streamed so it
                     # never blocks" endpoint blocks on exactly that call.
-                    guards = await run_in_threadpool(_run_guards, body, text, cfg)
+                    guards = _run_guards(body, text, cfg)
+                return result, guards, run_id
+
+            async def _run():
+                try:
+                    result, guards, run_id = await run_in_threadpool(_do_scan)
                     payload = envelope(
                         result,
                         truncated=truncated,
                         original_char_count=original_n,
                         guards=guards,
                         redibis_config=cfg,
+                    )
+                    _attach_llm_trace(
+                        payload,
+                        request=request,
+                        requested=bool(body.use_llm),
+                        result=result,
+                        run_id=run_id,
                     )
                     await queue.put({"event": "result", "envelope": payload})
                 except TextPIIServiceError as exc:
@@ -987,7 +1405,8 @@ def register_gateway_routes(
             check_toxicity=body.check_toxicity,
             check_prompt_injection=body.check_prompt_injection,
         )
-        guards = _run_guards(scan_body, clipped, cfg)
+        with _gateway_llm_run() as run_id:
+            guards = _run_guards(scan_body, clipped, cfg)
         from redibis.pii.text_guards import strongest_action
 
         action, reasons = strongest_action(guards, thresholds=_guard_thresholds(cfg))
@@ -999,7 +1418,15 @@ def register_gateway_routes(
             },
             "analysers": {name: g.to_dict() for name, g in guards.items()},
             "decision": {"action": action, "reasons": reasons},
+            "run_uuid": run_id,
         }
+        _attach_llm_trace(
+            payload,
+            request=request,
+            requested=False,
+            result=None,
+            run_id=run_id,
+        )
         logger.info(
             "gateway_guard actor=%s chars=%s checks=%s decision=%s",
             _actor(request),

@@ -185,11 +185,16 @@ def test_registry_save_rejects_api_key_in_api_base(client, tmp_path, monkeypatch
     assert "looks like an API key" in r.json()["detail"]
 
 
-def test_llm_providers_lists_default_provider(client):
+def test_llm_providers_lists_default_provider(client, monkeypatch):
+    # Isolate from operator configs/global_settings.json (not in the OSS extract).
+    monkeypatch.setattr(
+        "redibis.webapp.backend.load_global_settings",
+        lambda: {"llm_defaults": {"provider": "sglang"}},
+    )
     r = client.get("/api/llm-providers")
     assert r.status_code == 200
     body = r.json()
-    assert body.get("default_provider") == "gemini"
+    assert body.get("default_provider") == "sglang"
 
 
 def test_provider_test_non_enrichment_error_returns_ok_false(client, monkeypatch):
@@ -273,5 +278,7 @@ def test_llm_calls_endpoint_returns_recent(client):
 
     r = client.get("/api/llm/calls?limit=5")
     assert r.status_code == 200
-    calls = r.json()["calls"]
+    body = r.json()
+    calls = body["calls"]
     assert any(c["provider"] == "demo" for c in calls)
+    assert "transcripts" in body

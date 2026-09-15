@@ -25,7 +25,7 @@
 }
 .gw-check { font-size: 13px; }
 .gw-inline { font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
-.gw-inline select, .gw-inline input[type="text"] {
+.gw-inline select, .gw-inline input[type="text"], .gw-inline input[type="password"] {
   font: inherit; border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px;
   background: var(--card); color: var(--ink);
 }
@@ -142,6 +142,28 @@
 }
 .gw-result[dir="rtl"] { direction: rtl; text-align: right; }
 .gw-pol-row { display: grid; grid-template-columns: 1fr 120px; gap: 8px; margin: 6px 0; font-size: 13px; }
-.gw-pol-row select { font: inherit; border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px; }
+.gw-llm-call { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.gw-llm-call-head { font-size: 12px; font-weight: 700; margin-bottom: 6px; word-break: break-word; }
+.gw-llm-label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 8px 0 4px; }
+.gw-llm-pre {
+  margin: 0; padding: 8px 10px; max-height: 220px; overflow: auto;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: #f8fafc; font-size: 11px; line-height: 1.45;
+  white-space: pre-wrap; word-break: break-word;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+}
 .gw-pol-actions { display: flex; gap: 8px; margin: 0 0 8px; flex-wrap: wrap; }
+.gw-actions-bar {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin: 0 0 16px;
+}
+.gw-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.gw-field input, .gw-field select {
+  font: inherit; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px;
+  background: var(--card); color: var(--ink);
+}
+.gw-usecase-overlay { min-height: 180px; margin-top: 10px; unicode-bidi: isolate; }
+.gw-hl, .gw-pill { unicode-bidi: isolate; }
+.gw-report-host { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; }
+.gw-report-host .hl, .gw-report-host pre.text { unicode-bidi: isolate; }
 @media (max-width: 900px) { .gw-grid { grid-template-columns: 1fr; } }

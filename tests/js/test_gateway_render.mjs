@@ -30,6 +30,8 @@ function fakeDocument() {
       this.dataset = {};
       this.tabIndex = 0;
       this.hidden = false;
+      this.dir = "";
+      this.style = {};
     }
     get textContent() {
       if (this.childNodes.length) {
@@ -176,3 +178,4 @@ describe("safe DOM construction", () => {
     assert.equal(host.childNodes[0].childNodes[0].nodeType, 3);
   });
 });
+

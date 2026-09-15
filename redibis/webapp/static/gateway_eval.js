@@ -663,6 +663,7 @@ async function runEvaluation() {
       engines: $("evEngines").value,
       min_score: Number($("evMinScore").value || 0.35),
       use_llm: !!$("evUseLlm").checked,
+      llm_api_key: ($("evUseLlm").checked && $("evLlmKey") && $("evLlmKey").value.trim()) || "",
       overlap_iou: 0.5,
       normalization: "v1",
       tier: ["strict", "value", "overlap", "type"],
@@ -808,6 +809,10 @@ langEl.addEventListener("change", persistCurrentText);
 $("evAddSpan").addEventListener("click", classifySelection);
 $("evAddCase").addEventListener("click", addCase);
 runBtn.addEventListener("click", runEvaluation);
+$("evUseLlm").addEventListener("change", () => {
+  const wrap = $("evLlmKeyWrap");
+  if (wrap) wrap.hidden = !$("evUseLlm").checked;
+});
 $("evCancel").addEventListener("click", () => {
   if (evalAbort) evalAbort.abort();
 });

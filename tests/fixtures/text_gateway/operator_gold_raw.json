@@ -1,0 +1,94 @@
+[
+  {
+    "id": "case_24_new_mixed_arabic_english",
+    "raw_text": "Agent: Ahlan bi حضرتك، معك كريم من خدمة العملاء. أقدر أساعدك إزاي النهاردة؟\n(Welcome, you're with Karim from customer service. How can I help you today?)\nCustomer: ألو يا كريم، لو سمحت أنا عامل أوردر بقالي 3 أيام ولسه ماوصلش، وعايز أغير العنوان بتاعي ضروري.\n(Hello Karim, please I placed an order 3 days ago and it still hasn't arrived, and I need to change my address urgently.)\nAgent: ولا يهمك يا فندم، تحت أمرك. ممكن بس الأول الـ Full Name ورقم الموبايل المسجل على الأوردر؟\n(No worries sir, at your service. Could I first get the full name and the mobile number registered on the order?)\nCustomer: أنا اسمي شريف محمد عبد الحميد إبراهيم، ورقم الموبايل: زيرو - تلاتة - وحَد - خمسة - اتنين - تسعة - سبعة - أربعة - ستة - صفر - تمانية.\n(My name is Sherif Mohamed Abdel Hamid Ibrahim, and the mobile number: 03152974608.)\nAgent: تمام يا بشمهندس شريف، لقيت الأوردر. بالنسبة للعنوان الجديد، اتفضل أمليهولي بالتفصيل لو سمحت.\n(Got it engineer Sherif, I found the order. Regarding the new address, please go ahead and dictate it to me in detail.)\nCustomer: تمام، العنوان الجديد هو: مدينة نصر، شارع التسعين الشمالي، عمارة رقم خمستاشر (15)، الدور التالت، شقة رقم سبعة (7)، بجوار مول كايرو فيستيفال سيتي، القاهرة.\n(Okay, the new address is: Nasr City, North Teseen Street, Building number fifteen (15), Third floor, Apartment number seven (7), next to Cairo Festival City Mall, Cairo.)\nAgent: تمام يا فندم، العنوان تسجل معايا كامل. وبما إن في فرق سعر في الشحن، هل حابب تدفع بـ Credit Card دلوقتي؟\n(Alright sir, the address has been fully recorded. And since there's a shipping price difference, would you like to pay with a Credit Card right now?)\nCustomer: أيوة، تمام. الكارت بتاعي هو Mastercard، ورقم الكارت هو: خمسة - أربعة - اتنين - صفر - تلاتة - سبعة - تسعة - واحد - خمسة - أربعة - اتنين - صفر - تمانية - ستة - تسعة - تلاتة.\n(Yes, perfect. My card is a Mastercard, and the card number is: 5420379154208693.)\nAgent: تمام يا فندم، وتاريخ الإنتهاء (Expiry date) والـ CVV كام لو سمحت؟\n(Alright sir, and what is the expiry date and CVV please?)\nCustomer: تاريخ الإنتهاء شهر اتناشر (12) سنة سبعة وعشرين (27)، والـ CVV هو ثمانية - خمسة - اتنين (852).\n(The expiry date is month twelve (12) year twenty-seven (27), and the CVV is eight - five - two (852).)",
+    "expected_pii": [
+      {"value": "كريم", "type": "Agent Name", "start": 26, "end": 30},
+      {"value": "شريف محمد عبد الحميد إبراهيم", "type": "Full Name", "start": 546, "end": 574},
+      {"value": "زيرو - تلاتة - وحَد - خمسة - اتنين - تسعة - سبعة - أربعة - ستة - صفر - تمانية", "type": "Phone Number (Spoken)", "start": 593, "end": 671},
+      {"value": "03152974608", "type": "Phone Number (Digits)", "start": 725, "end": 736},
+      {"value": "مدينة نصر، شارع التسعين الشمالي، عمارة رقم خمستاشر (15)، الدور التالت، شقة رقم سبعة (7)، بجوار مول كايرو فيستيفال سيتي، القاهرة", "type": "Physical Address", "start": 914, "end": 1044},
+      {"value": "خمسة - أربعة - اتنين - صفر - تلاتة - سبعة - تسعة - واحد - خمسة - أربعة - اتنين - صفر - تمانية - ستة - تسعة - تلاتة", "type": "Credit Card Number (Spoken)", "start": 1493, "end": 1609},
+      {"value": "5420379154208693", "type": "Credit Card Number (Digits)", "start": 1667, "end": 1683},
+      {"value": "شهر اتناشر (12) سنة سبعة وعشرين (27)", "type": "Credit Card Expiry Date", "start": 1810, "end": 1846},
+      {"value": "ثمانية - خمسة - اتنين", "type": "CVV (Spoken)", "start": 1862, "end": 1883},
+      {"value": "852", "type": "CVV (Digits)", "start": 1885, "end": 1888}
+    ]
+  },
+  {
+    "id": "case_01_basic_english",
+    "raw_text": "Agent: Thank you for calling. Can I get your full name and phone number?\nCaller: Yes, it's David Smith. My MSISDN is +44 7911 123456.\nAgent: Great. I'll update your contact email to david.smith123@example.com.",
+    "expected_pii": [
+      {"value": "David Smith", "type": "Full Name", "start": 85, "end": 96},
+      {"value": "+44 7911 123456", "type": "Phone Number", "start": 112, "end": 127},
+      {"value": "david.smith123@example.com", "type": "Email Address", "start": 172, "end": 198}
+    ]
+  },
+  {
+    "id": "case_10_arabic_wallet_failure",
+    "raw_text": "خدمة العملاء: فودافون كاش معاك، إزاي أقدر أساعدك؟\nالعميل: يا فندم أنا عملت تحويل فلوس من محفظتي رقم زيرو مية، عشرين تلاتين، ربعمية وخمسين، لواحد صاحبي بس الفلوس مسمعتش عنده.\nخدمة العملاء: تمام، الرقم اللي حولتله كام؟\nالعميل: زيرو حداشر، اتنين اتنين، تلاتة تلاتة، أربعة خمسات.\nخدمة العملاء: جالك رسالة فيها كود تأكيد العملية (OTP)؟\nالعميل: أيوه الكود كان ستة، سبعة، زيرو، اتنين، واحد، تسعة. بس الرصيد اتخصم.",
+    "expected_pii": [
+      {"value": "زيرو مية، عشرين تلاتين، ربعمية وخمسين", "type": "Mobile Wallet Number (Spoken)", "start": 97, "end": 134},
+      {"value": "زيرو حداشر، اتنين اتنين، تلاتة تلاتة، أربعة خمسات", "type": "Mobile Wallet Number (Spoken)", "start": 230, "end": 280},
+      {"value": "ستة، سبعة، زيرو، اتنين، واحد، تسعة", "type": "OTP / Authentication Code", "start": 361, "end": 396}
+    ]
+  },
+  {
+    "id": "case_02_technical_troubleshoot",
+    "raw_text": "Agent: Let's check the warranty on your phone. Can you read me the 15-digit IMEI number?\nCaller: Sure, the IMEI is 358190102938475.\nAgent: Thank you. And this is for the line connected to 07700900112?",
+    "expected_pii": [
+      {"value": "358190102938475", "type": "IMEI", "start": 115, "end": 130},
+      {"value": "07700900112", "type": "Phone Number", "start": 190, "end": 201}
+    ]
+  },
+  {
+    "id": "case_16_mixed_script_wallet_transfer",
+    "raw_text": "Agent: خدمة المحافظ الإلكترونية، تحت أمرك.\nCaller: عملت transfer لـ amount كبير من محفظتي زيرو ميتين، تسعة تمانية سبعة، ستة خمسات، والـ transaction failed بس الرصيد اتخصم.\nAgent: ممكن رقم الـ National ID عشان نراجع الـ system logs الخاصة بالعملية دي؟\nCaller: اتنين تمانية خمسة، زيرو أربعة اتناشر، زيرو واحد، زيرو زيرو، تلاتة اتنين واحد أربعة.",
+    "expected_pii": [
+      {"value": "زيرو ميتين، تسعة تمانية سبعة، ستة خمسات", "type": "Mobile Wallet Number (Spoken)", "start": 91, "end": 131},
+      {"value": "اتنين تمانية خمسة، زيرو أربعة اتناشر، زيرو واحد، زيرو زيرو، تلاتة اتنين واحد أربعة", "type": "National ID (Spoken)", "start": 260, "end": 344}
+    ]
+  },
+  {
+    "id": "case_19_plan_migration",
+    "raw_text": "Agent: مساء الخير، معاك أحمد من قسم المبيعات، أقدر أساعدك إزاي؟\nCaller: مساء النور، كنت عايز أعمل migrate للخط بتاعي من باقة الكنترول للـ postpaid لو سمحت.\nAgent: تمام يا فندم، الخط اللي بنكلم عليه 01011223344؟\nCaller: أيوه بالظبط، واسمي مصطفى كمال محمود.\nAgent: تمام يا أستاذ مصطفى، هيتم رفع الـ request وهيوصلك رسالة بالتأكيد.",
+    "expected_pii": [
+      {"value": "أحمد", "type": "Agent Name", "start": 24, "end": 28},
+      {"value": "01011223344", "type": "Phone Number / MSISDN (Digits)", "start": 201, "end": 212},
+      {"value": "مصطفى كمال محمود", "type": "Full Name", "start": 241, "end": 257}
+    ]
+  },
+  {
+    "id": "case_20_router_delivery",
+    "raw_text": "Agent: بكلم حضرتك بخصوص الـ request الخاص بتغيير الـ router لـ VDSL.\nCaller: أيوه أنا طلبت router جديد، هو هيوصل إمتى؟\nAgent: هيوصل بكرا يا فندم، بس محتاجين نأكد الـ delivery address.\nCaller: العنوان 15 شارع المعادي الجديد، متفرع من شارع النصر، عمارة 4، شقة 12.\nAgent: تمام، هخلي المندوب يكلمك على رقم زيرو خمستاشر، اتنين اتنين، تلاتة أربعة خمسة، ستة سبعة تمانية.\nCaller: تمام شكراً.",
+    "expected_pii": [
+      {"value": "15 شارع المعادي الجديد، متفرع من شارع النصر، عمارة 4، شقة 12", "type": "Physical Address", "start": 203, "end": 263},
+      {"value": "زيرو خمستاشر، اتنين اتنين، تلاتة أربعة خمسة، ستة سبعة تمانية", "type": "Phone Number / MSISDN (Spoken Grouped)", "start": 306, "end": 365}
+    ]
+  },
+  {
+    "id": "case_21_scratch_card",
+    "raw_text": "Agent: الدعم الفني للكروت والشحن، تحت أمرك.\nCaller: جبت scratch card بـ 100 جنيه وبحاول أشحنه بيديني invalid code، مش عارف ليه.\nAgent: ولا يهمك يا فندم، مليني الـ 14 رقم اللي على الكارت لو سمحت.\nCaller: واحد اتنين تلاتة، أربعة خمسة ستة، سبعة تمانية تسعة، زيرو واحد، اتنين تلاتة أربعة.\nAgent: والرقم اللي بتشحنله 01233445566؟\nCaller: مظبوط.",
+    "expected_pii": [
+      {"value": "واحد اتنين تلاتة، أربعة خمسة ستة، سبعة تمانية تسعة، زيرو واحد، اتنين تلاتة أربعة", "type": "Recharge Voucher / Scratch Card PIN (Spoken)", "start": 208, "end": 289},
+      {"value": "01233445566", "type": "Phone Number / MSISDN (Digits)", "start": 318, "end": 329}
+    ]
+  },
+  {
+    "id": "case_22_puk_code",
+    "raw_text": "Agent: أهلاً بيك في خدمة العملاء، إزاي أساعدك؟\nCaller: التليفون بتاع ابني عمل lock وطالب الـ PUK code عشان دخل الباسورد غلط.\nAgent: تمام، لتأكيد البيانات، ممكن الـ National ID بتاع صاحب الخط؟\nCaller: اتنين تسعة زيرو، واحد واحد اتنين اتنين، زيرو واحد، زيرو اتنين، تلاتة أربعة خمسة.\nAgent: شكراً لحضرتك، الـ PUK code هو 12345678.",
+    "expected_pii": [
+      {"value": "اتنين تسعة زيرو، واحد واحد اتنين اتنين، زيرو واحد، زيرو اتنين، تلاتة أربعة خمسة", "type": "National ID (Spoken)", "start": 203, "end": 284},
+      {"value": "12345678", "type": "PUK Code (Digits)", "start": 323, "end": 331}
+    ]
+  },
+  {
+    "id": "case_23_ticket_follow_up",
+    "raw_text": "Agent: قسم المتابعة والشكاوى معاك.\nCaller: أنا بتابع الـ ticket رقم SR-45099، النت عندي بطيء جداً بقاله أسبوع.\nAgent: ثواني بفتح الـ profile... الخط مسجل باسم ياسمين طارق؟\nCaller: أيوه أنا.\nAgent: الـ technical team شغال عليها حالياً في السنترال، ممكن رقم contact تاني عشان نبلغك بالـ update؟\nCaller: كلموني على زيرو حداشر، خمسة خمسة، زيرو زيرو، اتنين تلاتة، واحد واحد.",
+    "expected_pii": [
+      {"value": "SR-45099", "type": "Support Ticket Number / Internal ID", "start": 69, "end": 77},
+      {"value": "ياسمين طارق", "type": "Full Name", "start": 162, "end": 173},
+      {"value": "زيرو حداشر، خمسة خمسة، زيرو زيرو، اتنين تلاتة، واحد واحد", "type": "Phone Number / MSISDN (Spoken Grouped)", "start": 316, "end": 372}
+    ]
+  }
+]

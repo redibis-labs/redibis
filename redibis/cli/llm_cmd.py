@@ -237,7 +237,7 @@ def _llm_add(args) -> int:
     api_base = getattr(args, "api_base", None) or preset.get("api_base") or ""
     model = getattr(args, "model", None) or ""
     if not model and preset:
-        model = "Qwen/Qwen2.5-14B-Instruct"
+        model = "Qwen/Qwen2.5-14B-Instruct-AWQ"
     profile_type = getattr(args, "profile_type", None) or "openai_compatible"
     if getattr(args, "raw", False):
         profile_type = "raw"

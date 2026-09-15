@@ -1,0 +1,122 @@
+kind: redibis.text_rules
+replace_defaults: true
+exclude_terms:
+  - agent
+  - caller
+  - migrate
+  - plan
+  - postpaid
+  - prepaid
+  - control
+  - router
+  - ticket
+  - request
+  - profile
+  - ok
+  - yes
+  - no
+exclude_patterns:
+  - '(?i)^agent:?$'
+  - '(?i)^caller:?$'
+patterns:
+  add:
+    arabic_name_after_label:
+      pattern: '(?:اسمي|واسمي|باسم|اسمها|اسمه|اسم المفوض|واسم المفوض)\s+([\u0621-\u064A]+(?:\s[\u0621-\u064A]+){1,4}?)(?=\s+و|\s+(?:من|في|يا|على|لو)\b|[.،,؟!?]|$)'
+      entity_type: PERSON
+      recognizer_group: free_text
+      script: arabic
+      presidio_score: 0.78
+      context_hints: [اسم, اسمي, باسم, اسمها]
+      unvalidated_reason: Arabic full name after an explicit name cue (اسمي / باسم / اسمها) is strong free-text evidence.
+    arabic_agent_name_after_maak:
+      pattern: '(?:معاك|معك)\s+([\u0621-\u064A]{2,20})(?=\s+من\b)'
+      entity_type: PERSON
+      recognizer_group: free_text
+      script: arabic
+      presidio_score: 0.78
+      context_hints: [معاك, معك]
+      unvalidated_reason: Agent given name after معاك/معك … من is strong call-center evidence.
+    latin_name_after_label:
+      pattern: '(?i)(?:it[''’]s|it is|i am|i[''’]m|name is)\s+([A-Z][a-z]+(?:[\s\-''][A-Z][a-z]+){1,4})'
+      entity_type: PERSON
+      recognizer_group: free_text
+      script: latin
+      presidio_score: 0.78
+      context_hints: [name]
+      unvalidated_reason: English full name after it's / name is is strong free-text evidence.
+    spoken_card_expiry:
+      pattern: 'شهر\s+[\u0621-\u064A]+(?:\s*\(\d{1,2}\))?(?:\s+سنة)?(?:\s+[\u0621-\u064A]+)+(?:\s*\(\d{2,4}\))?'
+      entity_type: CREDIT_CARD_EXPIRATION
+      recognizer_group: free_text
+      script: arabic
+      presidio_score: 0.82
+      context_hints: [انتهاء, expiry, شهر]
+      unvalidated_reason: Spoken month/year expiry after شهر is shape evidence in card-update transcripts.
+    arabic_health_condition:
+      pattern: 'حالة\s+ولادة\s+مستعجلة|ولادة\s+مستعجلة'
+      entity_type: GDPR_SPECIAL_CATEGORY
+      recognizer_group: free_text
+      script: arabic
+      presidio_score: 0.82
+      context_hints: [صحة, ولادة, إسعاف]
+      unvalidated_reason: An explicit emergency health phrase naming a medical condition is special-category evidence.
+    arabic_company_name:
+      pattern: 'شركة\s+[\u0621-\u064A]+(?:\s[\u0621-\u064A]+){1,8}'
+      entity_type: ORGANIZATION
+      recognizer_group: free_text
+      script: arabic
+      presidio_score: 0.8
+      context_hints: [شركة, حساب]
+      unvalidated_reason: Egyptian company name after شركة is strong organization evidence in B2B transcripts.
+    arabic_landmark_after_quddam:
+      pattern: 'قدام\s+[\u0621-\u064A]+(?:\s[\u0621-\u064A]+){0,3}'
+      entity_type: LOCATION
+      recognizer_group: free_text
+      script: arabic
+      presidio_score: 0.8
+      context_hints: [عنوان, لوكيشن]
+      unvalidated_reason: Landmark after قدام is a physical location in emergency geolocation transcripts.
+    arabic_desert_road_km:
+      pattern: 'طريق\s+[\u0621-\u064A]+(?:\s[\u0621-\u064A]+){1,5}\s+الكيلو\s+[\u0621-\u064A]+(?:\s+و[\u0621-\u064A]+)?'
+      entity_type: LOCATION
+      recognizer_group: free_text
+      script: arabic
+      presidio_score: 0.82
+      context_hints: [طريق, لوكيشن]
+      unvalidated_reason: Named road plus kilometre marker is a physical location.
+  remove: []
+  replace_all: false
+context_cues:
+  LOCATION:
+    triggers: [العنوان, عنوان, delivery address, shipping address, اللوكيشن, لوكيشن]
+    extend: sentence
+  PHONE_NUMBER:
+    triggers: [الخط, رقم, موبايل, تليفون, تواصل, contact, msisdn, phone, mobile, الموبايل]
+  EG_NATIONAL_ID:
+    triggers: [رقم قومي, الرقم القومي, National ID, قومي, nid]
+  SIM_PUK:
+    triggers: [puk, puk code, رمز puk, الـ puk, باك]
+  VOUCHER:
+    triggers: [scratch card, scratch, كارت شحن, كود الشحن, 14 رقم]
+  SUPPORT_TICKET:
+    triggers: [ticket, تذكرة, SR-]
+quantity_units:
+  - GB
+  - TB
+  - MB
+  - KB
+  - جنيه
+  - جنية
+  - EGP
+  - LE
+  - أيام
+  - يوم
+  - أسبوع
+  - اسابيع
+  - week
+  - weeks
+  - شهر
+  - months
+  - days
+  - minutes
+  - دقيقة

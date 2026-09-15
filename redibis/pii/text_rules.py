@@ -167,7 +167,7 @@ class TextRuleOverlay:
 
 
 def default_text_rules() -> TextRuleOverlay:
-    """Shipped defaults that cover Egyptian call-center cases 19–23."""
+    """Shipped defaults that cover Egyptian call-center operator goldens."""
     return TextRuleOverlay.from_dict({
         "exclude_terms": [
             "agent", "caller", "migrate", "plan", "postpaid", "prepaid",
@@ -182,17 +182,116 @@ def default_text_rules() -> TextRuleOverlay:
             "add": {
                 "arabic_name_after_label": {
                     "pattern": (
-                        r"(?:اسمي|واسمي|باسم)\s+"
-                        r"([\u0621-\u064A]+(?:\s[\u0621-\u064A]+){1,3})"
+                        r"(?:اسمي|واسمي|باسم|اسمها|اسمه|اسم المفوض|واسم المفوض)\s+"
+                        r"([\u0621-\u064A]+(?:\s[\u0621-\u064A]+){1,4}?)"
+                        r"(?=\s+و|\s+(?:من|في|يا|على|لو)\b|[.،,؟!?]|$)"
                     ),
                     "entity_type": "PERSON",
                     "recognizer_group": "free_text",
                     "script": "arabic",
                     "presidio_score": 0.78,
-                    "context_hints": ("اسم", "اسمي", "باسم"),
+                    "context_hints": ("اسم", "اسمي", "باسم", "اسمها"),
                     "unvalidated_reason": (
                         "Arabic full name after an explicit name cue "
-                        "(اسمي / باسم) is strong free-text evidence."
+                        "(اسمي / باسم / اسمها) is strong free-text evidence."
+                    ),
+                },
+                "arabic_agent_name_after_maak": {
+                    "pattern": r"(?:معاك|معك)\s+([\u0621-\u064A]{2,20})(?=\s+من\b)",
+                    "entity_type": "PERSON",
+                    "recognizer_group": "free_text",
+                    "script": "arabic",
+                    "presidio_score": 0.78,
+                    "context_hints": ("معاك", "معك"),
+                    "unvalidated_reason": (
+                        "Agent given name after معاك/معك … من is strong "
+                        "call-center evidence."
+                    ),
+                },
+                "latin_name_after_label": {
+                    "pattern": (
+                        r"(?i)(?:it['’]s|it is|i am|i['’]m|name is)\s+"
+                        r"([A-Z][a-z]+(?:[\s\-'][A-Z][a-z]+){1,4})"
+                    ),
+                    "entity_type": "PERSON",
+                    "recognizer_group": "free_text",
+                    "script": "latin",
+                    "presidio_score": 0.78,
+                    "context_hints": ("name",),
+                    "unvalidated_reason": (
+                        "English full name after it's / name is is strong "
+                        "free-text evidence."
+                    ),
+                },
+                "spoken_card_expiry": {
+                    "pattern": (
+                        r"شهر\s+[\u0621-\u064A]+"
+                        r"(?:\s*\(\d{1,2}\))?"
+                        r"(?:\s+سنة)?"
+                        r"(?:\s+[\u0621-\u064A]+)+"
+                        r"(?:\s*\(\d{2,4}\))?"
+                    ),
+                    "entity_type": "CREDIT_CARD_EXPIRATION",
+                    "recognizer_group": "free_text",
+                    "script": "arabic",
+                    "presidio_score": 0.82,
+                    "context_hints": ("انتهاء", "expiry", "شهر"),
+                    "unvalidated_reason": (
+                        "Spoken month/year expiry after شهر is shape evidence "
+                        "in card-update transcripts."
+                    ),
+                },
+                "arabic_health_condition": {
+                    "pattern": r"حالة\s+ولادة\s+مستعجلة|ولادة\s+مستعجلة",
+                    "entity_type": "GDPR_SPECIAL_CATEGORY",
+                    "recognizer_group": "free_text",
+                    "script": "arabic",
+                    "presidio_score": 0.82,
+                    "context_hints": ("صحة", "ولادة", "إسعاف"),
+                    "unvalidated_reason": (
+                        "An explicit emergency health phrase naming a medical "
+                        "condition is special-category evidence."
+                    ),
+                },
+                "arabic_company_name": {
+                    "pattern": (
+                        r"شركة\s+[\u0621-\u064A]+(?:\s[\u0621-\u064A]+){1,8}"
+                    ),
+                    "entity_type": "ORGANIZATION",
+                    "recognizer_group": "free_text",
+                    "script": "arabic",
+                    "presidio_score": 0.8,
+                    "context_hints": ("شركة", "حساب"),
+                    "unvalidated_reason": (
+                        "Egyptian company name after شركة is strong "
+                        "organization evidence in B2B transcripts."
+                    ),
+                },
+                "arabic_landmark_after_quddam": {
+                    "pattern": r"قدام\s+[\u0621-\u064A]+(?:\s[\u0621-\u064A]+){0,3}",
+                    "entity_type": "LOCATION",
+                    "recognizer_group": "free_text",
+                    "script": "arabic",
+                    "presidio_score": 0.8,
+                    "context_hints": ("عنوان", "لوكيشن"),
+                    "unvalidated_reason": (
+                        "Landmark after قدام is a physical location in "
+                        "emergency geolocation transcripts."
+                    ),
+                },
+                "arabic_desert_road_km": {
+                    "pattern": (
+                        r"طريق\s+[\u0621-\u064A]+(?:\s[\u0621-\u064A]+){1,5}"
+                        r"\s+الكيلو\s+[\u0621-\u064A]+(?:\s+و[\u0621-\u064A]+)?"
+                    ),
+                    "entity_type": "LOCATION",
+                    "recognizer_group": "free_text",
+                    "script": "arabic",
+                    "presidio_score": 0.82,
+                    "context_hints": ("طريق", "لوكيشن"),
+                    "unvalidated_reason": (
+                        "Named road plus kilometre marker is a physical "
+                        "location."
                     ),
                 },
             },
@@ -203,13 +302,14 @@ def default_text_rules() -> TextRuleOverlay:
             "LOCATION": {
                 "triggers": [
                     "العنوان", "عنوان", "delivery address", "shipping address",
+                    "اللوكيشن", "لوكيشن",
                 ],
                 "extend": "sentence",
             },
             "PHONE_NUMBER": {
                 "triggers": [
                     "الخط", "رقم", "موبايل", "تليفون", "تواصل", "contact",
-                    "msisdn", "phone", "mobile",
+                    "msisdn", "phone", "mobile", "الموبايل",
                 ],
             },
             "EG_NATIONAL_ID": {
@@ -218,7 +318,7 @@ def default_text_rules() -> TextRuleOverlay:
                 ],
             },
             "SIM_PUK": {
-                "triggers": ["puk", "puk code", "رمز puk", "الـ puk"],
+                "triggers": ["puk", "puk code", "رمز puk", "الـ puk", "باك"],
             },
             "VOUCHER": {
                 "triggers": [

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="referrer" content="same-origin"/>
+  <title>Redibis — Evaluation run</title>
+  <link rel="stylesheet" href="/static/app.css?v={{ css_v }}"/>
+  <link rel="stylesheet" href="/static/gateway.css?v={{ css_v }}"/>
+  <link rel="icon" type="image/png" href="/static/logo.png"/>
+  <style>{{ report_css|safe }}</style>
+</head>
+<body class="gateway-page gw-run-page">
+  <nav class="nav">
+    <a class="nav-left" href="/" aria-label="Open scan console">
+      <img src="/static/logo.png" alt="R" class="nav-logo-img" onerror="this.style.display='none'"/>
+      <div class="nav-brand">Redibis</div>
+      <div class="nav-tagline">evaluation run</div>
+    </a>
+    <div class="nav-right">
+      <a class="nav-link" href="/gateway">◈ Gateway</a>
+      <a class="nav-link" href="/gateway/evaluations">◈ Evaluations</a>
+      <a class="nav-link" href="/gateway/usecases">◈ Use cases</a>
+      {% include "_user_menu.html" %}
+    </div>
+  </nav>
+
+  <div class="page gw">
+    <div class="gw-actions-bar">
+      <a id="ucBack" class="btn btn-ghost" href="/gateway/usecases{% if usecase_id %}/{{ usecase_id }}{% endif %}">Back to use case</a>
+      <button id="ucRerun" type="button" class="btn" {% if not usecase_id %}hidden{% endif %}>Re-run with these edits</button>
+    </div>
+    {% if report_missing %}
+    <p class="gw-hint">Unknown evaluation run.</p>
+    {% else %}
+    <div id="ucReport" class="gw-report-host">{{ report_body|safe }}</div>
+    {% endif %}
+  </div>
+
+  <script>
+    window.GW_RUN_UUID = {{ (run_uuid or "")|tojson }};
+    window.GW_USECASE_ID = {{ (usecase_id or "")|tojson }};
+  </script>
+  <script src="/static/auth.js"></script>
+  <script type="module" src="/static/gateway_run.js?v={{ js_v }}"></script>
+</body>
+</html>

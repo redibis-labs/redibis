@@ -23,6 +23,7 @@
       <a class="nav-link" href="/reports">◈ Reports</a>
       <a class="nav-link" href="/gateway">◈ Gateway</a>
       <a class="nav-link" href="/gateway/evaluations">◈ Evaluations</a>
+      <a class="nav-link" href="/gateway/usecases">◈ Use cases</a>
       <a class="nav-link" href="/docs" target="_blank">◉ API Docs</a>
       {% if user and user.role == 'admin' %}
       <a class="nav-link" href="/users">👤 Users</a>
@@ -101,6 +102,9 @@
           </label>
           <label class="gw-check">
             <input id="evUseLlm" type="checkbox"/> Use LLM refiner
+          </label>
+          <label id="evLlmKeyWrap" class="gw-inline" hidden title="Session-only. Not stored.">API key
+            <input id="evLlmKey" type="password" autocomplete="off" placeholder="optional" size="18"/>
           </label>
           <button id="evRun" type="button" class="btn">Run evaluation</button>
         </div>

@@ -74,8 +74,8 @@ var cfg = {
   quality_config_name: null,
   // LLM
   llm_enabled: false,
-  llm_provider: "gemini",
-  llm_model: "gemini-3.5-flash",
+  llm_provider: "sglang",
+  llm_model: "Qwen/Qwen2.5-14B-Instruct-AWQ",
   llm_api_key: "",
   llm_endpoint_url: null,
   agentic_planner_provider: "",
@@ -472,7 +472,9 @@ function ensureLlmRefinerDefaults(){
     if(mapped&&names.indexOf(mapped)>=0) cfg.llm_provider=mapped;
   }
   if(!cfg.llm_provider||names.indexOf(cfg.llm_provider)<0){
-    cfg.llm_provider=names.indexOf("gemini")>=0?"gemini":names[0];
+    cfg.llm_provider=names.indexOf("sglang")>=0?"sglang":
+      (names.indexOf("vllm")>=0?"vllm":
+      (names.indexOf("gemini")>=0?"gemini":names[0]));
   }
   if(cfg.llm_endpoint_url&&validateLlmApiBase(cfg.llm_endpoint_url,cfg.llm_provider)){
     cfg.llm_endpoint_url=null;
@@ -553,12 +555,23 @@ async function loadLlmCalls(force){
   if(S.llmCallsFetched&&!force) return;
   S.llmCallsLoading=true;
   try{
-    var d=await GET("/api/llm/calls?limit=50");
+    var d=await GET("/api/llm/calls?limit=200");
     S.llmCalls=d.calls||[];
+    S.llmCallsTranscripts=!!d.transcripts;
     S.llmCallsFetched=true;
     render();
   }catch(e){addLog("LLM calls load failed: "+e.message,"err")}
   finally{S.llmCallsLoading=false}
+}
+function toggleLlmCallRow(i){
+  S.llmCallOpen=S.llmCallOpen===i?null:i;
+  render();
+}
+function downloadLlmCallsJson(runId){
+  var rid=runId||"";
+  var calls=(S.llmCalls||[]).filter(function(c){return !rid||c.run_id===rid});
+  var name=rid?"llm-calls-"+String(rid).substring(0,12)+".json":"llm-calls-recent.json";
+  downloadTextFile(name,JSON.stringify({run_id:rid,call_count:calls.length,calls:calls},null,2),"application/json");
 }
 async function testLlmProvider(name){
   var key="llmTest_"+name;
@@ -796,31 +809,49 @@ function vDebugPage(){
 
 function vLlmDebugPanel(){
   var calls=S.llmCalls||[];
+  var open=S.llmCallOpen;
   var rows=calls.length===0?
-    "<div style='color:var(--muted);font-style:italic;padding:.5rem'>No LLM calls recorded yet. Run enrichment or test a provider in Settings → LLM.</div>":
+    "<div style='color:var(--muted);font-style:italic;padding:.5rem'>No LLM calls recorded yet. Run a Gateway scan with Use LLM refiner, enrichment, or test a provider in Settings → LLM.</div>":
     "<div style='overflow-x:auto'><table class='dbg-tbl' style='font-size:.72rem'><thead><tr>"+
-      "<th>Time</th><th>Provider</th><th>Model</th><th>Status</th><th>Latency</th><th>Tokens</th><th>Cost</th><th>Error</th>"+
+      "<th>Time</th><th>Used</th><th>Provider</th><th>Model</th><th>Role</th><th>Status</th><th>Latency</th><th>Tokens</th><th></th>"+
     "</tr></thead><tbody>"+
-    calls.map(function(c){
+    calls.map(function(c,i){
       var sc=c.status==="ok"?"ch-grn":"ch-red";
-      return "<tr>"+
+      var used=c.status==="ok"?"yes":"no";
+      var detail="";
+      if(open===i){
+        detail="<tr><td colspan='9' style='background:#f8fafc'>"+
+          "<div style='font-size:.68rem;color:var(--muted);margin-bottom:6px'>run "+E(c.run_id||"—")+" · hash "+E(c.prompt_hash||"—")+"</div>"+
+          (c.system_prompt?"<div class='stitle' style='margin:8px 0 4px'>system prompt</div><pre style='white-space:pre-wrap;word-break:break-word;font-size:.7rem;max-height:180px;overflow:auto;margin:0;padding:8px;background:#fff;border:1px solid var(--border);border-radius:6px'>"+E(c.system_prompt)+"</pre>":"")+
+          (c.user_prompt?"<div class='stitle' style='margin:8px 0 4px'>user prompt</div><pre style='white-space:pre-wrap;word-break:break-word;font-size:.7rem;max-height:220px;overflow:auto;margin:0;padding:8px;background:#fff;border:1px solid var(--border);border-radius:6px'>"+E(c.user_prompt)+"</pre>":"")+
+          (c.response?"<div class='stitle' style='margin:8px 0 4px'>response</div><pre style='white-space:pre-wrap;word-break:break-word;font-size:.7rem;max-height:220px;overflow:auto;margin:0;padding:8px;background:#fff;border:1px solid var(--border);border-radius:6px'>"+E(c.response)+"</pre>":"")+
+          (c.error?"<div style='margin-top:8px;color:#991b1b;font-size:.72rem'>"+E(c.error)+"</div>":"")+
+          (!c.system_prompt&&!c.user_prompt&&!c.response?"<div style='color:var(--muted);font-size:.75rem'>No transcript on this record (explorer role, or the call predates transcript capture).</div>":"")+
+          (c.run_id?"<div style='margin-top:8px'><button class='btn btn-dim btn-sm' onclick='downloadLlmCallsJson(\""+E(c.run_id)+"\")'>download this run</button></div>":"")+
+        "</td></tr>";
+      }
+      return "<tr style='cursor:pointer' onclick='toggleLlmCallRow("+i+")'>"+
         "<td class='mono' style='font-size:.65rem'>"+E((c.timestamp||"").substring(11,19))+"</td>"+
+        "<td><span class='chip "+(used==="yes"?"ch-grn":"ch-red")+"'>"+used+"</span></td>"+
         "<td class='mono'>"+E(c.provider)+"</td>"+
-        "<td class='mono' style='max-width:140px;word-break:break-all'>"+E(c.model_id)+"</td>"+
+        "<td class='mono' style='max-width:160px;word-break:break-all'>"+E(c.model_id)+"</td>"+
+        "<td class='mono' style='font-size:.65rem'>"+E(c.model_role||"—")+"</td>"+
         "<td><span class='chip "+sc+"'>"+E(c.status)+"</span></td>"+
         "<td class='mono'>"+Math.round(c.latency_ms||0)+"ms</td>"+
         "<td class='mono'>"+(c.prompt_tokens||0)+"/"+(c.completion_tokens||0)+"</td>"+
-        "<td class='mono'>"+(c.cost_usd!=null?Number(c.cost_usd).toFixed(4):"—")+"</td>"+
-        "<td style='font-size:.65rem;color:var(--muted);max-width:200px;word-break:break-word'>"+E(c.error||"—")+"</td>"+
-      "</tr>";
+        "<td style='font-size:.65rem;color:var(--muted)'>"+(open===i?"hide":"prompt")+"</td>"+
+      "</tr>"+detail;
     }).join("")+
     "</tbody></table></div>";
   return "<div class='cbox' style='margin-bottom:0'>"+
-    "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px'>"+
+    "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px'>"+
       "<div class='stitle' style='margin:0'>LLM Debug ("+calls.length+")</div>"+
-      "<button class='btn btn-dim btn-sm'"+(S.llmCallsLoading?" disabled":"")+" onclick='loadLlmCalls(true)'>↺ refresh</button>"+
+      "<div style='display:flex;gap:8px'>"+
+        "<button class='btn btn-dim btn-sm' "+(calls.length?"":"disabled ")+"onclick='downloadLlmCallsJson()'>⬇ download all</button>"+
+        "<button class='btn btn-dim btn-sm'"+(S.llmCallsLoading?" disabled":"")+" onclick='loadLlmCalls(true)'>↺ refresh</button>"+
+      "</div>"+
     "</div>"+
-    "<div style='font-size:.75rem;color:var(--muted);margin-bottom:8px'>Recent LiteLLM calls — provider, model, latency, tokens, cost, and redacted errors.</div>"+
+    "<div style='font-size:.75rem;color:var(--muted);margin-bottom:8px'>Every model call in this process — whether it ran, the prompt that was sent, and the response. Click a row to expand. Admin only for transcripts.</div>"+
     rows+
   "</div>";
 }
@@ -5579,11 +5610,53 @@ async function applySettingsLlm(){
 }
 
 var GATEWAY_MODEL_ROLES=["pii.text_refiner","gateway.toxicity","gateway.prompt_injection"];
+var GATEWAY_SGLANG_DEFAULT_MODEL="Qwen/Qwen2.5-14B-Instruct-AWQ";
 var GATEWAY_PROVIDER_HINTS={
-  sglang:{label:"GPU (SGLang)",endpoint:"http://localhost:30000/v1"},
-  vllm:{label:"GPU (vLLM)",endpoint:"http://localhost:8001/v1"},
-  ollama:{label:"CPU/GPU (Ollama)",endpoint:"http://localhost:11434"},
+  sglang:{label:"GPU (SGLang)",endpoint:"http://localhost:30000/v1",model:"Qwen/Qwen2.5-14B-Instruct-AWQ",api_key_env:"SGLANG_API_KEY"},
+  vllm:{label:"GPU (vLLM)",endpoint:"http://localhost:8001/v1",model:"Qwen/Qwen2.5-7B-Instruct",api_key_env:"VLLM_API_KEY"},
+  ollama:{label:"CPU/GPU (Ollama)",endpoint:"http://localhost:11434",model:"llama3.3",api_key_env:""},
+  gemini:{label:"cloud (Gemini)",endpoint:"",model:"gemini-3.5-flash",api_key_env:"GEMINI_API_KEY"},
+  openai:{label:"cloud (OpenAI)",endpoint:"",model:"gpt-4.1",api_key_env:"OPENAI_API_KEY"},
+  claude:{label:"cloud (Claude)",endpoint:"",model:"claude-sonnet-5",api_key_env:"ANTHROPIC_API_KEY"},
+  openrouter:{label:"cloud (OpenRouter)",endpoint:"",model:"openai/gpt-4o-mini",api_key_env:"OPENROUTER_API_KEY"},
 };
+
+function gatewayProviderMeta(name){
+  var hint=GATEWAY_PROVIDER_HINTS[name]||{};
+  var p=(llmRefinerProviderList()||[]).find(function(x){return x.name===name;})||{};
+  var models=(p.known_models||[]).slice();
+  var def=p.default_model_bare||hint.model||"";
+  if(name==="sglang"&&!def) def=GATEWAY_SGLANG_DEFAULT_MODEL;
+  if(def&&models.indexOf(def)<0) models.unshift(def);
+  return {
+    label:hint.label||(p.cloud?"cloud":"local"),
+    endpoint:p.api_base||hint.endpoint||"",
+    model:def,
+    models:models,
+    api_key_env:p.api_key_env||hint.api_key_env||"",
+    api_key_env_set:!!p.api_key_env_set,
+    api_key_saved:!!p.api_key_saved,
+    needs_key:!!p.needs_key,
+    cloud:!!p.cloud
+  };
+}
+
+function gatewayApiKeyHintHtml(meta){
+  var env=meta.api_key_env||"";
+  var bits=[];
+  if(env){
+    bits.push("Env var <span class='mono'>"+E(env)+"</span>: "+
+      (meta.api_key_env_set
+        ?"<span class='chip ch-grn'>set</span> — used if the key field is empty"
+        :"<span class='chip ch-amb'>not set</span> — paste a key above or <span class='mono'>export "+E(env)+"=your-key</span>"));
+  }else{
+    bits.push("Optional for every provider. Local SGLang/vLLM can use a dummy key (e.g. <span class='mono'>sk-local</span>); cloud providers need a real key or env var.");
+  }
+  if(meta.api_key_saved){
+    bits.push("A saved provider key is already stored and will be reused unless you paste a new override.");
+  }
+  return "<div style='font-size:.68rem;margin-top:4px'>"+bits.join("<br/>")+"</div>";
+}
 
 function vSettingsGatewayModelsTab(){
   ensureLlmRefinerDefaults();
@@ -5603,12 +5676,11 @@ function vSettingsGatewayModelsTab(){
   var cards=GATEWAY_MODEL_ROLES.map(function(role){
     var b=roles[role]||{};
     var curProv=b.provider||"";
-    var curModel=b.model||"";
+    var meta=gatewayProviderMeta(curProv);
+    var curModel=b.model||(curProv?meta.model:"");
     var enabled=b.enabled!==false;
-    var hint=GATEWAY_PROVIDER_HINTS[curProv]||{label:"local",endpoint:""};
-    var active=provs.find(function(p){return p.name===curProv;})||{};
-    var endpoint=(active.api_base||hint.endpoint||"");
-    var models=(active.known_models||[]).slice();
+    var endpoint=meta.endpoint||"";
+    var models=meta.models||[];
     var idSafe=role.replace(/\./g,"_");
     var opts=["<option value=''"+(!curProv?" selected":"")+">(unset / inherit)</option>"].concat(provs.map(function(p){
       var tag=(GATEWAY_PROVIDER_HINTS[p.name]&&GATEWAY_PROVIDER_HINTS[p.name].label)||(p.cloud?"cloud":"local");
@@ -5622,18 +5694,27 @@ function vSettingsGatewayModelsTab(){
       "<div style='margin-bottom:10px'>"+
         "<div style='font-size:.68rem;text-transform:uppercase;color:var(--muted);letter-spacing:.06em;margin-bottom:4px'>Provider</div>"+
         "<select id='gw_role_prov_"+idSafe+"' class='input mono' onchange='onGatewayModelProviderChange(\""+E(role)+"\")'>"+opts+"</select>"+
-        "<div style='font-size:.68rem;color:var(--muted);margin-top:4px'>Runtime: <span class='mono'>"+E(hint.label)+"</span></div>"+
+        "<div style='font-size:.68rem;color:var(--muted);margin-top:4px'>Runtime: <span class='mono'>"+E(meta.label)+"</span></div>"+
       "</div>"+
       "<div style='margin-bottom:10px'>"+
         "<div style='font-size:.68rem;text-transform:uppercase;color:var(--muted);letter-spacing:.06em;margin-bottom:4px'>Model</div>"+
-        "<input id='gw_role_model_"+idSafe+"' class='input mono' list='gw_role_model_list_"+idSafe+"' value='"+E(curModel)+"' placeholder='model id'/>"+
+        "<input id='gw_role_model_"+idSafe+"' class='input mono' list='gw_role_model_list_"+idSafe+"' value='"+E(curModel)+"' placeholder='"+E(meta.model||"model id")+"'/>"+
         "<datalist id='gw_role_model_list_"+idSafe+"'>"+
           models.map(function(m){return "<option value='"+E(m)+"'/>";}).join("")+
         "</datalist>"+
       "</div>"+
       "<div style='margin-bottom:10px'>"+
         "<div style='font-size:.68rem;text-transform:uppercase;color:var(--muted);letter-spacing:.06em;margin-bottom:4px'>Endpoint / api_base</div>"+
-        "<input id='gw_role_endpoint_"+idSafe+"' class='input mono' value='"+E(endpoint)+"' placeholder='"+E(hint.endpoint||"http://localhost:…")+"'/>"+
+        "<input id='gw_role_endpoint_"+idSafe+"' class='input mono' value='"+E(endpoint)+"' placeholder='"+E(meta.endpoint||"http://localhost:…")+"'/>"+
+      "</div>"+
+      "<div style='margin-bottom:10px'>"+
+        "<div style='font-size:.68rem;text-transform:uppercase;color:var(--muted);letter-spacing:.06em;margin-bottom:4px'>API key env var</div>"+
+        "<input id='gw_role_keyenv_"+idSafe+"' class='input mono' value='"+E(meta.api_key_env)+"' placeholder='SGLANG_API_KEY / GEMINI_API_KEY / …'/>"+
+      "</div>"+
+      "<div style='margin-bottom:10px'>"+
+        "<div style='font-size:.68rem;text-transform:uppercase;color:var(--muted);letter-spacing:.06em;margin-bottom:4px'>API key (all providers)</div>"+
+        "<input id='gw_role_key_"+idSafe+"' class='input' type='password' value='' autocomplete='off' placeholder='optional override — used for Test; not written to disk'/>"+
+        gatewayApiKeyHintHtml(meta)+
       "</div>"+
       "<div class='row' style='gap:8px;flex-wrap:wrap'>"+
         "<button class='btn btn-sm btn-ghost' onclick='testGatewayModelRole(\""+E(role)+"\")'>Test connection</button>"+
@@ -5645,6 +5726,8 @@ function vSettingsGatewayModelsTab(){
     "<div class='stitle mb10'>Text Gateway Models</div>"+
     "<div style='font-size:.82rem;color:var(--muted);margin-bottom:14px'>"+
       "Bind the free-text refiner and optional safety judges. Local GPU defaults are SGLang / vLLM; Ollama works on CPU. "+
+      "SGLang defaults to <span class='mono'>"+E(GATEWAY_SGLANG_DEFAULT_MODEL)+"</span>. "+
+      "Every provider has an API key field — paste a session override for Test, or set the env-var name to persist. Keys are never written to disk. "+
       "Changes apply to new Gateway scans; the Gateway page refreshes health when it regains focus. "+
       "LLM findings stay <span class='mono'>is_proposal: true</span> until a deterministic rule confirms them. "+
       "<span class='mono'>text_gateway.toxicity_llm_enabled</span> and "+
@@ -5655,14 +5738,32 @@ function vSettingsGatewayModelsTab(){
   "</div>";
 }
 
+function fillGatewayRoleDatalist(idSafe, models){
+  var list=document.getElementById("gw_role_model_list_"+idSafe);
+  if(!list) return;
+  list.textContent="";
+  (models||[]).forEach(function(m){
+    var opt=document.createElement("option");
+    opt.value=m;
+    list.appendChild(opt);
+  });
+}
+
 function onGatewayModelProviderChange(role){
   var idSafe=role.replace(/\./g,"_");
   var sel=document.getElementById("gw_role_prov_"+idSafe);
   var ep=document.getElementById("gw_role_endpoint_"+idSafe);
-  if(!sel||!ep) return;
-  var hint=GATEWAY_PROVIDER_HINTS[sel.value]||{};
-  var active=(llmRefinerProviderList()||[]).find(function(p){return p.name===sel.value;})||{};
-  ep.value=active.api_base||hint.endpoint||ep.value;
+  var modelEl=document.getElementById("gw_role_model_"+idSafe);
+  var envEl=document.getElementById("gw_role_keyenv_"+idSafe);
+  if(!sel) return;
+  var meta=gatewayProviderMeta(sel.value);
+  if(ep) ep.value=meta.endpoint||"";
+  if(modelEl){
+    modelEl.value=meta.model||"";
+    modelEl.placeholder=meta.model||"model id";
+  }
+  if(envEl) envEl.value=meta.api_key_env||"";
+  fillGatewayRoleDatalist(idSafe, meta.models);
 }
 
 async function testGatewayModelRole(role){
@@ -5671,10 +5772,12 @@ async function testGatewayModelRole(role){
   var prov=(document.getElementById("gw_role_prov_"+idSafe)||{}).value||"";
   var model=(document.getElementById("gw_role_model_"+idSafe)||{}).value||"";
   var endpoint=(document.getElementById("gw_role_endpoint_"+idSafe)||{}).value||"";
+  var key=((document.getElementById("gw_role_key_"+idSafe)||{}).value||"").trim();
   if(status) status.textContent="Testing…";
   try{
     var body={provider:prov,model:model};
     if(endpoint) body.endpoint_url=endpoint;
+    if(key) body.api_key=key;
     var d=await POST("/api/llm/routes/"+encodeURIComponent(role)+"/test", body);
     var ok=d&&(d.ok===true||d.success===true||d.status==="ok"||(d.stages&&d.stages.every(function(s){return s.ok!==false;})));
     if(status) status.textContent=ok?"Connected":("Failed"+(d&&d.error?": "+d.error:""));
@@ -5683,6 +5786,27 @@ async function testGatewayModelRole(role){
     if(status) status.textContent="Failed: "+apiErr(e);
     toast("Connection failed: "+apiErr(e), false);
   }
+}
+
+function mergeGatewayProviderRegistry(providers, provider, patch){
+  var current=providers[provider]&&typeof providers[provider]==="object"?providers[provider]:{};
+  var next={};
+  Object.keys(current).forEach(function(k){
+    if(k!=="api_key_saved"&&k!=="api_key") next[k]=current[k];
+  });
+  Object.keys(patch||{}).forEach(function(k){
+    if(k==="api_key"||k==="api_key_saved") return;
+    if(patch[k]==null||patch[k]===""){
+      if(k==="api_base") delete next.api_base;
+      else if(k==="api_key_env") delete next.api_key_env;
+      return;
+    }
+    next[k]=patch[k];
+  });
+  var meta=(S.llmProviders||[]).find(function(p){return p.name===provider;})||{};
+  if(meta.model&&!next.litellm_model) next.litellm_model=meta.model;
+  if(meta.model_prefix&&!next.model_prefix) next.model_prefix=meta.model_prefix;
+  providers[provider]=next;
 }
 
 async function applySettingsGatewayModels(){
@@ -5700,37 +5824,57 @@ async function applySettingsGatewayModels(){
     return;
   }
   var roles=Object.assign({}, current);
-  var registryPatch={};
+  var registryTouched=false;
+  var providers={};
+  try{
+    var reg=await GET("/api/llm-providers/registry");
+    providers=(reg&&reg.providers)||{};
+  }catch(_e){
+    providers={};
+  }
+  var pastedKey=false;
   GATEWAY_MODEL_ROLES.forEach(function(role){
     var idSafe=role.replace(/\./g,"_");
     var provEl=document.getElementById("gw_role_prov_"+idSafe);
     var modelEl=document.getElementById("gw_role_model_"+idSafe);
     var enEl=document.getElementById("gw_role_en_"+idSafe);
     var epEl=document.getElementById("gw_role_endpoint_"+idSafe);
+    var envEl=document.getElementById("gw_role_keyenv_"+idSafe);
+    var keyEl=document.getElementById("gw_role_key_"+idSafe);
     var provider=(provEl&&provEl.value)||"";
     roles[role]={
       provider:provider,
       model:(modelEl&&modelEl.value)||"",
       enabled:!(enEl)||enEl.checked,
     };
-    if(provider && epEl&&epEl.value){
-      registryPatch[provider]={api_base:epEl.value};
+    if(keyEl&&(keyEl.value||"").trim()) pastedKey=true;
+    if(provider){
+      var patch={};
+      if(epEl&&epEl.value) patch.api_base=epEl.value;
+      if(envEl&&(envEl.value||"").trim()) patch.api_key_env=(envEl.value||"").trim();
+      if(Object.keys(patch).length){
+        mergeGatewayProviderRegistry(providers, provider, patch);
+        registryTouched=true;
+      }
     }
   });
   var putOpts={headers:{"If-Match":"revision:"+rev}};
   try{
     await PUT("/api/llm/routes",{settings:{llm:{default:existingDefault,roles:roles}}}, putOpts);
-    if(Object.keys(registryPatch).length){
+    if(registryTouched){
       try{
-        await PUT("/api/llm-providers/registry",{providers:registryPatch});
+        await PUT("/api/llm-providers/registry",{providers:providers});
       }catch(regErr){
-        alert("Role bindings saved, but provider endpoints were not: "+apiErr(regErr));
+        alert("Role bindings saved, but provider endpoints/keys were not: "+apiErr(regErr));
         await loadLlmRoutesRuntime();
         render();
         return;
       }
     }
-    toast("Text Gateway models saved");
+    toast(pastedKey
+      ?"Text Gateway models saved. Pasted API keys are for Test only — set the env var for scans."
+      :"Text Gateway models saved");
+    await loadLlmProviders().catch(function(){});
     await loadLlmRoutesRuntime();
     render();
   }catch(e){

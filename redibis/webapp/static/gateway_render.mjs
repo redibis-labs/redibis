@@ -100,6 +100,12 @@ export function concatenatedText(segments) {
   return segments.map((s) => s.text).join("");
 }
 
+export function offsetsFromPrefixAndSelected(prefixText, selectedText) {
+  const start = toChars(prefixText || "").length;
+  const end = start + toChars(selectedText || "").length;
+  return end > start ? { start, end } : null;
+}
+
 export function selectionOffsets(container, selection) {
   const sel = selection || (typeof window !== "undefined" ? window.getSelection() : null);
   if (!container || !sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
@@ -108,9 +114,7 @@ export function selectionOffsets(container, selection) {
   const pre = range.cloneRange();
   pre.selectNodeContents(container);
   pre.setEnd(range.startContainer, range.startOffset);
-  const start = toChars(pre.toString()).length;
-  const end = start + toChars(range.toString()).length;
-  return end > start ? { start, end } : null;
+  return offsetsFromPrefixAndSelected(pre.toString(), range.toString());
 }
 
 export function overlayEvalSpans(expected, predicted, metric, proposals) {
@@ -214,6 +218,8 @@ export function renderHighlights(container, text, spans, documentRef) {
   if (!doc || !container) return concatenatedText(segmentsFor(text, spans).segments);
   const { segments } = segmentsFor(text, spans);
   container.textContent = "";
+  container.dir = "auto";
+  container.style.unicodeBidi = "isolate";
   for (const seg of segments) {
     if (!seg.top) {
       container.appendChild(doc.createTextNode(seg.text));
@@ -222,6 +228,8 @@ export function renderHighlights(container, text, spans, documentRef) {
     const mark = doc.createElement("mark");
     mark.className = `gw-hl gw-${classOf(seg.top.entity_type, seg.top.eval_kind)}`;
     if (seg.allProposals) mark.classList.add("gw-proposal");
+    mark.dir = "auto";
+    mark.style.unicodeBidi = "isolate";
     mark.dataset.abbr = abbr(seg.top.entity_type);
     mark.dataset.spans = JSON.stringify(
       seg.spans.map((s) => ({

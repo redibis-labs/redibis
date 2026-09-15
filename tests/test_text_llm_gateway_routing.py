@@ -105,3 +105,33 @@ def test_service_attaches_refiner_when_role_bound(monkeypatch):
     health = svc.health()
     assert health["engines"]["llm"]["role_bound"] is True
     assert health["engines"]["preprocess"]["available"] is True
+
+
+def test_build_llm_override_passes_request_api_key(monkeypatch):
+    from redibis.config import RedibisConfig
+    from redibis.services.text_pii_service import TextPIIService
+
+    captured = {}
+
+    class FakeProv:
+        name = "sglang"
+        model = "Qwen/Qwen2.5-14B-Instruct-AWQ"
+        api_key = ""
+
+    def fake_get_provider(name, **kwargs):
+        captured["name"] = name
+        captured["kwargs"] = kwargs
+        FakeProv.api_key = kwargs.get("api_key") or ""
+        return FakeProv()
+
+    monkeypatch.setattr("redibis.enrich.providers.get_provider", fake_get_provider)
+    monkeypatch.setattr(TextPIIService, "_try_load_ner", lambda self: None)
+    monkeypatch.setattr(TextPIIService, "_try_llm", lambda self: None)
+
+    svc = TextPIIService(redibis_config=RedibisConfig())
+    refiner = svc._build_llm_override(
+        "sglang", "Qwen/Qwen2.5-14B-Instruct-AWQ", api_key="sk-local",
+    )
+    assert captured["name"] == "sglang"
+    assert captured["kwargs"].get("api_key") == "sk-local"
+    assert refiner._provider is FakeProv or refiner._provider.name == "sglang"

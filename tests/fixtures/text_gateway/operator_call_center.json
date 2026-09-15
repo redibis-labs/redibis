@@ -1,0 +1,353 @@
+{
+  "kind": "redibis.text_span_eval_dataset",
+  "schema_version": "1.0",
+  "offset_unit": "unicode_codepoint",
+  "id": "gateway-operator-call-center",
+  "cases": [
+    {
+      "id": "case_24_new_mixed_arabic_english",
+      "text": "Agent: Ahlan bi حضرتك، معك كريم من خدمة العملاء. أقدر أساعدك إزاي النهاردة؟\n(Welcome, you're with Karim from customer service. How can I help you today?)\nCustomer: ألو يا كريم، لو سمحت أنا عامل أوردر بقالي 3 أيام ولسه ماوصلش، وعايز أغير العنوان بتاعي ضروري.\n(Hello Karim, please I placed an order 3 days ago and it still hasn't arrived, and I need to change my address urgently.)\nAgent: ولا يهمك يا فندم، تحت أمرك. ممكن بس الأول الـ Full Name ورقم الموبايل المسجل على الأوردر؟\n(No worries sir, at your service. Could I first get the full name and the mobile number registered on the order?)\nCustomer: أنا اسمي شريف محمد عبد الحميد إبراهيم، ورقم الموبايل: زيرو - تلاتة - وحَد - خمسة - اتنين - تسعة - سبعة - أربعة - ستة - صفر - تمانية.\n(My name is Sherif Mohamed Abdel Hamid Ibrahim, and the mobile number: 03152974608.)\nAgent: تمام يا بشمهندس شريف، لقيت الأوردر. بالنسبة للعنوان الجديد، اتفضل أمليهولي بالتفصيل لو سمحت.\n(Got it engineer Sherif, I found the order. Regarding the new address, please go ahead and dictate it to me in detail.)\nCustomer: تمام، العنوان الجديد هو: مدينة نصر، شارع التسعين الشمالي، عمارة رقم خمستاشر (15)، الدور التالت، شقة رقم سبعة (7)، بجوار مول كايرو فيستيفال سيتي، القاهرة.\n(Okay, the new address is: Nasr City, North Teseen Street, Building number fifteen (15), Third floor, Apartment number seven (7), next to Cairo Festival City Mall, Cairo.)\nAgent: تمام يا فندم، العنوان تسجل معايا كامل. وبما إن في فرق سعر في الشحن، هل حابب تدفع بـ Credit Card دلوقتي؟\n(Alright sir, the address has been fully recorded. And since there's a shipping price difference, would you like to pay with a Credit Card right now?)\nCustomer: أيوة، تمام. الكارت بتاعي هو Mastercard، ورقم الكارت هو: خمسة - أربعة - اتنين - صفر - تلاتة - سبعة - تسعة - واحد - خمسة - أربعة - اتنين - صفر - تمانية - ستة - تسعة - تلاتة.\n(Yes, perfect. My card is a Mastercard, and the card number is: 5420379154208693.)\nAgent: تمام يا فندم، وتاريخ الإنتهاء (Expiry date) والـ CVV كام لو سمحت؟\n(Alright sir, and what is the expiry date and CVV please?)\nCustomer: تاريخ الإنتهاء شهر اتناشر (12) سنة سبعة وعشرين (27)، والـ CVV هو ثمانية - خمسة - اتنين (852).\n(The expiry date is month twelve (12) year twenty-seven (27), and the CVV is eight - five - two (852).)",
+      "language": "ar",
+      "expected_spans": [
+        {
+          "start": 27,
+          "end": 31,
+          "entity_type": "PERSON"
+        },
+        {
+          "start": 610,
+          "end": 638,
+          "entity_type": "PERSON"
+        },
+        {
+          "start": 655,
+          "end": 732,
+          "entity_type": "PHONE_NUMBER"
+        },
+        {
+          "start": 805,
+          "end": 816,
+          "entity_type": "PHONE_NUMBER"
+        },
+        {
+          "start": 1074,
+          "end": 1201,
+          "entity_type": "LOCATION"
+        },
+        {
+          "start": 1703,
+          "end": 1817,
+          "entity_type": "CREDIT_CARD"
+        },
+        {
+          "start": 1883,
+          "end": 1899,
+          "entity_type": "CREDIT_CARD"
+        },
+        {
+          "start": 2059,
+          "end": 2095,
+          "entity_type": "CREDIT_CARD_EXPIRATION"
+        },
+        {
+          "start": 2109,
+          "end": 2130,
+          "entity_type": "CVV"
+        },
+        {
+          "start": 2132,
+          "end": 2135,
+          "entity_type": "CVV"
+        }
+      ]
+    },
+    {
+      "id": "case_01_basic_english",
+      "text": "Agent: Thank you for calling. Can I get your full name and phone number?\nCaller: Yes, it's David Smith. My MSISDN is +44 7911 123456.\nAgent: Great. I'll update your contact email to david.smith123@example.com.",
+      "language": "en",
+      "expected_spans": [
+        {
+          "start": 91,
+          "end": 102,
+          "entity_type": "PERSON"
+        },
+        {
+          "start": 117,
+          "end": 132,
+          "entity_type": "PHONE_NUMBER"
+        },
+        {
+          "start": 182,
+          "end": 208,
+          "entity_type": "EMAIL_ADDRESS"
+        }
+      ]
+    },
+    {
+      "id": "case_10_arabic_wallet_failure",
+      "text": "خدمة العملاء: فودافون كاش معاك، إزاي أقدر أساعدك؟\nالعميل: يا فندم أنا عملت تحويل فلوس من محفظتي رقم زيرو مية، عشرين تلاتين، ربعمية وخمسين، لواحد صاحبي بس الفلوس مسمعتش عنده.\nخدمة العملاء: تمام، الرقم اللي حولتله كام؟\nالعميل: زيرو حداشر، اتنين اتنين، تلاتة تلاتة، أربعة خمسات.\nخدمة العملاء: جالك رسالة فيها كود تأكيد العملية (OTP)؟\nالعميل: أيوه الكود كان ستة، سبعة، زيرو، اتنين، واحد، تسعة. بس الرصيد اتخصم.",
+      "language": "ar",
+      "expected_spans": [
+        {
+          "start": 100,
+          "end": 137,
+          "entity_type": "PHONE_NUMBER"
+        },
+        {
+          "start": 225,
+          "end": 274,
+          "entity_type": "PHONE_NUMBER"
+        },
+        {
+          "start": 354,
+          "end": 388,
+          "entity_type": "OTP"
+        }
+      ]
+    },
+    {
+      "id": "case_02_technical_troubleshoot",
+      "text": "Agent: Let's check the warranty on your phone. Can you read me the 15-digit IMEI number?\nCaller: Sure, the IMEI is 358190102938475.\nAgent: Thank you. And this is for the line connected to 07700900112?",
+      "language": "en",
+      "expected_spans": [
+        {
+          "start": 115,
+          "end": 130,
+          "entity_type": "IMEI"
+        },
+        {
+          "start": 188,
+          "end": 199,
+          "entity_type": "PHONE_NUMBER"
+        }
+      ]
+    },
+    {
+      "id": "case_16_mixed_script_wallet_transfer",
+      "text": "Agent: خدمة المحافظ الإلكترونية، تحت أمرك.\nCaller: عملت transfer لـ amount كبير من محفظتي زيرو ميتين، تسعة تمانية سبعة، ستة خمسات، والـ transaction failed بس الرصيد اتخصم.\nAgent: ممكن رقم الـ National ID عشان نراجع الـ system logs الخاصة بالعملية دي؟\nCaller: اتنين تمانية خمسة، زيرو أربعة اتناشر، زيرو واحد، زيرو زيرو، تلاتة اتنين واحد أربعة.",
+      "language": "ar",
+      "expected_spans": [
+        {
+          "start": 90,
+          "end": 129,
+          "entity_type": "PHONE_NUMBER"
+        },
+        {
+          "start": 259,
+          "end": 341,
+          "entity_type": "EG_NATIONAL_ID"
+        }
+      ]
+    },
+    {
+      "id": "case_19_plan_migration",
+      "text": "Agent: مساء الخير، معاك أحمد من قسم المبيعات، أقدر أساعدك إزاي؟\nCaller: مساء النور، كنت عايز أعمل migrate للخط بتاعي من باقة الكنترول للـ postpaid لو سمحت.\nAgent: تمام يا فندم، الخط اللي بنكلم عليه 01011223344؟\nCaller: أيوه بالظبط، واسمي مصطفى كمال محمود.\nAgent: تمام يا أستاذ مصطفى، هيتم رفع الـ request وهيوصلك رسالة بالتأكيد.",
+      "language": "ar",
+      "expected_spans": [
+        {
+          "start": 24,
+          "end": 28,
+          "entity_type": "PERSON"
+        },
+        {
+          "start": 198,
+          "end": 209,
+          "entity_type": "PHONE_NUMBER"
+        },
+        {
+          "start": 238,
+          "end": 254,
+          "entity_type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": "case_20_router_delivery",
+      "text": "Agent: بكلم حضرتك بخصوص الـ request الخاص بتغيير الـ router لـ VDSL.\nCaller: أيوه أنا طلبت router جديد، هو هيوصل إمتى؟\nAgent: هيوصل بكرا يا فندم، بس محتاجين نأكد الـ delivery address.\nCaller: العنوان 15 شارع المعادي الجديد، متفرع من شارع النصر، عمارة 4، شقة 12.\nAgent: تمام، هخلي المندوب يكلمك على رقم زيرو خمستاشر، اتنين اتنين، تلاتة أربعة خمسة، ستة سبعة تمانية.\nCaller: تمام شكراً.",
+      "language": "ar",
+      "expected_spans": [
+        {
+          "start": 200,
+          "end": 260,
+          "entity_type": "LOCATION"
+        },
+        {
+          "start": 302,
+          "end": 362,
+          "entity_type": "PHONE_NUMBER"
+        }
+      ]
+    },
+    {
+      "id": "case_21_scratch_card",
+      "text": "Agent: الدعم الفني للكروت والشحن، تحت أمرك.\nCaller: جبت scratch card بـ 100 جنيه وبحاول أشحنه بيديني invalid code، مش عارف ليه.\nAgent: ولا يهمك يا فندم، مليني الـ 14 رقم اللي على الكارت لو سمحت.\nCaller: واحد اتنين تلاتة، أربعة خمسة ستة، سبعة تمانية تسعة، زيرو واحد، اتنين تلاتة أربعة.\nAgent: والرقم اللي بتشحنله 01233445566؟\nCaller: مظبوط.",
+      "language": "ar",
+      "expected_spans": [
+        {
+          "start": 203,
+          "end": 283,
+          "entity_type": "VOUCHER"
+        },
+        {
+          "start": 312,
+          "end": 323,
+          "entity_type": "PHONE_NUMBER"
+        }
+      ]
+    },
+    {
+      "id": "case_22_puk_code",
+      "text": "Agent: أهلاً بيك في خدمة العملاء، إزاي أساعدك؟\nCaller: التليفون بتاع ابني عمل lock وطالب الـ PUK code عشان دخل الباسورد غلط.\nAgent: تمام، لتأكيد البيانات، ممكن الـ National ID بتاع صاحب الخط؟\nCaller: اتنين تسعة زيرو، واحد واحد اتنين اتنين، زيرو واحد، زيرو اتنين، تلاتة أربعة خمسة.\nAgent: شكراً لحضرتك، الـ PUK code هو 12345678.",
+      "language": "ar",
+      "expected_spans": [
+        {
+          "start": 200,
+          "end": 279,
+          "entity_type": "EG_NATIONAL_ID"
+        },
+        {
+          "start": 318,
+          "end": 326,
+          "entity_type": "SIM_PUK"
+        }
+      ]
+    },
+    {
+      "id": "case_23_ticket_follow_up",
+      "text": "Agent: قسم المتابعة والشكاوى معاك.\nCaller: أنا بتابع الـ ticket رقم SR-45099، النت عندي بطيء جداً بقاله أسبوع.\nAgent: ثواني بفتح الـ profile... الخط مسجل باسم ياسمين طارق؟\nCaller: أيوه أنا.\nAgent: الـ technical team شغال عليها حالياً في السنترال، ممكن رقم contact تاني عشان نبلغك بالـ update؟\nCaller: كلموني على زيرو حداشر، خمسة خمسة، زيرو زيرو، اتنين تلاتة، واحد واحد.",
+      "language": "ar",
+      "expected_spans": [
+        {
+          "start": 68,
+          "end": 76,
+          "entity_type": "SUPPORT_TICKET"
+        },
+        {
+          "start": 159,
+          "end": 170,
+          "entity_type": "PERSON"
+        },
+        {
+          "start": 312,
+          "end": 368,
+          "entity_type": "PHONE_NUMBER"
+        }
+      ]
+    },
+    {
+      "id": "case_05_credit_card_update",
+      "text": "خدمة العملاء: أهلاً بيك يا فندم في قسم الحسابات، أقدر أساعدك إزاي؟\nالعميل: كنت عايز أغير كارت الفيزا المربوط بدفع الفاتورة التلقائي عشان الكارت القديم ضاع وطلعت واحد بداله.\nخدمة العملاء: ولا يهمك يا فندم، ممكن تمليني الستاشر رقم بتوع الكارت الجديد؟\nالعميل: أربعة اتنين زيرو تلاتة، خمسة خمسة ستة ستة، سبعة تمنية تسعة زيرو، واحد اتنين تلاتة أربعة.\nخدمة العملاء: تمام، تاريخ الانتهاء كام؟\nالعميل: شهر حداشر عشرين تلاتين. ورقم السي في في اللي في الضهر تلاتة سبعة اتنين.",
+      "language": "ar",
+      "expected_spans": [
+        {
+          "start": 257,
+          "end": 344,
+          "entity_type": "CREDIT_CARD"
+        },
+        {
+          "start": 394,
+          "end": 416,
+          "entity_type": "CREDIT_CARD_EXPIRATION"
+        },
+        {
+          "start": 448,
+          "end": 464,
+          "entity_type": "CVV"
+        }
+      ]
+    },
+    {
+      "id": "case_06_emergency_geolocation",
+      "text": "خدمة العملاء: خط الدعم العاجل معاك.\nالعميل: يا فندم أنا عربيتي عطلت وفي حالة ولادة مستعجلة لمراتي اسمها سارة عبد الرحمن ومحتاجين إسعاف، أنا بكلمك من خط فودافون عشان معنديش شبكة تانية.\nخدمة العملاء: أهدي يا فندم إحنا حددنا اللوكيشن التقريبي بتاع الموبايل عن طريق الآي بي، هو اتنين واحد اتنين دوت خمسين دوت أربعتاشر دوت عشرة، حضرتك على طريق الإسكندرية الصحراوي الكيلو خمسة وأربعين صح؟\nالعميل: أيوه بالظبط أنا واقف قدام واحة عمر.",
+      "language": "ar",
+      "expected_spans": [
+        {
+          "start": 72,
+          "end": 90,
+          "entity_type": "GDPR_SPECIAL_CATEGORY"
+        },
+        {
+          "start": 104,
+          "end": 119,
+          "entity_type": "PERSON"
+        },
+        {
+          "start": 274,
+          "end": 322,
+          "entity_type": "IP_ADDRESS"
+        },
+        {
+          "start": 334,
+          "end": 378,
+          "entity_type": "LOCATION"
+        },
+        {
+          "start": 412,
+          "end": 425,
+          "entity_type": "LOCATION"
+        }
+      ]
+    },
+    {
+      "id": "case_07_b2b_tax_id",
+      "text": "خدمة العملاء: خدمة عملاء الشركات، أقدر أساعد حضرتك إزاي؟\nالعميل: أنا بكلمك بخصوص حساب شركة النور للاستيراد والتصدير. عايزين نضيف خط جديد للمندوبين.\nخدمة العملاء: تمام يا فندم، عشان الإجراء ده محتاجين بس نأكد رقم البطاقة الضريبية واسم المفوض بالتعاقد.\nالعميل: البطاقة الضريبية رقمها ربعمية وخمسين داش تلتومية وعشرين داش مية وخمستاشر. واسم المفوض خالد مصطفى كمال.",
+      "language": "ar",
+      "expected_spans": [
+        {
+          "start": 86,
+          "end": 115,
+          "entity_type": "ORGANIZATION"
+        },
+        {
+          "start": 282,
+          "end": 331,
+          "entity_type": "EG_TAX_ID"
+        },
+        {
+          "start": 345,
+          "end": 360,
+          "entity_type": "PERSON"
+        }
+      ]
+    },
+    {
+      "id": "case_08_roaming_passport",
+      "text": "خدمة العملاء: قسم التجوال الدولي معاك.\nالعميل: أنا هسافر دبي بكرة وعايز أفعل باقة التجوال، بس التطبيق طلب مني أحدث رقم الباسبور عشان الخط متسجل بجواز سفر قديم.\nخدمة العملاء: تمام يا فندم مليني رقم جواز السفر الجديد وحروفه.\nالعميل: إيه كابيتال، تسعة زيرو تلاتة أربعة خمسة سبعة اتنين واحد. وابعتلي التأكيد على الإيميل بتاعي.\nخدمة العملاء: الإيميل اللي متسجل عندنا هو khaled underscore 20 at outlook dot com مظبوط؟\nالعميل: أيوه هو ده.",
+      "language": "ar",
+      "expected_spans": [
+        {
+          "start": 231,
+          "end": 286,
+          "entity_type": "PASSPORT"
+        },
+        {
+          "start": 365,
+          "end": 404,
+          "entity_type": "EMAIL_ADDRESS"
+        }
+      ]
+    },
+    {
+      "id": "case_09_puk_grouped_numbers",
+      "text": "خدمة العملاء: الدعم الفني معاك، إزاي أقدر أساعدك؟\nالعميل: الخط قفل مني وطلب رمز الباك عشان كتبت البين كود غلط تلات مرات.\nخدمة العملاء: تمام، رقم الموبايل هو زيرو مية، خمسة وخمسين، تلاتين، ربعمية؟\nالعميل: مظبوط.\nخدمة العملاء: للتحقق الأمني، ممكن الرقم القومي بالكامل؟\nالعميل: اتنين تمانية تلاتة، زيرو تسعة واحد خمسة، زيرو واحد زيرو زيرو تلاتة تلاتة.\nخدمة العملاء: شكراً يا فندم، رمز الباك (PUK) بتاعك هو تمانية سبعة ستة خمسة أربعة تلاتة اتنين واحد.",
+      "language": "ar",
+      "expected_spans": [
+        {
+          "start": 157,
+          "end": 194,
+          "entity_type": "PHONE_NUMBER"
+        },
+        {
+          "start": 275,
+          "end": 347,
+          "entity_type": "EG_NATIONAL_ID"
+        },
+        {
+          "start": 403,
+          "end": 446,
+          "entity_type": "SIM_PUK"
+        }
+      ]
+    }
+  ]
+}

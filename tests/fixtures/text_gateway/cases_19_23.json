@@ -10,6 +10,11 @@
       "language": "ar",
       "expected_spans": [
         {
+          "start": 24,
+          "end": 28,
+          "entity_type": "PERSON"
+        },
+        {
           "start": 198,
           "end": 209,
           "entity_type": "PHONE_NUMBER"

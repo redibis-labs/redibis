@@ -21,6 +21,8 @@ _llm_log = logging.getLogger("redibis.llm")
 
 _RING: deque[ModelCallRecord] = deque(maxlen=200)
 _RING_LOCK = Lock()
+_TRANSCRIPT_MAX = 32_000
+_TRANSCRIPT_FIELDS = ("system_prompt", "user_prompt", "response")
 
 # Propagated from guarded_model_call into provider.complete recording.
 _CALL_CTX: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
@@ -74,6 +76,37 @@ def redact(text: str, *, secrets: Iterable[str] = ()) -> str:
     for pattern, repl in _REDACT_PATTERNS:
         out = pattern.sub(repl, out)
     return out
+
+
+def clip_transcript(text: str, *, secrets: Iterable[str] = ()) -> tuple[str, bool]:
+    """Redact secrets and cap stored prompt/response length."""
+    cleaned = redact(text or "", secrets=secrets)
+    if len(cleaned) > _TRANSCRIPT_MAX:
+        return cleaned[:_TRANSCRIPT_MAX] + "\n…[truncated]", True
+    return cleaned, False
+
+
+def completion_text(resp: Any) -> str:
+    """Best-effort extraction of the model reply from a provider response object."""
+    if resp is None:
+        return ""
+    try:
+        content = getattr(getattr(resp.choices[0], "message", None), "content", None)
+        if content:
+            return str(content)
+    except Exception:
+        pass
+    if isinstance(resp, dict):
+        try:
+            return str(resp["choices"][0]["message"]["content"] or "")
+        except Exception:
+            pass
+        if resp.get("text"):
+            return str(resp.get("text") or "")
+    text = getattr(resp, "text", None)
+    if text:
+        return str(text)
+    return ""
 
 
 def _host_only(api_base: Optional[str]) -> str:
@@ -149,6 +182,9 @@ def build_model_call_record(
     api_base: Optional[str] = None,
     system_prompt_len: int = 0,
     user_prompt_len: int = 0,
+    system_prompt: str = "",
+    user_prompt: str = "",
+    response: str = "",
     error_secrets: Iterable[str] = (),
     model_role: str = "",
     routing_revision: int = 0,
@@ -156,6 +192,14 @@ def build_model_call_record(
 ) -> ModelCallRecord:
     prompt_tokens, completion_tokens, cost_usd = _extract_usage(resp)
     ctx = current_llm_call_context()
+    sys_txt, trunc_s = clip_transcript(system_prompt, secrets=error_secrets)
+    usr_txt, trunc_u = clip_transcript(user_prompt, secrets=error_secrets)
+    rsp_txt, trunc_r = clip_transcript(
+        response if response else completion_text(resp),
+        secrets=error_secrets,
+    )
+    combined = f"{system_prompt or ''}\n{user_prompt or ''}"
+    prompt_hash = hashlib.sha256(combined.encode("utf-8")).hexdigest()[:16] if combined.strip() else ""
     return ModelCallRecord(
         model_id=model or getattr(provider, "litellm_model", "") or getattr(provider, "model", ""),
         provider=getattr(provider, "name", "unknown"),
@@ -167,8 +211,13 @@ def build_model_call_record(
         status=status,
         api_base=_host_only(api_base or getattr(provider, "api_base", None) or getattr(provider, "endpoint_url", None)),
         error=redact(error, secrets=error_secrets)[:500],
-        system_prompt_len=system_prompt_len,
-        user_prompt_len=user_prompt_len,
+        system_prompt_len=system_prompt_len or len(system_prompt or ""),
+        user_prompt_len=user_prompt_len or len(user_prompt or ""),
+        system_prompt=sys_txt,
+        user_prompt=usr_txt,
+        response=rsp_txt,
+        prompt_hash=prompt_hash,
+        transcript_truncated=bool(trunc_s or trunc_u or trunc_r),
         model_role=model_role or str(ctx.get("model_role") or ""),
         routing_revision=int(routing_revision or ctx.get("routing_revision") or 0),
         run_id=run_id or str(ctx.get("run_id") or ""),
@@ -188,12 +237,22 @@ def record_llm_call(rec: ModelCallRecord) -> None:
         pass
 
 
+def public_call_dict(rec: ModelCallRecord, *, include_transcripts: bool = True) -> dict:
+    """Serialize a call record; strip prompt/response unless the caller is allowed them."""
+    payload = asdict(rec)
+    if not include_transcripts:
+        for key in _TRANSCRIPT_FIELDS:
+            payload.pop(key, None)
+    return payload
+
+
 def get_recent_llm_calls(
     *,
     limit: int = 50,
     model_role: str = "",
     run_id: str = "",
     routing_revision: Optional[int] = None,
+    include_transcripts: bool = True,
 ) -> list[dict]:
     lim = max(1, min(int(limit or 50), 200))
     role_f = (model_role or "").strip()
@@ -208,14 +267,14 @@ def get_recent_llm_calls(
             continue
         if routing_revision is not None and int(rec.routing_revision or 0) != int(routing_revision):
             continue
-        out.append(asdict(rec))
+        out.append(public_call_dict(rec, include_transcripts=include_transcripts))
         if len(out) >= lim:
             break
     return out
 
 
 def emit_llm_log(rec: ModelCallRecord, *, error: str = "", error_secrets: Iterable[str] = ()) -> None:
-    payload = asdict(rec)
+    payload = public_call_dict(rec, include_transcripts=is_llm_log_prompts_enabled())
     _llm_log.info(
         "LLM call provider=%s model=%s status=%s latency_ms=%.0f tokens=%s/%s cost=%.4f",
         rec.provider,

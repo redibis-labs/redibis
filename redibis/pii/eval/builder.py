@@ -29,6 +29,22 @@ def _load(path: Path) -> Any:
     return json.loads(text)
 
 
+def locate_unique_value(text: str, value: str) -> tuple[int, int]:
+    """Return ``(start, end)`` when ``value`` occurs exactly once in ``text``.
+
+    Used by eval-build and the use-case asset store so a hand-edited value
+    cannot silently attach to the wrong offsets.
+    """
+    if not value:
+        raise CorpusBuildError("value is empty")
+    first = text.find(value)
+    if first < 0:
+        raise CorpusBuildError(f"value {value!r} not found verbatim in text")
+    if text.find(value, first + 1) >= 0:
+        raise CorpusBuildError(f"value {value!r} occurs more than once")
+    return first, first + len(value)
+
+
 def _find_value(text: str, value: str, *, occurrence: int = 1, after: str = "") -> tuple[int, int]:
     if not value:
         raise CorpusBuildError("value is empty")

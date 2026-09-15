@@ -373,6 +373,8 @@ def test_scan_stream_emits_ordered_stage_events_then_result(client):
     envelope = events[-1]["envelope"]
     assert envelope["analysers"]["pii"]["status"] == "ok"
     assert envelope["decision"]["action"] == "allow"
+    assert "llm" in envelope
+    assert envelope["llm"]["used"] is False
 
 
 def test_scan_stream_reports_service_error_as_error_event(client):
@@ -480,7 +482,14 @@ def test_explorer_can_stream_gateway_evaluation(client):
     assert any(ev.get("event") == "result" for ev in lines)
 
 
-def test_evaluation_fails_closed_when_llm_is_unready(client):
+def test_evaluation_fails_closed_when_llm_is_unready(client, monkeypatch):
+    import redibis.webapp.gateway_routes as gw
+
+    monkeypatch.setattr(
+        gw,
+        "_text_refiner_health",
+        lambda *a, **k: {"ready": False, "reason": "LLM refiner is not ready"},
+    )
     _explorer(client)
     r = _post(
         client,
@@ -571,4 +580,102 @@ def test_settings_role_binding_appears_in_gateway_health(client, tmp_path, monke
     assert llm["provider"] == "demo"
     assert llm["model"]
     assert "status" in llm
+
+
+def _admin(client: TestClient):
+    assert _login(client, "admin", ADMIN_PW).status_code == 200
+
+
+class RecordingFakeService(FakeService):
+    def scan(self, text, **kwargs):
+        from types import SimpleNamespace
+
+        from redibis.enrich.llm_logging import build_model_call_record, record_llm_call
+
+        rec = build_model_call_record(
+            SimpleNamespace(name="sglang", residency="local"),
+            "Qwen/Qwen2.5-14B-Instruct-AWQ",
+            None,
+            latency_ms=11.0,
+            status="ok",
+            system_prompt="You are a PII span detector.",
+            user_prompt="Text:\n" + text,
+            response='{"spans":[]}',
+        )
+        record_llm_call(rec)
+        return super().scan(text, **kwargs)
+
+
+def test_envelope_includes_llm_usage_without_transcripts_for_explorer(client):
+    _explorer(client)
+    r = _post(client, "/api/gateway/scan", {"text": "hello"})
+    body = r.json()
+    assert "llm" in body
+    llm = body["llm"]
+    assert llm["requested"] is False
+    assert llm["used"] is False
+    assert llm["call_count"] == 0
+    assert llm["skip_reason"] == "not requested"
+    for call in llm.get("calls") or []:
+        assert "system_prompt" not in call
+        assert "user_prompt" not in call
+        assert "response" not in call
+
+
+def test_admin_scan_returns_llm_prompt_and_response(client, monkeypatch):
+    import redibis.webapp.gateway_routes as gw
+
+    monkeypatch.setattr(gw, "_get_service", lambda: RecordingFakeService())
+    _admin(client)
+    r = _post(client, "/api/gateway/scan", {"text": "alice@example.com", "use_llm": True})
+    assert r.status_code == 200, r.text
+    llm = r.json()["llm"]
+    assert llm["requested"] is True
+    assert llm["used"] is True
+    assert llm["call_count"] >= 1
+    call = llm["calls"][0]
+    assert call["system_prompt"] == "You are a PII span detector."
+    assert "alice@example.com" in call["user_prompt"]
+    assert call["response"] == '{"spans":[]}'
+    assert call["provider"] == "sglang"
+
+
+def test_explorer_scan_strips_llm_transcripts(client, monkeypatch):
+    import redibis.webapp.gateway_routes as gw
+
+    monkeypatch.setattr(gw, "_get_service", lambda: RecordingFakeService())
+    _explorer(client)
+    r = _post(client, "/api/gateway/scan", {"text": "alice@example.com", "use_llm": True})
+    assert r.status_code == 200, r.text
+    llm = r.json()["llm"]
+    assert llm["used"] is True
+    assert llm["call_count"] >= 1
+    call = llm["calls"][0]
+    assert "system_prompt" not in call
+    assert "user_prompt" not in call
+    assert "response" not in call
+    assert call["provider"] == "sglang"
+    assert call["status"] == "ok"
+
+
+def test_explorer_cannot_export_llm_calls(client):
+    _explorer(client)
+    r = client.get("/api/llm/calls/export")
+    assert r.status_code == 403
+
+
+def test_admin_can_export_llm_calls(client, monkeypatch):
+    import redibis.webapp.gateway_routes as gw
+
+    monkeypatch.setattr(gw, "_get_service", lambda: RecordingFakeService())
+    _admin(client)
+    scanned = _post(client, "/api/gateway/scan", {"text": "bob@example.com", "use_llm": True})
+    run_id = scanned.json()["llm"]["run_id"]
+    r = client.get(f"/api/llm/calls/export?run_id={run_id}")
+    assert r.status_code == 200, r.text
+    assert "attachment" in (r.headers.get("Content-Disposition") or "")
+    body = r.json()
+    assert body["call_count"] >= 1
+    assert "system_prompt" in body["calls"][0]
+    assert "bob@example.com" in body["calls"][0]["user_prompt"]
 

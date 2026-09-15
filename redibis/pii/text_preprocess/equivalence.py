@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Optional
 
 from redibis.pii.scan.result import Candidate
@@ -42,6 +43,20 @@ def _compatible_entities(a: str, b: str) -> bool:
     return pair == {"PHONE_NUMBER", "EG_NATIONAL_ID"}
 
 
+# Spoken + parenthetical card/CVV/OTP surfaces are separate operator golds.
+_KEEP_BOTH_TYPES = frozenset({
+    "CVV",
+    "CREDIT_CARD",
+    "CREDIT_CARD_EXPIRATION",
+    "OTP",
+    "IP_ADDRESS",
+    "PASSPORT",
+    "EG_TAX_ID",
+})
+_KEEP_INNER_TYPES = frozenset({"EMAIL_ADDRESS", "URL"})
+_PHONE_PREFIX_EXTRA = re.compile(r"^[+\s().-]*$")
+
+
 def _preferred_entity(a: Candidate, b: Candidate) -> str:
     types = {a.entity_type, b.entity_type}
     if "EG_NATIONAL_ID" in types:
@@ -74,6 +89,8 @@ class VariantEquivalenceMerger:
             merged_into: Optional[Candidate] = None
             for i, s in enumerate(selected):
                 if not _compatible_entities(c.entity_type, s.entity_type):
+                    continue
+                if c.entity_type in _KEEP_BOTH_TYPES or s.entity_type in _KEEP_BOTH_TYPES:
                     continue
                 if _canonical_of(c) and _canonical_of(c) == _canonical_of(s) and _near_or_overlap(c, s):
                     start = min(c.start or 0, s.start or 0)
@@ -116,8 +133,37 @@ class VariantEquivalenceMerger:
                     continue
                 if not _near_or_overlap(o, s, gap=4):
                     continue
-                start = min(o.start or 0, s.start or 0)
-                end = max(o.end or 0, s.end or 0)
+                if s.entity_type in _KEEP_BOTH_TYPES or o.entity_type in _KEEP_BOTH_TYPES:
+                    continue
+                # Labeled regex wrappers (e.g. "PUK code هو 12345678") share the
+                # canonical digits but must not widen the preprocess value span.
+                # Adjacent equivalent surfaces (spoken + parenthetical) still union.
+                # A leading "+" / punctuation-only extra on the regex/phone span
+                # (international MSISDN) is kept so the surface includes "+".
+                p_start, p_end = int(s.start or 0), int(s.end or 0)
+                o_start, o_end = int(o.start or 0), int(o.end or 0)
+                if s.entity_type in _KEEP_INNER_TYPES or o.entity_type in _KEEP_INNER_TYPES:
+                    if o_start >= p_start and o_end <= p_end:
+                        start, end = o_start, o_end
+                    elif p_start >= o_start and p_end <= o_end:
+                        start, end = p_start, p_end
+                    else:
+                        start, end = p_start, p_end
+                elif p_start >= o_start and p_end <= o_end:
+                    extra = (text[o_start:p_start] + text[p_end:o_end]) if text else ""
+                    if extra and _PHONE_PREFIX_EXTRA.match(extra):
+                        start, end = o_start, o_end
+                    else:
+                        start, end = p_start, p_end
+                elif o_start >= p_start and o_end <= p_end:
+                    extra = (text[p_start:o_start] + text[o_end:p_end]) if text else ""
+                    if s.entity_type == "PHONE_NUMBER" and extra and _PHONE_PREFIX_EXTRA.match(extra):
+                        start, end = p_start, p_end
+                    else:
+                        start, end = p_start, p_end
+                else:
+                    start = min(o_start, p_start)
+                    end = max(o_end, p_end)
                 surface = text[start:end] if text and 0 <= start < end <= len(text) else (s.text or o.text)
                 selected[j] = Candidate(
                     entity_type=_preferred_entity(s, o),

@@ -40,15 +40,18 @@
     },
     "sglang": {
       "description": "Local SGLang OpenAI-compatible server (alias: slang)",
-      "litellm_model": "openai/default",
+      "litellm_model": "openai/Qwen/Qwen2.5-14B-Instruct-AWQ",
       "model_prefix": "openai",
       "api_base": "http://localhost:30000/v1",
+      "api_key_env": "SGLANG_API_KEY",
       "supports_json": true,
       "residency": "local",
       "known_models": [
+        "Qwen/Qwen2.5-14B-Instruct-AWQ",
+        "Qwen/Qwen2.5-14B-Instruct",
+        "Qwen/Qwen2.5-7B-Instruct",
         "default",
-        "meta-llama/Llama-3.1-8B-Instruct",
-        "Qwen/Qwen2.5-7B-Instruct"
+        "meta-llama/Llama-3.1-8B-Instruct"
       ],
       "params": { "temperature": 0.2 }
     },

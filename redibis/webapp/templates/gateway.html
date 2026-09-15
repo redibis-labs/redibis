@@ -23,6 +23,7 @@
       <a class="nav-link" href="/reports">◈ Reports</a>
       <a class="nav-link" href="/gateway">◈ Gateway</a>
       <a class="nav-link" href="/gateway/evaluations">◈ Evaluations</a>
+      <a class="nav-link" href="/gateway/usecases">◈ Use cases</a>
       <a class="nav-link" href="/docs" target="_blank">◉ API Docs</a>
       {% if user and user.role == 'admin' %}
       <a class="nav-link" href="/users">👤 Users</a>
@@ -94,6 +95,9 @@
           <label id="gwLlmModelWrap" class="gw-inline" hidden>Model
             <input id="gwLlmModel" type="text" placeholder="(default)" size="14"/>
           </label>
+          <label id="gwLlmKeyWrap" class="gw-inline" hidden title="Session-only. Not stored. Used for this scan instead of the provider env var.">API key
+            <input id="gwLlmKey" type="password" autocomplete="off" placeholder="optional" size="18"/>
+          </label>
           <span class="gw-spacer"></span>
           <span id="gwCount" class="gw-count">0 / {{ ui_max_chars }}</span>
           <button id="gwEdit" type="button" class="btn btn-ghost" hidden>Edit</button>
@@ -125,6 +129,12 @@
           <h2>Safety checks</h2>
           <div id="gwSafety" class="gw-kv-list"></div>
         </div>
+        <div class="gw-card" id="gwLlmCard" hidden>
+          <h2>LLM log</h2>
+          <p class="gw-hint">Whether a model ran, what was sent, and what came back. Admin sees the full transcript; explorers see usage only.</p>
+          <div id="gwLlm"></div>
+          <button id="gwLlmDownload" type="button" class="btn btn-ghost btn-sm">Download LLM log</button>
+        </div>
         <div class="gw-card" id="gwMetaCard" hidden>
           <h2>Provenance</h2>
           <dl id="gwMeta" class="gw-kv"></dl>
@@ -144,6 +154,7 @@
           <h2>Actions</h2>
           <button id="gwDeid" type="button" class="btn btn-ghost" disabled>Copy de-identified text</button>
           <button id="gwDownload" type="button" class="btn btn-ghost">Download JSON</button>
+          <button id="gwLlmDownloadBar" type="button" class="btn btn-ghost" hidden>Download LLM log</button>
           <button id="gwClear" type="button" class="btn btn-red">Clear</button>
         </div>
       </aside>

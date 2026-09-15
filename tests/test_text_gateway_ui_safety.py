@@ -13,7 +13,9 @@ def test_no_web_storage_or_innerhtml_of_user_text():
     js = (STATIC / "gateway.js").read_text(encoding="utf-8")
     eval_js = (STATIC / "gateway_eval.js").read_text(encoding="utf-8")
     mjs = (STATIC / "gateway_render.mjs").read_text(encoding="utf-8")
-    blob = js + "\n" + eval_js + "\n" + mjs
+    usecase_js = (STATIC / "gateway_usecase.js").read_text(encoding="utf-8")
+    run_js = (STATIC / "gateway_run.js").read_text(encoding="utf-8")
+    blob = js + "\n" + eval_js + "\n" + mjs + "\n" + usecase_js + "\n" + run_js
     assert "localStorage" not in blob
     assert "sessionStorage" not in blob
     assert "indexedDB" not in blob
@@ -21,6 +23,8 @@ def test_no_web_storage_or_innerhtml_of_user_text():
     assert "innerHTML" not in js
     assert "innerHTML" not in eval_js
     assert "innerHTML" not in mjs
+    assert "innerHTML" not in usecase_js
+    assert "innerHTML" not in run_js
     assert "insertAdjacentHTML" not in blob
     assert "document.write" not in blob
 
@@ -131,6 +135,7 @@ def test_scan_can_be_cancelled_and_cleans_up_on_unload():
 def test_llm_provider_and_guard_controls_are_present():
     html = (TEMPLATES / "gateway.html").read_text(encoding="utf-8")
     assert 'id="gwLlmProvider"' in html
+    assert 'id="gwLlmKey"' in html
     assert 'id="gwCheckToxicity"' in html
     assert 'id="gwCheckInjection"' in html
     js = (STATIC / "gateway.js").read_text(encoding="utf-8")
@@ -138,6 +143,31 @@ def test_llm_provider_and_guard_controls_are_present():
     assert "check_toxicity" in js
     assert "check_prompt_injection" in js
     assert "llm_provider" in js and "llm_model" in js
+    assert "llm_api_key" in js
+    assert "preferLocalProviderForHfModel" in js
+    assert "looksLikeHfModel" in js
+
+
+def test_admin_llm_log_card_uses_text_nodes_and_download():
+    html = (TEMPLATES / "gateway.html").read_text(encoding="utf-8")
+    js = (STATIC / "gateway.js").read_text(encoding="utf-8")
+    assert 'id="gwLlmCard"' in html
+    assert 'id="gwLlm"' in html
+    assert "Download LLM log" in html
+    assert "renderLlmLog" in js
+    assert "downloadLlmLog" in js
+    assert "llm used" in js
+    assert "createTextNode" in js
+    assert "innerHTML" not in js
+
+
+def test_settings_debug_panel_downloads_llm_transcripts():
+    app = (STATIC / "app.js").read_text(encoding="utf-8")
+    assert "downloadLlmCallsJson" in app
+    assert "toggleLlmCallRow" in app
+    assert "/api/llm/calls?limit=200" in app
+    assert "system prompt" in app
+    assert "download this run" in app
 
 
 def test_settings_has_text_gateway_models_tab():
@@ -152,6 +182,12 @@ def test_settings_has_text_gateway_models_tab():
     assert "gateway.prompt_injection" in app
     assert "sglang" in app
     assert "GATEWAY_MODEL_ROLES" in app
+    assert "GATEWAY_SGLANG_DEFAULT_MODEL" in app
+    assert "Qwen/Qwen2.5-14B-Instruct-AWQ" in app
+    assert "gw_role_key_" in app
+    assert "gw_role_keyenv_" in app
+    assert "body.api_key=key" in app
+    assert "API key (all providers)" in app
     assert "/api/pii/text/rules/publish" in app
     assert "/api/pii/text/rules/promote" in app
     assert "/api/rdbpack/versions" in app
@@ -207,8 +243,30 @@ def test_evaluation_builder_page_and_health_refresh():
 
 
 def test_gateway_health_check_never_reveals_credentials():
-    """The client-side provider list must only render safe metadata — never
-    request an API key/endpoint field from the health payload."""
+    """Provider list from health is metadata-only; the user-entered key is
+    a request field and is never read back from the health payload."""
     js = (STATIC / "gateway.js").read_text(encoding="utf-8")
-    assert "api_key" not in js.lower().replace("api_key_env_set", "")
+    html = (TEMPLATES / "gateway.html").read_text(encoding="utf-8")
+    assert 'id="gwLlmKey"' in html
+    assert "llm_api_key" in js
+    assert "health.api_key" not in js
     assert "endpoint_url" not in js
+
+
+def test_evaluations_page_has_llm_api_key_field():
+    html = (TEMPLATES / "gateway_eval.html").read_text(encoding="utf-8")
+    js = (STATIC / "gateway_eval.js").read_text(encoding="utf-8")
+    assert 'id="evLlmKey"' in html
+    assert "llm_api_key" in js
+
+
+def test_usecase_pages_linked_from_gateway_nav():
+    gw = (TEMPLATES / "gateway.html").read_text(encoding="utf-8")
+    ev = (TEMPLATES / "gateway_eval.html").read_text(encoding="utf-8")
+    uc = (TEMPLATES / "gateway_usecase.html").read_text(encoding="utf-8")
+    run = (TEMPLATES / "gateway_run.html").read_text(encoding="utf-8")
+    for blob in (gw, ev, uc, run):
+        assert 'href="/gateway/usecases"' in blob
+    assert 'id="ucOverlay"' in uc
+    assert 'dir="auto"' in uc
+    assert "unicode-bidi: isolate" in (STATIC / "gateway.css").read_text(encoding="utf-8")

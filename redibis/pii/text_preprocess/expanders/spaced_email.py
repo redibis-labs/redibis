@@ -12,13 +12,15 @@ from redibis.pii.text_preprocess.surface import SurfaceSpan
 
 
 @lru_cache(maxsize=1)
-def _token_sets() -> tuple[set[str], set[str]]:
+def _token_sets() -> tuple[set[str], set[str], set[str]]:
     data = load_yaml_lexicon("at_tokens.yaml")
     at_tokens = {fold_ar(t) for t in (data.get("at_tokens") or [])}
     dot_tokens = {fold_ar(t) for t in (data.get("dot_tokens") or [])}
+    underscore_tokens = {fold_ar(t) for t in (data.get("underscore_tokens") or [])}
     at_tokens.update({"@", "＠"})
     dot_tokens.update({".", "．"})
-    return at_tokens, dot_tokens
+    underscore_tokens.update({"_"})
+    return at_tokens, dot_tokens, underscore_tokens
 
 
 # Local part: contiguous or lightly spaced alnum (not free English words)
@@ -32,6 +34,7 @@ _SPACED_AT = re.compile(
     rf"({_TLD})(?!\w)",
     re.IGNORECASE,
 )
+_CLEAN_EMAIL = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 
 
 def _collapse_alnum(s: str) -> str:
@@ -57,9 +60,11 @@ class SpacedEmailExpander:
             if not local or not domain or not tld:
                 continue
             canonical = f"{local}@{domain}.{tld}"
-            # Skip already-clean emails (regex path covers them)
+            # Skip already-clean emails (regex path covers them). `_LOCAL`
+            # allows intra-local spaces, so "Contact alice@example.com" would
+            # otherwise swallow the leading word; leave those to regex.
             surface = m.group(0)
-            if re.fullmatch(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}", surface.strip()):
+            if _CLEAN_EMAIL.search(surface):
                 continue
             out.append(SurfaceSpan(
                 start=m.start(),
@@ -75,7 +80,7 @@ class SpacedEmailExpander:
         return out
 
     def _token_walk(self, text: str) -> list[SurfaceSpan]:
-        at_tokens, dot_tokens = _token_sets()
+        at_tokens, dot_tokens, underscore_tokens = _token_sets()
         tokens = list(re.finditer(r"\S+", text))
         fillers = {
             "email", "mail", "me", "my", "the", "is", "reach", "write", "to",
@@ -102,6 +107,10 @@ class SpacedEmailExpander:
                     break
                 if folded in dot_tokens or raw == ".":
                     local_parts.insert(0, ".")
+                    j -= 1
+                    continue
+                if folded in underscore_tokens or raw == "_":
+                    local_parts.insert(0, "_")
                     j -= 1
                     continue
                 if re.fullmatch(r"[A-Za-z0-9._%+\-]{1,24}", raw):
@@ -153,6 +162,11 @@ class SpacedEmailExpander:
                         local_rebuilt.append(buf)
                         buf = ""
                     local_rebuilt.append(".")
+                elif part == "_":
+                    if buf:
+                        local_rebuilt.append(buf)
+                        buf = ""
+                    local_rebuilt.append("_")
                 else:
                     buf += part
             if buf:
@@ -180,6 +194,9 @@ class SpacedEmailExpander:
                 continue
             canonical = f"{local}@{domain}"
             surface = text[start:end]
+            if _CLEAN_EMAIL.search(surface):
+                i += 1
+                continue
             if not re.search(r"(?i)\bat\b|\[at\]|\(at\)|آت", surface) and "@" not in surface:
                 i += 1
                 continue

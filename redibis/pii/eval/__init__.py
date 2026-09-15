@@ -1,7 +1,7 @@
 """Portable, deterministic evaluation helpers for free-text PII spans."""
 
 from .batch import assemble_batch_report, discover_eval_files, evaluate_path
-from .builder import CorpusBuildError, build_dataset, build_path
+from .builder import CorpusBuildError, build_dataset, build_path, locate_unique_value
 from .gates import GateError, apply_gates_to_report, evaluate_gates, format_gate_failure, load_gate_file
 from .report_html import render_report_html
 from .runner import EvalCancelled, eval_limiter_weight, evaluate_with_service
@@ -46,6 +46,7 @@ __all__ = [
     "evaluate_with_service",
     "format_gate_failure",
     "load_gate_file",
+    "locate_unique_value",
     "render_report_html",
     "validate_dataset",
 ]

@@ -9,15 +9,16 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-JS_TEST = ROOT / "tests" / "js" / "test_gateway_render.mjs"
+JS_DIR = ROOT / "tests" / "js"
 
 
 def test_gateway_render_node_suite():
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not on PATH")
+    files = sorted(str(p) for p in JS_DIR.glob("*.mjs"))
     proc = subprocess.run(
-        [node, "--test", str(JS_TEST)],
+        [node, "--test", *files],
         cwd=str(ROOT),
         capture_output=True,
         text=True,

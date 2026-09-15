@@ -12,18 +12,28 @@ from redibis.pii.text_preprocess.surface import SurfaceSpan
 # Digit groups separated by common separators — at least 8 digits total.
 _CLUSTER = re.compile(
     r"(?<!\w)"
-    r"[\d٠-٩۰-۹](?:[\d٠-٩۰-۹\s\-–—./_]{6,30}[\d٠-٩۰-۹])"
+    r"\+?[\d٠-٩۰-۹](?:[\d٠-٩۰-۹\s\-–—./_]{6,30}[\d٠-٩۰-۹])"
     r"(?!\w)"
 )
 
 _LABELS = {
-    "PHONE_NUMBER": ["موبايل", "هاتف", "تليفون", "phone", "mobile", "msisdn"],
+    "PHONE_NUMBER": [
+        "موبايل", "الموبايل", "هاتف", "تليفون", "phone", "mobile", "msisdn",
+        "line", "connected",
+    ],
     "EG_NATIONAL_ID": ["قومي", "هوية", "national id", "nid", "الرقم القومي"],
     "IMEI": ["imei", "جهاز"],
     "IMSI": ["imsi"],
     "ICCID": ["iccid", "sim", "شريحة"],
-    "CREDIT_CARD": ["card", "visa", "mastercard", "بطاقة", "ائتمان"],
+    "CREDIT_CARD": [
+        "card", "visa", "mastercard", "بطاقة", "ائتمان", "فيزا", "كارت",
+    ],
 }
+# When several labels sit in the same window (e.g. "IMEI بتاع التليفون"),
+# prefer the device/id type over the generic phone cue.
+_HINT_PRIORITY = (
+    "IMEI", "IMSI", "ICCID", "EG_NATIONAL_ID", "CREDIT_CARD", "PHONE_NUMBER",
+)
 
 
 @register_text_expander("digit_cluster")
@@ -36,21 +46,29 @@ class DigitClusterExpander:
         out: list[SurfaceSpan] = []
         for m in _CLUSTER.finditer(text):
             surface = m.group(0)
-            # Skip pure contiguous digit runs that regex already covers well,
-            # unless separators are present.
-            if re.fullmatch(r"[\d٠-٩۰-۹]+", surface):
-                continue
             digits = re.sub(r"\D", "", fold_indic_digits(surface))
             if not (8 <= len(digits) <= 20):
                 continue
             hint = ""
             label = ""
+            found_hints: list[tuple[str, str]] = []
             for entity, labels in _LABELS.items():
-                found = label_near(text, m.start(), m.end(), labels)
+                found = label_near(text, m.start(), m.end(), labels, radius=80)
                 if found:
-                    hint = entity
-                    label = found
-                    break
+                    found_hints.append((entity, found))
+            if found_hints:
+                found_hints.sort(
+                    key=lambda item: (
+                        _HINT_PRIORITY.index(item[0])
+                        if item[0] in _HINT_PRIORITY
+                        else len(_HINT_PRIORITY)
+                    )
+                )
+                hint, label = found_hints[0]
+            # Skip unlabeled contiguous digit runs — regex already covers them.
+            # Keep labeled contiguous IMEI / non-EG MSISDN / PAN that validators drop.
+            if re.fullmatch(r"[\d٠-٩۰-۹]+", surface) and not hint:
+                continue
             if not hint:
                 if len(digits) == 14:
                     hint = "EG_NATIONAL_ID"

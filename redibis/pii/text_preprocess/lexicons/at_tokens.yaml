@@ -17,3 +17,8 @@ dot_tokens:
   - نقطة
   - نقطه
   - دوت
+
+underscore_tokens:
+  - underscore
+  - under_score
+  - "_"

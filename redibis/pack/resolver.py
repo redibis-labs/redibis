@@ -416,6 +416,9 @@ def pack_stack_for_evidence(
     """Header block per PLAN §3 ``header.provenance.pack_stack``."""
     layers = list(resolved_stack.layers)
     applied = [L for L in layers if L.source != "builtin"] or layers
+    # compute_stack_uuid takes one mode. Use the last applied layer's mode —
+    # the effective overlay policy at the top of the stack. Per-layer mode is
+    # recorded on packs[]. Mixed-mode stacks are not hashed as a mode sequence.
     mode = (applied[-1].mode if applied else "overlay") or "overlay"
 
     packs_out: list[dict[str, Any]] = []

@@ -3148,22 +3148,67 @@ async def llm_providers_registry_save(body: LlmProvidersRegistryBody) -> dict:
 
 @app.get("/api/llm/calls")
 async def llm_calls(
+    request: Request,
     limit: int = Query(50, ge=1, le=200),
     model_role: str = Query(""),
     run_id: str = Query(""),
     routing_revision: Optional[int] = Query(None),
 ) -> dict:
-    """Recent LLM call records (in-memory ring buffer)."""
-    from redibis.enrich.llm_logging import get_recent_llm_calls
+    """Recent LLM call records (in-memory ring buffer).
 
+    Prompt/response bodies are admin-only (or unrestricted when auth is off).
+    Explorers receive metadata — provider, model, status, whether the call ran.
+    """
+    from redibis.enrich.llm_logging import get_recent_llm_calls
+    from redibis.webapp.pii_text_routes import role_may_see_full_provenance
+
+    include = role_may_see_full_provenance(request)
     return {
         "calls": get_recent_llm_calls(
             limit=limit,
             model_role=model_role,
             run_id=run_id,
             routing_revision=routing_revision,
-        )
+            include_transcripts=include,
+        ),
+        "transcripts": include,
     }
+
+
+@app.get("/api/llm/calls/export")
+async def llm_calls_export(
+    request: Request,
+    run_id: str = Query(""),
+    limit: int = Query(200, ge=1, le=200),
+    _user=Depends(require_admin),
+) -> Response:
+    """Download recent LLM calls (with transcripts) as a JSON file. Admin only."""
+    from datetime import datetime, timezone
+
+    from redibis.enrich.llm_logging import get_recent_llm_calls
+
+    rid = (run_id or "").strip()
+    calls = get_recent_llm_calls(
+        limit=limit,
+        run_id=rid,
+        include_transcripts=True,
+    )
+    payload = {
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "run_id": rid,
+        "call_count": len(calls),
+        "calls": calls,
+    }
+    stem = rid[:12] if rid else "recent"
+    filename = f"llm-calls-{stem}.json"
+    return Response(
+        content=json.dumps(payload, indent=2, ensure_ascii=False),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 class LlmTestBody(BaseModel):

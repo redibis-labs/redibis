@@ -704,3 +704,29 @@ def test_matcher_invariants_cover_every_class():
     missing = set(MATCH_CLASSES) - seen
     assert not missing, f"taxonomy fixtures missed classes: {sorted(missing)}"
 
+
+def test_report_html_tints_overcaptured_chars():
+    from redibis.pii.eval.report_html import render_report_body
+    from redibis.pii.eval.span_metrics import REPORT_KIND, SCHEMA_VERSION_1_2
+
+    case = _phone_case()
+    pred = [{"start": 5, "end": 17, "entity_type": "PHONE_NUMBER"}]
+    scored = evaluate_case(case, pred)
+    row = next(r for r in scored["match_classes"] if r["class"] == "superset")
+    assert row["coverage"] == 1.0
+    assert row["char_precision"] < 1.0
+    assert row["value_equal"] is True
+    report = evaluate_dataset(
+        {
+            "kind": DATASET_KIND,
+            "schema_version": SCHEMA_VERSION_1_2,
+            "id": "overcap",
+            "cases": [case],
+        },
+        {"phone-dot": pred},
+    )
+    assert report["kind"] == REPORT_KIND
+    html = render_report_body(report)
+    assert 'class="hl extra"' in html
+    assert "dir=\"auto\"" in html
+

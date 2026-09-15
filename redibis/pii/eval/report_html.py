@@ -246,7 +246,7 @@ def _highlight_html(text: str, spans: Sequence[Mapping[str, Any]]) -> str:
         chunk = _esc("".join(chars[i:j]))
         kind = labels[i]
         if kind:
-            parts.append(f'<mark class="hl {kind}">{chunk}</mark>')
+            parts.append(f'<mark class="hl {kind}" dir="auto">{chunk}</mark>')
         else:
             parts.append(chunk)
         i = j
@@ -333,7 +333,7 @@ def _case_html(case: Mapping[str, Any], *, metric_name: str) -> str:
         f"tags {_esc(', '.join(case.get('tags') or []) or '—')} · "
         f"strict F1 {_esc(exact.get('f1', 0))} · value F1 {_esc(value.get('f1', 0))} · "
         f"overlap F1 {_esc(overlap.get('f1', 0))}</p>"
-        f'<pre class="text">{_highlight_html(_case_text(str(case.get("text") or "")), overlays)}</pre>'
+        f'<pre class="text" dir="auto">{_highlight_html(_case_text(str(case.get("text") or "")), overlays)}</pre>'
         + _span_table(case)
         + "</article>"
     )
@@ -352,7 +352,7 @@ h1,h2,h3{font-weight:650;margin:0 0 8px}
 .tile .num{font-size:22px;font-weight:700}
 .delta{font-size:12px;color:#555}
 .file.failed{border-color:#c1272d}
-.hl{border-radius:3px;padding:0 1px;border-bottom:2px solid}
+.hl{border-radius:3px;padding:0 1px;border-bottom:2px solid;unicode-bidi:isolate}
 .hl.exact{background:#dcfce7;border-color:#166534}
 .hl.near{background:#fef3c7;border-color:#b45309}
 .hl.bad{background:#fee2e2;border-color:#c1272d}
@@ -362,7 +362,7 @@ h1,h2,h3{font-weight:650;margin:0 0 8px}
 .hl.fn{background:#ffedd5;border-color:#b45309}
 .hl.tp{background:#dcfce7;border-color:#166534}
 .hl.proposal{background:transparent;border-bottom-style:dashed;opacity:.85}
-pre.text{white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-monospace,monospace;margin:8px 0 0}
+pre.text{white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-monospace,monospace;margin:8px 0 0;unicode-bidi:isolate}
 .legend span{display:inline-block;margin-right:12px}
 .legend .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;border-bottom:2px solid}
 .prov{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 16px}
@@ -388,14 +388,13 @@ pre.text{white-space:pre-wrap;word-break:break-word;font:13px/1.5 ui-monospace,m
 """
 
 
-def render_single_report_html(report: Mapping[str, Any], *, metric_name: str = "exact") -> str:
+def report_css() -> str:
+    return _css()
+
+
+def _single_body(report: Mapping[str, Any], *, metric_name: str) -> str:
     cases = "".join(_case_html(case, metric_name=metric_name) for case in report.get("cases") or [])
-    return f"""<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"/>
-<title>Redibis evaluation report</title>
-<style>{_css()}</style></head>
-<body>
-<h1>Text-span evaluation</h1>
+    return f"""<h1>Text-span evaluation</h1>
 {_provenance(report)}
 {_notes_html(report)}
 {_kpi_tiles(report)}
@@ -414,6 +413,16 @@ def render_single_report_html(report: Mapping[str, Any], *, metric_name: str = "
   <span><i class="sw" style="border-bottom:2px dashed #555"></i>missed</span>
 </p>
 {cases or '<p class="muted">No cases.</p>'}
+"""
+
+
+def render_single_report_html(report: Mapping[str, Any], *, metric_name: str = "exact") -> str:
+    return f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/>
+<title>Redibis evaluation report</title>
+<style>{report_css()}</style></head>
+<body>
+{_single_body(report, metric_name=metric_name)}
 </body></html>
 """
 
@@ -442,7 +451,7 @@ def render_batch_report_html(report: Mapping[str, Any], *, metric_name: str = "e
     return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"/>
 <title>Redibis batch evaluation report</title>
-<style>{_css()}</style></head>
+<style>{report_css()}</style></head>
 <body>
 <h1>Batch text-span evaluation</h1>
 {_provenance(report)}
@@ -474,3 +483,21 @@ def render_report_html(report: Mapping[str, Any], *, metric_name: str = "exact")
     if kind == REPORT_KIND:
         return render_single_report_html(report, metric_name=metric_name)
     raise ValueError(f"unsupported report kind {kind!r}")
+
+
+def render_report_body(report: Mapping[str, Any], *, metric_name: str = "exact") -> str:
+    """Inner HTML shared by the CLI export and the /gateway/runs page."""
+    if metric_name not in ("exact", "overlap", "strict", "value"):
+        raise ValueError(f"unsupported metric {metric_name!r}")
+    version = str(report.get("schema_version") or "")
+    if version not in SUPPORTED_REPORT_VERSIONS:
+        raise ValueError(f"unsupported schema_version {report.get('schema_version')!r}")
+    kind = report.get("kind")
+    if kind == REPORT_KIND:
+        return _single_body(report, metric_name=metric_name)
+    html = render_report_html(report, metric_name=metric_name)
+    start = html.find("<body>")
+    end = html.rfind("</body>")
+    if start >= 0 and end > start:
+        return html[start + len("<body>"):end]
+    return html

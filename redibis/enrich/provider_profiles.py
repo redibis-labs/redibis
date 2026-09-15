@@ -49,7 +49,7 @@ SGLANG_QWEN_PRESET: dict[str, Any] = {
     "name": "sglang-qwen",
     "description": "SGLang-hosted Qwen (local)",
     "profile_type": "openai_compatible",
-    "litellm_model": "openai/Qwen/Qwen2.5-14B-Instruct",
+    "litellm_model": "openai/Qwen/Qwen2.5-14B-Instruct-AWQ",
     "model_prefix": "openai",
     "api_base": "http://localhost:30000/v1",
     "api_key_env": "SGLANG_API_KEY",
