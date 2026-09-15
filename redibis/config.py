@@ -578,9 +578,21 @@ class TextGatewayConfig:
     # admin ``/api/pii/text/*`` stays opt-in for backward compatibility.
     obfuscation_preprocess: bool = True
     obfuscation_expanders: list = field(default_factory=list)
-    # Operator overlay: exclude_terms, patterns, context_cues, quantity_units.
-    # Empty = shipped defaults only. Merged at RuleSet compile time.
+    # Operator overlay: exclude_terms, patterns, context_cues, quantity_units,
+    # noise_terms, ner_stoplist. Empty = shipped defaults only.
     rules: dict = field(default_factory=dict)
+    ui_max_chars: int = 200_000
+    scan_max_chars: int = 200_000
+    ner_window_chars: int = 1200
+    ner_window_overlap: int = 200
+    ner_max_windows: int = 200
+    max_llm_windows: int = 8
+    llm_window_chars: int = 3500
+    llm_window_overlap: int = 300
+    # Durable LLM transcripts contain raw input text. Off by default; never
+    # stored in the run registry. Enable only with an explicit admin-only
+    # read path and a retention period.
+    llm_log_persist: bool = False
 
 
 @dataclass
@@ -589,6 +601,32 @@ class PackSourceConfig:
 
     path: str = ""
     mode: str = "overlay"
+
+
+@dataclass
+class SampleDataConfig:
+    """Server-side sample data library browsable from the web app.
+
+    Lets an operator start a scan from a file that already sits on the machine
+    hosting redibis, instead of uploading one. When ``roots`` is empty and
+    ``REDIBIS_SAMPLE_DATA_DIR`` is unset, the process working directory (the
+    folder the server was started from) is used. Every configured root is
+    readable to every signed-in user of the web app.
+
+    ``roots`` entries are either a plain path string or a mapping
+    ``{name, label, path}``. Paths are resolved once at startup; nothing
+    outside a resolved root is ever readable, symlinks included.
+    """
+
+    roots: list = field(default_factory=list)
+    extensions: list = field(
+        default_factory=lambda: [".csv", ".tsv", ".parquet", ".xlsx", ".xls"]
+    )
+    max_file_mb: int = 512
+    max_depth: int = 4
+    max_entries: int = 2000
+    # Allow the picker to start a scan. False = listing and preview only.
+    allow_scan: bool = True
 
 
 @dataclass
@@ -619,6 +657,7 @@ class RedibisConfig:
     pack: PackConfig = field(default_factory=PackConfig)
     packs: list = field(default_factory=list)  # list[PackSourceConfig | dict]
     text_gateway: TextGatewayConfig = field(default_factory=TextGatewayConfig)
+    sample_data: SampleDataConfig = field(default_factory=SampleDataConfig)
 
     @classmethod
     def default(cls) -> "RedibisConfig":

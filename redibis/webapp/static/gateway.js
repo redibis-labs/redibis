@@ -1,12 +1,13 @@
-import {
+const {
   classOf,
   classifyBanners,
   paintBanners,
   remapSpansAfterDeid,
   renderHighlights,
-} from "./gateway_render.mjs";
+} = await import(`./gateway_render.mjs?v=${window.GW_RENDER_V || ""}`);
+const { createRulesEditor } = await import(`./gateway_rules.mjs?v=${window.GW_RULES_V || window.GW_RENDER_V || ""}`);
 
-const MAX = Number(window.GW_MAX_CHARS || 20000);
+const MAX = Number(window.GW_MAX_CHARS || 200000);
 const STRATEGIES = ["redact", "mask", "hash", "fpe", "fake", "passthrough"];
 const $ = (id) => document.getElementById(id);
 
@@ -46,6 +47,8 @@ const safetyCard = $("gwSafetyCard");
 const safetyEl = $("gwSafety");
 const llmCard = $("gwLlmCard");
 const llmEl = $("gwLlm");
+const llmSummaryEl = $("gwLlmSummary");
+const llmShowBtn = $("gwLlmShow");
 const llmDownloadBtn = $("gwLlmDownload");
 const llmDownloadBarBtn = $("gwLlmDownloadBar");
 const progressEl = $("gwProgress");
@@ -77,6 +80,18 @@ const STAGE_LABEL = {
 
 let sourceText = "";
 let lastEnvelope = null;
+let lastLlmLog = null;
+let llmLogOpen = false;
+const rulesEditor = $("gwRules")
+  ? createRulesEditor($("gwRules"), {
+    getText: () => sourceText || (input && input.value) || "",
+    getLanguage: () => langEl.value,
+    getEngines: () => enginesEl.value,
+    getMinScore: () => Number(minScoreEl.value || 0.35),
+    onError: (err) => paintBanners(bannerEl, [{ kind: "warn", text: err.message }]),
+    onSaved: () => paintBanners(bannerEl, [{ kind: "ok", text: "Rules saved as default." }]),
+  })
+  : null;
 let reviewedPolicy = null;
 let health = null;
 let scanAbort = null;
@@ -126,6 +141,7 @@ function scanPayload() {
     llm_api_key: (useLlmEl && useLlmEl.checked && llmKeyEl && llmKeyEl.value.trim()) || "",
     check_toxicity: !!(checkToxicityEl && checkToxicityEl.checked),
     check_prompt_injection: !!(checkInjectionEl && checkInjectionEl.checked),
+    draft_rules: rulesEditor && rulesEditor.getDraft() || undefined,
   };
 }
 
@@ -276,6 +292,9 @@ function showTip(mark, ev) {
       s.score != null ? Number(s.score).toFixed(2) : "",
       s.engine || "",
       s.is_proposal ? "needs review" : "",
+      s.agreement ? "agree " + s.agreement : "",
+      s.arbitration_rule || "",
+      s.llm_verdict ? "llm " + s.llm_verdict : "",
     ].filter(Boolean);
     line.appendChild(document.createTextNode(bits.join(" · ")));
     tip.appendChild(line);
@@ -313,6 +332,35 @@ function renderSummary(env) {
       row.appendChild(sw);
       row.appendChild(document.createTextNode(type + " · " + n + " · " + classOf(type)));
       summaryEl.appendChild(row);
+    }
+    const spansForNoise = (pii.spans || []).filter((s) => s.text);
+    if (spansForNoise.length) {
+      const noiseHint = document.createElement("div");
+      noiseHint.className = "gw-hint";
+      noiseHint.appendChild(document.createTextNode("Add a finding to noise terms:"));
+      summaryEl.appendChild(noiseHint);
+      spansForNoise.slice(0, 12).forEach((span) => {
+        const line = document.createElement("div");
+        line.className = "gw-sum-row";
+        line.appendChild(document.createTextNode((span.entity_type || "") + " · "));
+        const surface = document.createElement("span");
+        surface.dir = "auto";
+        surface.style.unicodeBidi = "isolate";
+        surface.appendChild(document.createTextNode(span.text || ""));
+        line.appendChild(surface);
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn btn-ghost btn-sm gw-noise-btn";
+        btn.appendChild(document.createTextNode("⌦ noise"));
+        btn.addEventListener("click", async () => {
+          if (!rulesEditor) return;
+          rulesEditor.addTerm("noise_terms", span.text);
+          await rulesEditor.preview();
+          runScan();
+        });
+        line.appendChild(btn);
+        summaryEl.appendChild(line);
+      });
     }
   }
   const spans = pii.spans || [];
@@ -419,26 +467,46 @@ function appendKv(parent, key, value) {
   parent.appendChild(dd);
 }
 
-function renderLlmLog(env) {
-  if (!llmCard || !llmEl) return;
-  const llm = env && env.llm;
-  llmEl.textContent = "";
-  if (!llm) {
-    llmCard.hidden = true;
-    if (llmDownloadBarBtn) llmDownloadBarBtn.hidden = true;
+function llmSummaryLine(llm) {
+  if (!llm) return "No LLM activity.";
+  const bits = [
+    llm.used ? "used" : "skipped",
+    (llm.call_count || 0) + " call" + ((llm.call_count || 0) === 1 ? "" : "s"),
+    (llm.providers || []).join("/") || "",
+    (llm.models || []).join("/") || "",
+    llm.windows_total ? ("windows " + (llm.windows_scanned || 0) + "/" + llm.windows_total) : "",
+    llm.skip_reason || "",
+  ].filter(Boolean);
+  return bits.join(" · ");
+}
+
+async function fetchLlmLog(runUuid) {
+  if (!runUuid) return { available: false, reason: "no run id", calls: [] };
+  const res = await fetch("/api/gateway/llm-log/" + encodeURIComponent(runUuid));
+  if (!res.ok) return { available: false, reason: "fetch failed (" + res.status + ")", calls: [] };
+  return res.json();
+}
+
+function paintLlmTranscripts(container, log) {
+  container.textContent = "";
+  if (!log || log.available === false) {
+    container.appendChild(document.createTextNode((log && log.reason) || "log not retained for this run"));
+    const note = document.createElement("p");
+    note.className = "gw-hint";
+    note.appendChild(document.createTextNode(
+      (log && log.retention && log.retention.note) ||
+      "The log is a process-local ring of the last 200 calls on this worker."
+    ));
+    container.appendChild(note);
     return;
   }
-  const dl = document.createElement("dl");
-  dl.className = "gw-kv";
-  appendKv(dl, "used", llm.used ? "yes" : "no");
-  appendKv(dl, "requested", llm.requested ? "yes" : "no");
-  appendKv(dl, "pii refiner", llm.pii_refiner_ran ? "ran" : "did not run");
-  appendKv(dl, "calls", String(llm.call_count || 0));
-  appendKv(dl, "provider", (llm.providers || []).join(", "));
-  appendKv(dl, "model", (llm.models || []).join(", "));
-  if (llm.skip_reason) appendKv(dl, "why not", llm.skip_reason);
-  llmEl.appendChild(dl);
-  (llm.calls || []).forEach((call) => {
+  if (log.transcripts_withheld) {
+    const note = document.createElement("p");
+    note.className = "gw-hint";
+    note.appendChild(document.createTextNode("Transcripts withheld for this role."));
+    container.appendChild(note);
+  }
+  (log.calls || []).forEach((call) => {
     const wrap = document.createElement("div");
     wrap.className = "gw-llm-call";
     const head = document.createElement("div");
@@ -472,10 +540,46 @@ function renderLlmLog(env) {
       err.appendChild(document.createTextNode(String(call.error)));
       wrap.appendChild(err);
     }
-    llmEl.appendChild(wrap);
+    container.appendChild(wrap);
   });
+}
+
+function renderLlmLog(env) {
+  if (!llmCard) return;
+  const llm = env && env.llm;
+  lastLlmLog = null;
+  llmLogOpen = false;
+  if (llmEl) {
+    llmEl.textContent = "";
+    llmEl.hidden = true;
+  }
+  if (!llm) {
+    llmCard.hidden = true;
+    if (llmDownloadBarBtn) llmDownloadBarBtn.hidden = true;
+    return;
+  }
+  if (llmSummaryEl) llmSummaryEl.textContent = llmSummaryLine(llm);
+  if (llmShowBtn) llmShowBtn.textContent = "Show LLM log";
   llmCard.hidden = false;
   if (llmDownloadBarBtn) llmDownloadBarBtn.hidden = false;
+}
+
+async function toggleLlmLog() {
+  if (!lastEnvelope) return;
+  if (llmLogOpen) {
+    llmLogOpen = false;
+    if (llmEl) llmEl.hidden = true;
+    if (llmShowBtn) llmShowBtn.textContent = "Show LLM log";
+    return;
+  }
+  const log = lastLlmLog || await fetchLlmLog(lastEnvelope.run_uuid || (lastEnvelope.llm && lastEnvelope.llm.run_id));
+  lastLlmLog = log;
+  llmLogOpen = true;
+  if (llmEl) {
+    paintLlmTranscripts(llmEl, log);
+    llmEl.hidden = false;
+  }
+  if (llmShowBtn) llmShowBtn.textContent = "Hide";
 }
 
 function selectFor(value) {
@@ -724,6 +828,7 @@ async function runScan() {
       wantedEngines: enginesEl.value,
       enginesRan: pii.engines_ran || [],
       spanCount: (pii.spans || []).length,
+      coverage: (env.text_meta && env.text_meta.coverage) || pii.coverage,
     });
     if (env.decision && env.decision.action === "block") {
       banners.push({
@@ -852,12 +957,14 @@ function downloadJson() {
   URL.revokeObjectURL(a.href);
 }
 
-function downloadLlmLog() {
-  if (!lastEnvelope || !lastEnvelope.llm) return;
-  const blob = new Blob([JSON.stringify(lastEnvelope.llm, null, 2)], { type: "application/json" });
+async function downloadLlmLog() {
+  if (!lastEnvelope) return;
+  const log = lastLlmLog || await fetchLlmLog(lastEnvelope.run_uuid || (lastEnvelope.llm && lastEnvelope.llm.run_id));
+  lastLlmLog = log;
+  const blob = new Blob([JSON.stringify(log, null, 2)], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  const stem = String(lastEnvelope.llm.run_id || lastEnvelope.run_uuid || "run").slice(0, 12);
+  const stem = String((log && log.run_uuid) || lastEnvelope.run_uuid || "run").slice(0, 12);
   a.download = "llm-log-" + stem + ".json";
   a.click();
   URL.revokeObjectURL(a.href);
@@ -891,6 +998,7 @@ clearBtn.addEventListener("click", resetAll);
 deidBtn.addEventListener("click", copyDeidentified);
 downloadBtn.addEventListener("click", downloadJson);
 if (llmDownloadBtn) llmDownloadBtn.addEventListener("click", downloadLlmLog);
+if (llmShowBtn) llmShowBtn.addEventListener("click", toggleLlmLog);
 if (llmDownloadBarBtn) llmDownloadBarBtn.addEventListener("click", downloadLlmLog);
 window.addEventListener("beforeunload", () => {
   cancelScan();

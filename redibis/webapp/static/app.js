@@ -8,6 +8,9 @@ var S={view:"homepage",aboutOpen:false,settingsOpen:false,stab:"data",
   evalSemantic:false,evalMinF1:0.8,evalBusy:false,evalAbort:null,evalStage:"",
   piiDets:[],piiF:"all",contracts:[],selContract:null,cyaml:"",chist:[],
   rxCat:[],es:null,sample:null,
+  // Server-side sample data library (browse + scan without uploading)
+  sampleLibOpen:false,sampleLib:null,sampleLibRoot:"",sampleLibFilter:"",
+  sampleLibBusy:false,sampleLibErr:"",sampleRef:null,
   // Debug page state
   debugSessions:[],debugSelSid:null,debugSession:null,debugRawJson:false,
   debugFlushBusy:false,debugSessionsLoading:false,_debugBootstrapped:false,
@@ -142,6 +145,22 @@ function configScalars(){
   };
 }
 
+// Create a session from the uploaded File or from a server-side sample path.
+// Scan and discovery must both go through here — posting FormData with a null
+// file is what FastAPI reports as "Expected UploadFile, received: str".
+async function createSessionFromCurrentSource(){
+  var sess;
+  if(S.sampleRef){
+    sess=await POST("/api/sessions/from-sample",buildSampleSessionBody());
+  }else{
+    if(!S.file) throw new Error("No file selected — upload a CSV or pick a server sample.");
+    sess=await POST("/api/sessions",buildSessionFormData());
+  }
+  S.sid=sess.session_id;
+  try{await PATCH("/api/sessions/"+S.sid+"/config",{fields:configScalars()});}catch(_){}
+  return sess;
+}
+
 // Ensure a session exists (for discovery, which is decoupled from the scan button).
 async function ensureSession(){
   if(S.sid){
@@ -153,11 +172,7 @@ async function ensureSession(){
       if(S.result) S.result=null;
     }
   }
-  if(!S.file) throw new Error("No active session — upload a CSV and run a scan first.");
-  var fd=buildSessionFormData();
-  var sess=await POST("/api/sessions",fd);
-  S.sid=sess.session_id;
-  try{await PATCH("/api/sessions/"+S.sid+"/config",{fields:configScalars()});}catch(_){}
+  await createSessionFromCurrentSource();
   return S.sid;
 }
 
@@ -182,7 +197,7 @@ function clearScanState(){
   clearLastSession();
   if(location.search) history.replaceState(null,"",window.location.pathname);
   Object.assign(S,{
-    file:null,fname:"",rows:0,cols:0,columns:[],
+    file:null,fname:"",rows:0,cols:0,columns:[],sampleRef:null,
     sid:null,table:null,scope:null,prog:0,pmsg:"",logs:[],result:null,
     sample:null,scanDone:false,scanLinks:{},
     approved:{items:[],summary:{}},apprSel:null,apprPreview:null,
@@ -327,7 +342,7 @@ function onFile(f){
     S.sid=null;S.result=null;S.scanDone=false;S.table=null;S.restoredSession=false;
     clearLastSession();
   }
-  S.file=f;S.fname=f.name;S.restoredSession=false;
+  S.file=f;S.fname=f.name;S.restoredSession=false;S.sampleRef=null;
   var rd=new FileReader();
   rd.onload=function(e){
     var lines=e.target.result.split("\n").filter(function(l){return l.trim()});
@@ -369,6 +384,161 @@ function buildSessionFormData(){
   return fd;
 }
 
+// JSON twin of buildSessionFormData() for the server-side sample library.
+// Keep the two in step — they feed the same session-creation code path.
+function buildSampleSessionBody(){
+  var tname="data."+String(S.fname||"sample").replace(/\.[^.]+$/,"").replace(/[^a-zA-Z0-9_]/g,"_");
+  S.table=tname;
+  var selectedCols=S.columns.filter(function(c){return c.on}).map(function(c){return c.name});
+  var body={
+    root:(S.sampleRef&&S.sampleRef.root)||"",
+    path:(S.sampleRef&&S.sampleRef.path)||"",
+    table:tname,
+    scan_mode:cfg.scan_mode,
+    equation:cfg.equation,
+    pii_engines:cfg.pii_engines,
+    pii_regex_confidence:cfg.pii_regex_confidence,
+    pii_gliner_confidence:cfg.pii_gliner_confidence,
+    pii_gliner_model:cfg.pii_gliner_model,
+    pii_gliner_always_run:!!cfg.pii_gliner_always_run,
+    automerge:cfg.automerge||"none"
+  };
+  if(cfg.pii_models_dir) body.pii_models_dir=cfg.pii_models_dir;
+  if(cfg.pii_regex_config_name) body.pii_regex_config=cfg.pii_regex_config_name;
+  if(cfg.quality_config_name) body.quality_config=cfg.quality_config_name;
+  if(selectedCols.length>0&&selectedCols.length<S.columns.length)
+    body.selected_columns=selectedCols;
+  return body;
+}
+
+// ── Server-side sample data library ──
+function fmtBytes(n){
+  n=Number(n||0);
+  if(n<1024) return n+" B";
+  if(n<1024*1024) return (n/1024).toFixed(0)+" KB";
+  if(n<1024*1024*1024) return (n/1024/1024).toFixed(1)+" MB";
+  return (n/1024/1024/1024).toFixed(1)+" GB";
+}
+
+// GET that surfaces FastAPI's `detail` — the shared GET() throws statusText,
+// which would hide "path escapes the sample data root" behind "Bad Request".
+async function getSampleJson(url){
+  var r=await fetch(url,{credentials:"same-origin"});
+  var text=await r.text();
+  var body=null;
+  try{body=JSON.parse(text)}catch(_){}
+  if(!r.ok){
+    var detail=body&&typeof body.detail==="string"?body.detail:(text||r.statusText);
+    throw new Error(detail);
+  }
+  return body;
+}
+
+async function openSampleLib(){
+  S.sampleLibOpen=true;S.sampleLibBusy=true;S.sampleLibErr="";S.sampleLibFilter="";render();
+  try{
+    S.sampleLib=await getSampleJson("/api/sample-data"+(S.sampleLibRoot?"?root="+encodeURIComponent(S.sampleLibRoot):""));
+    S.sampleLibRoot=S.sampleLib.root||"";
+  }catch(e){
+    S.sampleLib=null;S.sampleLibErr=e.message||"could not list server samples";
+  }
+  S.sampleLibBusy=false;render();
+}
+
+async function switchSampleRoot(name){
+  S.sampleLibRoot=name;
+  await openSampleLib();
+}
+
+async function pickSample(path){
+  S.sampleLibBusy=true;S.sampleLibErr="";render();
+  try{
+    var root=S.sampleLibRoot||"";
+    var pv=await getSampleJson("/api/sample-data/preview?path="+encodeURIComponent(path)+
+                     (root?"&root="+encodeURIComponent(root):""));
+    S.sid=null;S.result=null;S.scanDone=false;S.table=null;S.restoredSession=false;
+    clearLastSession();
+    S.file=null;
+    S.sampleRef={root:root,path:path};
+    S.fname=pv.name||path;
+    S.cols=(pv.columns||[]).length;
+    S.rows=pv.row_count==null?0:pv.row_count;
+    S.columns=(pv.columns||[]).map(function(c){return{name:c,on:true}});
+    S.sampleLibOpen=false;S.sampleLibBusy=false;
+    S.view="ready";render();
+  }catch(e){
+    S.sampleLibBusy=false;
+    S.sampleLibErr=e.message||"could not read that file";
+    render();
+  }
+}
+
+function setSampleFilter(v){S.sampleLibFilter=v;render();
+  var el=document.getElementById("sampleLibFilter");
+  if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}
+}
+
+function vSampleLib(){
+  var lib=S.sampleLib;
+  var body="";
+  if(S.sampleLibBusy) body="<div class=\"hint\" style=\"padding:24px 0\">loading…</div>";
+  else if(S.sampleLibErr) body="<div class=\"hint\" style=\"padding:16px 0;color:var(--red)\">"+E(S.sampleLibErr)+"</div>";
+  else if(!lib||lib.enabled===false)
+    body="<div class=\"hint\" style=\"padding:16px 0\">No sample data root is available.<br/><br/>"+
+         "The picker defaults to the folder the server was started from. Set <code>sample_data.roots</code> "+
+         "in <code>REDIBIS_CONFIG</code>, or <code>REDIBIS_SAMPLE_DATA_DIR=/path/to/samples</code>, then reopen this panel.</div>";
+  else{
+    var q=(S.sampleLibFilter||"").toLowerCase();
+    var files=(lib.files||[]).filter(function(f){
+      return !q||f.path.toLowerCase().indexOf(q)>=0;
+    });
+    var roots=(lib.roots||[]);
+    var rootBar="";
+    if(roots.length>1){
+      rootBar="<div class=\"row\" style=\"gap:6px;flex-wrap:wrap;margin-bottom:10px\">"+
+        roots.map(function(r){
+          var on=r.name===(lib.root||"");
+          return "<button class=\"btn btn-sm "+(on?"btn-red":"btn-ghost")+"\" "+
+            "data-r=\""+E(r.name)+"\" onclick=\"switchSampleRoot(this.dataset.r)\">"+
+            E(r.label||r.name)+"</button>";
+        }).join("")+"</div>";
+    }
+    var rows=files.length
+      ? files.map(function(f){
+          var dis=f.too_large;
+          return "<tr"+(dis?" style=\"opacity:.45\"":"")+">"+
+            "<td style=\"text-align:left\"><code>"+E(f.path)+"</code></td>"+
+            "<td style=\"white-space:nowrap\">"+E(fmtBytes(f.size))+"</td>"+
+            "<td style=\"text-align:right\">"+
+              (dis
+                ? "<span class=\"hint\">over "+E(String(lib.max_file_mb))+" MB</span>"
+                : (lib.allow_scan===false
+                    ? "<span class=\"hint\">browsing only</span>"
+                    : "<button class=\"btn btn-ghost btn-sm\" data-p=\""+E(f.path)+
+                      "\" onclick=\"pickSample(this.dataset.p)\">use this →</button>"))+
+            "</td></tr>";
+        }).join("")
+      : "<tr><td colspan=\"3\" class=\"hint\" style=\"padding:16px 0\">"+
+        (lib.files&&lib.files.length?"nothing matches that filter":"no loadable files under this root")+
+        "</td></tr>";
+    body=rootBar+
+      "<input id=\"sampleLibFilter\" class=\"input\" style=\"width:100%;margin-bottom:10px\" "+
+        "placeholder=\"filter by name…\" value=\""+E(S.sampleLibFilter||"")+"\" "+
+        "oninput=\"setSampleFilter(this.value)\"/>"+
+      "<div style=\"max-height:46vh;overflow:auto\"><table class=\"tbl\" style=\"width:100%\">"+
+        "<thead><tr><th style=\"text-align:left\">file</th><th>size</th><th></th></tr></thead>"+
+        "<tbody>"+rows+"</tbody></table></div>"+
+      (lib.truncated?"<div class=\"hint\" style=\"margin-top:8px\">listing truncated — narrow the root or raise sample_data.max_entries</div>":"");
+  }
+  return "<div class=\"modal-bg\" onclick=\"if(event.target===this)set({sampleLibOpen:false})\">"+
+    "<div class=\"modal\" style=\"max-width:720px;text-align:left\">"+
+      "<button class=\"modal-x\" onclick=\"set({sampleLibOpen:false})\">×</button>"+
+      "<div style=\"font-size:20px;font-weight:700;color:var(--ink);margin-bottom:4px\">server sample data</div>"+
+      "<div class=\"hint\" style=\"margin-bottom:14px\">files already on the machine running redibis — no upload</div>"+
+      body+
+    "</div></div>";
+}
+
 async function doScan(scope){
   if(S.scanBusy){
     addLog("Scan already in progress — wait for the current run to finish","err");
@@ -380,12 +550,8 @@ async function doScan(scope){
   S.logs=[];S.prog=5;S.pmsg="Creating session…";S.view="scanning";render();
   addLog("Starting scan (mode="+cfg.scan_mode+"): "+S.fname,"step");
   try{
-    var fd=buildSessionFormData();
-    var sess=await POST("/api/sessions",fd);
-    S.sid=sess.session_id;
+    var sess=await createSessionFromCurrentSource();
     addLog("Session "+sess.session_id+" created","ok");
-    // Sync the remaining scalar config (LLM, quality mode, validate, etc.)
-    try{await PATCH("/api/sessions/"+S.sid+"/config",{fields:configScalars()});}catch(_){}
     addLog("Config: "+JSON.stringify(sess.common_config),"");
     // SSE
     if(S.es)S.es.close();
@@ -940,11 +1106,8 @@ async function executeQualityProfiler(){
   if(!S.sid){
     S.logs=[];S.result=null;S.prog=5;S.pmsg="Creating session...";S.view="scanning";render();
     addLog("Starting Quality Profiler for "+S.fname,"step");
-    var fd=new FormData();fd.append("file",S.file);
-    fd.append("table","data."+S.fname.replace(/\.[^.]+$/,"").replace(/[^a-zA-Z0-9_]/g,"_"));
-    fd.append("equation","independent");
-    var sess=await POST("/api/sessions",fd);
-    S.sid=sess.session_id;addLog("Session: "+sess.session_id,"ok");
+    var sess=await createSessionFromCurrentSource();
+    addLog("Session: "+sess.session_id,"ok");
     if(S.es)S.es.close();
     var es=new EventSource("/api/sessions/"+sess.session_id+"/stream");
     es.onmessage=function(e){if(e.data==="[DONE]"){es.close();return}try{var d=JSON.parse(e.data);if(d.message)addLog(d.message,d.message.indexOf("ERROR")>=0?"err":"")}catch(x){}};
@@ -970,11 +1133,8 @@ async function executeQualityScanBypass(){
   if(!S.sid){
     S.logs=[];S.result=null;S.prog=5;S.pmsg="Creating session...";S.view="scanning";render();
     addLog("Starting Quality Scan for "+S.fname,"step");
-    var fd=new FormData();fd.append("file",S.file);
-    fd.append("table","data."+S.fname.replace(/\.[^.]+$/,"").replace(/[^a-zA-Z0-9_]/g,"_"));
-    fd.append("equation","independent");
-    var sess=await POST("/api/sessions",fd);
-    S.sid=sess.session_id;addLog("Session: "+sess.session_id,"ok");
+    var sess=await createSessionFromCurrentSource();
+    addLog("Session: "+sess.session_id,"ok");
     if(S.es)S.es.close();
     var es=new EventSource("/api/sessions/"+sess.session_id+"/stream");
     es.onmessage=function(e){if(e.data==="[DONE]"){es.close();return}try{var d=JSON.parse(e.data);if(d.message)addLog(d.message,d.message.indexOf("ERROR")>=0?"err":"")}catch(x){}};
@@ -1003,11 +1163,8 @@ async function executeQualityScanUpload(inp){
   if(!S.sid){
     S.logs=[];S.result=null;S.prog=5;S.pmsg="Creating session...";S.view="scanning";render();
     addLog("Starting Quality Scan for "+S.fname,"step");
-    var fd=new FormData();fd.append("file",S.file);
-    fd.append("table","data."+S.fname.replace(/\.[^.]+$/,"").replace(/[^a-zA-Z0-9_]/g,"_"));
-    fd.append("equation","independent");
-    var sess=await POST("/api/sessions",fd);
-    S.sid=sess.session_id;addLog("Session: "+sess.session_id,"ok");
+    var sess=await createSessionFromCurrentSource();
+    addLog("Session: "+sess.session_id,"ok");
     if(S.es)S.es.close();
     var es=new EventSource("/api/sessions/"+sess.session_id+"/stream");
     es.onmessage=function(e){if(e.data==="[DONE]"){es.close();return}try{var d=JSON.parse(e.data);if(d.message)addLog(d.message,d.message.indexOf("ERROR")>=0?"err":"")}catch(x){}};
@@ -1026,11 +1183,8 @@ async function executePiiScan(){
   if(!S.sid){
     S.logs=[];S.result=null;S.prog=5;S.pmsg="Creating session...";S.view="scanning";render();
     addLog("Starting PII scan for "+S.fname,"step");
-    var fd=new FormData();fd.append("file",S.file);
-    fd.append("table","data."+S.fname.replace(/\.[^.]+$/,"").replace(/[^a-zA-Z0-9_]/g,"_"));
-    fd.append("equation","independent");
-    var sess=await POST("/api/sessions",fd);
-    S.sid=sess.session_id;addLog("Session: "+sess.session_id,"ok");
+    var sess=await createSessionFromCurrentSource();
+    addLog("Session: "+sess.session_id,"ok");
     if(S.es)S.es.close();
     var es=new EventSource("/api/sessions/"+sess.session_id+"/stream");
     es.onmessage=function(e){if(e.data==="[DONE]"){es.close();return}try{var d=JSON.parse(e.data);if(d.message)addLog(d.message,d.message.indexOf("ERROR")>=0?"err":"")}catch(x){}};
@@ -1081,12 +1235,9 @@ async function executeQualityScan(){
 
 async function loadSample(){
   if(!S.sid) {
-    if(!S.file) return;
+    if(!S.file && !S.sampleRef) return;
     try {
-      var fd=new FormData();fd.append("file",S.file);
-      fd.append("table","data."+S.fname.replace(/\.[^.]+$/,"").replace(/[^a-zA-Z0-9_]/g,"_"));
-      var sess=await POST("/api/sessions",fd);
-      S.sid=sess.session_id;
+      await createSessionFromCurrentSource();
     } catch(e) { return; }
   }
   try {
@@ -2421,6 +2572,7 @@ function renderInner(){
   // Overlays
   var ov="";
   if(S.aboutOpen)ov+=vAbout();
+  if(S.sampleLibOpen)ov+=vSampleLib();
   document.getElementById("overlays").innerHTML=ov;
 
   bind();
@@ -2433,6 +2585,10 @@ function uploadDropzoneHtml(){
     "<div class=\"dz-icon\">↑</div>"+
     "<div class=\"dz-label\">drop your CSV here</div>"+
     "<div class=\"dz-hint\">or click to browse · csv / parquet / xlsx</div>"+
+  "</div>"+
+  "<div class=\"row\" style=\"justify-content:center;margin-top:10px\">"+
+    "<button class=\"btn btn-ghost btn-sm\" onclick=\"event.stopPropagation();openSampleLib()\">"+
+      "▤ use a file already on the server</button>"+
   "</div>";
 }
 

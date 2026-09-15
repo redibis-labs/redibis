@@ -184,3 +184,16 @@ def test_from_stack_labels_originating_layer(tmp_path: Path):
     assert "pack:pack-a@1.0.0:alpha" in rs.rules_source
     assert "pack:pack-b@2.0.0:beta" in rs.rules_source
     assert not any(s.startswith("pack:pack-b@2.0.0:alpha") for s in rs.rules_source)
+
+
+def test_from_stack_missing_sources_map_is_pack_unknown_not_top_layer(tmp_path: Path):
+    a = _write_tg_pack(tmp_path / "a.rdbpack", marker="A", pack_id="pack-a", stem="alpha")
+    b = _write_tg_pack(
+        tmp_path / "b.rdbpack", marker="B", pack_id="pack-b", version="2.0.0", stem="beta"
+    )
+    stack = apply_packs(RedibisConfig.default(), [a, b], include_builtin_default=False)
+    del stack.text_gateway_rule_sources["alpha"]
+    rs = RuleSetCompiler.from_stack(stack)
+    assert any(s.startswith("pack:unknown:alpha") for s in rs.rules_source)
+    assert not any("pack-b" in s and "alpha" in s for s in rs.rules_source)
+    assert "pack:pack-b@2.0.0:beta" in rs.rules_source

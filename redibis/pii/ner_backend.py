@@ -262,6 +262,9 @@ class GLiNERBackend(BaseNERBackend):
         device: str = "cpu",
         threshold: float = 0.3,
         batch_size: int = 8,
+        window_chars: int = 1200,
+        window_overlap: int = 200,
+        max_windows: int = 200,
     ) -> None:
         self._model_path = model_path
         self.labels = list(labels or DEFAULT_NER_LABELS)
@@ -269,6 +272,11 @@ class GLiNERBackend(BaseNERBackend):
         self._threshold = threshold
         self._batch_size = max(1, batch_size)
         self._model = None
+        self._window_chars = max(32, int(window_chars or 1200))
+        self._window_overlap = max(0, int(window_overlap or 0))
+        self._max_windows = max(1, int(max_windows or 200))
+        self.last_coverage: dict = {}
+        self._infer_lock = __import__("threading").RLock()
 
     @property
     def name(self) -> str:
@@ -277,6 +285,12 @@ class GLiNERBackend(BaseNERBackend):
     def _ensure_loaded(self) -> None:
         if self._model is not None:
             return
+        with self._infer_lock:
+            if self._model is not None:
+                return
+            self._load_model_unlocked()
+
+    def _load_model_unlocked(self) -> None:
         try:
             from gliner import GLiNER
         except ImportError as exc:
@@ -363,11 +377,12 @@ class GLiNERBackend(BaseNERBackend):
             batch = scored[i : i + self._batch_size]
             texts = [context_val for _, context_val in batch]
             try:
-                batch_entities = self._model.batch_predict_entities(
-                    texts,
-                    gliner_labels,
-                    threshold=self._threshold,
-                )
+                with self._infer_lock:
+                    batch_entities = self._model.batch_predict_entities(
+                        texts,
+                        gliner_labels,
+                        threshold=self._threshold,
+                    )
             except Exception:
                 continue
             for (_raw_val, _context_val), entities in zip(batch, batch_entities):
@@ -410,6 +425,12 @@ class GLiNERBackend(BaseNERBackend):
         phrases: dict[str, str] | None = None,
     ) -> list[NERSpan]:
         """GLiNER entity spans with code-point offsets into ``text`` (no column prefix)."""
+        self.last_coverage = {
+            "fraction": 1.0 if text else 1.0,
+            "windows_scanned": 0,
+            "windows_total": 0,
+            "reasons": {},
+        }
         if not text or not isinstance(text, str):
             return []
         canonical_labels = list(labels or self.labels)
@@ -420,45 +441,76 @@ class GLiNERBackend(BaseNERBackend):
             logger.warning("%s", exc)
             return []
         assert self._model is not None
-        try:
-            predict = getattr(self._model, "predict_entities", None)
-            infer = getattr(self._model, "inference", None)
-            if callable(predict):
-                entities = predict(
-                    text,
-                    gliner_labels,
-                    threshold=self._threshold,
-                )
-            elif callable(infer):
-                batch = infer(
-                    [text],
-                    gliner_labels,
-                    threshold=self._threshold,
-                )
-                entities = (batch or [None])[0] or []
-            else:
-                logger.warning(
-                    "GLiNER model %s has no predict_entities/inference — cannot scan text",
-                    self.name,
-                )
-                return []
-        except Exception as exc:
-            logger.warning("GLiNER predict_entities failed: %s", exc, exc_info=True)
-            return []
 
-        # phrase → canonical for reverse mapping when pack overlays French etc.
         reverse: dict[str, str] = {}
         for lab in canonical_labels:
             phrase = entity_to_gliner_phrase(lab, phrases=phrases)
             key = lab.strip().upper().replace(" ", "_")
             reverse[phrase.lower()] = key
 
+        def _predict_chunk(chunk: str) -> list[dict]:
+            with self._infer_lock:
+                predict = getattr(self._model, "predict_entities", None)
+                infer = getattr(self._model, "inference", None)
+                if callable(predict):
+                    entities = predict(
+                        chunk,
+                        gliner_labels,
+                        threshold=self._threshold,
+                    )
+                elif callable(infer):
+                    batch = infer(
+                        [chunk],
+                        gliner_labels,
+                        threshold=self._threshold,
+                    )
+                    entities = (batch or [None])[0] or []
+                else:
+                    logger.warning(
+                        "GLiNER model %s has no predict_entities/inference — cannot scan text",
+                        self.name,
+                    )
+                    return []
+            out: list[dict] = []
+            for ent in entities or []:
+                if not isinstance(ent, dict):
+                    continue
+                raw = _normalize_ner_label(ent.get("label", ""))
+                if not raw:
+                    continue
+                try:
+                    start = int(ent.get("start"))
+                    end = int(ent.get("end"))
+                except (TypeError, ValueError):
+                    continue
+                mapped = reverse.get(raw) or raw
+                out.append({
+                    "start": start,
+                    "end": end,
+                    "label": mapped,
+                    "score": float(ent.get("score", 0) or 0),
+                    "model": self.name,
+                })
+            return out
+
+        from redibis.pii.ner_window import map_windows
+
+        try:
+            raw_spans, coverage = map_windows(
+                text,
+                _predict_chunk,
+                target_chars=self._window_chars,
+                overlap_chars=self._window_overlap,
+                max_windows=self._max_windows,
+            )
+        except Exception as exc:
+            logger.warning("GLiNER predict_entities failed: %s", exc, exc_info=True)
+            return []
+        self.last_coverage = coverage
+
         spans: list[NERSpan] = []
-        for ent in entities or []:
+        for ent in raw_spans:
             if not isinstance(ent, dict):
-                continue
-            raw = _normalize_ner_label(ent.get("label", ""))
-            if not raw:
                 continue
             try:
                 start = int(ent.get("start"))
@@ -467,16 +519,13 @@ class GLiNERBackend(BaseNERBackend):
                 continue
             if start < 0 or end > len(text) or start >= end:
                 continue
-            matched = text[start:end]
-            score = float(ent.get("score", 0) or 0)
-            mapped = reverse.get(raw) or raw
             spans.append(NERSpan(
                 start=start,
                 end=end,
-                label=mapped,
-                score=score,
-                text=matched,
-                model=self.name,
+                label=str(ent.get("label") or ""),
+                score=float(ent.get("score") or 0),
+                text=text[start:end],
+                model=str(ent.get("model") or self.name),
             ))
         return spans
 

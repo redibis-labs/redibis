@@ -4,6 +4,10 @@ micro:
 by_entity:
   EMAIL_ADDRESS:
     value_recall: 0.50
+  PHONE_NUMBER:
+    value_recall: 0.50
+  PERSON:
+    value_recall: 0.50
 guard_violations_max: 0
 class_budgets:
   superset_max: 0.80

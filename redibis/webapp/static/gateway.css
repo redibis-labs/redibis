@@ -117,6 +117,10 @@
 .gw-extra { background: #fde68a; border-color: #b45309; color: #92400e; }
 .gw-miss { background: repeating-linear-gradient(45deg, rgba(107,114,128,.2), rgba(107,114,128,.2) 4px, transparent 4px, transparent 8px); border-color: #6b7280; color: inherit; }
 .gw-bad { background: rgba(193,39,45,.16); border-color: #C1272D; color: #C1272D; }
+.gw-contested {
+  box-shadow: inset 0 0 0 1px #7c3aed;
+  background: rgba(124, 58, 237, .14);
+}
 .gw-eval-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .gw-eval-table th, .gw-eval-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
 .gw-eval-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; }
@@ -166,4 +170,21 @@
 .gw-hl, .gw-pill { unicode-bidi: isolate; }
 .gw-report-host { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; }
 .gw-report-host .hl, .gw-report-host pre.text { unicode-bidi: isolate; }
-@media (max-width: 900px) { .gw-grid { grid-template-columns: 1fr; } }
+.gw-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; margin: 2px; border-radius: 99px;
+  border: 1px solid var(--border); font-size: 12px;
+  unicode-bidi: isolate;
+}
+.gw-chip-x { border: 0; background: transparent; cursor: pointer; color: var(--muted); font: inherit; }
+.gw-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 8px; }
+.gw-chip-add { display: flex; gap: 6px; margin-bottom: 10px; }
+.gw-chip-add input { flex: 1; font: inherit; border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; }
+.gw-rules-h { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 10px 0 4px; }
+.gw-rules-toggle { width: 100%; text-align: left; font: inherit; font-weight: 600; background: transparent; border: 0; cursor: pointer; color: var(--ink); padding: 0 0 8px; }
+.gw-diff-row { font-size: 12px; padding: 3px 6px; border-radius: 4px; margin: 2px 0; unicode-bidi: isolate; }
+.gw-diff-add { background: #dcfce7; color: #166534; }
+.gw-diff-remove { background: #fee2e2; color: #991b1b; }
+.gw-diff-change { background: #fef3c7; color: #92400e; }
+.gw-inline-form { margin-top: 8px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; }
+.gw-noise-btn { margin-left: 6px; font-size: 11px; padding: 0 6px; }

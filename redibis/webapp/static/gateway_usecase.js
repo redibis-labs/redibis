@@ -1,13 +1,13 @@
-import {
+const {
   offsetsFromPrefixAndSelected,
   paintBanners,
   renderHighlights,
   selectionOffsets,
   sliceCodepoints,
   toChars,
-} from "./gateway_render.mjs";
+} = await import(`./gateway_render.mjs?v=${window.GW_RENDER_V || ""}`);
 
-const MAX = Number(window.GW_MAX_CHARS || 20000);
+const MAX = Number(window.GW_MAX_CHARS || 200000);
 const ENTITY_TYPES = [
   "LOCATION", "PHONE_NUMBER", "PERSON", "EMAIL_ADDRESS", "EG_NATIONAL_ID",
   "VOUCHER", "SIM_PUK", "SUPPORT_TICKET", "CREDIT_CARD", "IMEI", "IMSI",

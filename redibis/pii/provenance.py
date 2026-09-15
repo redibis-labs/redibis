@@ -360,10 +360,10 @@ def mint_scan_provenance(
         try:
             from redibis.pack.identity import compute_stack_sha256, compute_stack_uuid
 
-            # compute_stack_uuid takes one mode. Use the last layer's mode — the
-            # effective overlay policy at the top of the stack. Per-layer mode is
-            # recorded on pack_layers[].mode; mixed-mode stacks are not hashed as
-            # a mode sequence.
+            # Last-layer-wins is the intended stack-mode policy, not an accident:
+            # compute_stack_uuid takes one mode, so we hash the top layer's overlay
+            # policy. Per-layer mode stays on pack_layers[].mode and is not part
+            # of the stack hash.
             mode = str(getattr(layers[-1], "mode", None) or "overlay")
             stack_uuid = compute_stack_uuid(layers, mode=mode)
             stack_sha256 = compute_stack_sha256(layers, mode=mode)

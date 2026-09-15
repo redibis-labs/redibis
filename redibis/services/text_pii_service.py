@@ -340,9 +340,12 @@ class TextPIIService:
         llm_provider: str = "",
         llm_model: str = "",
         llm_api_key: str = "",
+        llm_endpoint: str = "",
         preprocess_obfuscation: Optional[bool] = None,
         preprocess_expanders: Optional[list[str]] = None,
         include_provenance: bool = False,
+        equation: str = "independent",
+        include_arbitration: bool = False,
     ) -> DetectionResult:
         if text is None:
             raise TextPIIServiceError("text is required")
@@ -355,6 +358,7 @@ class TextPIIService:
         # Default preprocess off for library/admin API; Gateway opts in explicitly.
         if preprocess_obfuscation is None:
             preprocess_obfuscation = False
+        gw = getattr(self._cfg, "text_gateway", None) if self._cfg is not None else None
         cfg = TextScanConfig(
             engines=engines,
             language=language,
@@ -368,12 +372,22 @@ class TextPIIService:
             arabic=(language or "").startswith("ar"),
             preprocess_obfuscation=bool(preprocess_obfuscation),
             preprocess_expanders=tuple(preprocess_expanders or ()),
+            ner_window_chars=int(getattr(gw, "ner_window_chars", 1200) or 1200) if gw is not None else 1200,
+            ner_window_overlap=int(getattr(gw, "ner_window_overlap", 200) or 200) if gw is not None else 200,
+            ner_max_windows=int(getattr(gw, "ner_max_windows", 200) or 200) if gw is not None else 200,
+            llm_window_chars=int(getattr(gw, "llm_window_chars", 3500) or 3500) if gw is not None else 3500,
+            llm_window_overlap=int(getattr(gw, "llm_window_overlap", 300) or 300) if gw is not None else 300,
+            llm_max_windows=int(getattr(gw, "max_llm_windows", 8) or 8) if gw is not None else 8,
+            equation=str(equation or "independent"),
+            include_arbitration=bool(include_arbitration),
         )
         llm_override = None
         key = (llm_api_key or "").strip() or None
+        endpoint = (llm_endpoint or "").strip()
         if use_llm and (llm_provider or "").strip():
             llm_override = self._build_llm_override(
                 llm_provider.strip(), (llm_model or "").strip(), api_key=key,
+                endpoint_url=endpoint or None,
             )
         elif use_llm and key:
             from redibis.pii.text_llm import LlmTextRefiner
@@ -400,7 +414,14 @@ class TextPIIService:
         )
         return result
 
-    def _build_llm_override(self, provider_name: str, model: str, *, api_key: Optional[str] = None):
+    def _build_llm_override(
+        self,
+        provider_name: str,
+        model: str,
+        *,
+        api_key: Optional[str] = None,
+        endpoint_url: Optional[str] = None,
+    ):
         """Build a one-off refiner bound to a request-selected provider.
 
         Validated against the same provider registry used everywhere else
@@ -412,7 +433,12 @@ class TextPIIService:
         from redibis.pii.text_llm import LlmTextRefiner
 
         try:
-            provider = get_provider(provider_name, model=model, api_key=api_key)
+            provider = get_provider(
+                provider_name,
+                model=model,
+                api_key=api_key,
+                endpoint_url=(endpoint_url or None),
+            )
         except (ValueError, EnrichmentError) as exc:
             raise TextPIIServiceError(f"unknown llm_provider {provider_name!r}: {exc}") from exc
         refiner = LlmTextRefiner(redibis_config=self._cfg, provider=provider)

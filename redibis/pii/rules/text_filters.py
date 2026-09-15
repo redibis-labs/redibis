@@ -11,7 +11,14 @@ from dataclasses import replace
 from typing import Iterable, Optional, Sequence
 
 from redibis.pii.scan.result import Candidate
-from redibis.pii.text_preprocess.expanders._util import fold_ar
+from redibis.pii.text_preprocess.expanders._util import (
+    folded_without_noise,
+    fold_ar,
+    noise_set,
+    strip_edge_noise,
+    token_fold,
+    tokenize_with_spans,
+)
 from redibis.pii.text_rules import TextRuleOverlay, default_text_rules
 
 _SPEAKER_TURN = re.compile(
@@ -33,6 +40,55 @@ _ADDRESS_HEAD = re.compile(
     r"villa|street|st\.?|building|apt\.?|apartment|flat)"
 )
 _CANON_DIGITS = re.compile(r"\D+")
+_SENTENCE_STOPS = (".", "؟", "!", "\n")
+
+
+def next_sentence_break(text: str, start: int) -> int:
+    """Index of the next sentence stop at or after ``start``, or ``len(text)``.
+
+    Same stop set as ``ContextSpanExtender._clause_after``: ``.`` ``؟`` ``!``
+    newline, plus a speaker-turn boundary.
+    """
+    if start >= len(text):
+        return len(text)
+    speaker = _SPEAKER_TURN.search(text, start)
+    end = speaker.start() if speaker else len(text)
+    stops = [p for p in (text.find(sep, start) for sep in _SENTENCE_STOPS) if p >= 0]
+    if stops:
+        stop = min(stops)
+        if stop < end:
+            end = stop
+    return end
+
+
+def prev_sentence_break(text: str, pos: int) -> int:
+    """Start of the sentence containing ``pos`` (after the previous stop)."""
+    if pos <= 0:
+        return 0
+    lo = 0
+    for sep in _SENTENCE_STOPS:
+        p = text.rfind(sep, 0, pos)
+        if p >= lo:
+            lo = p + 1
+    for match in _SPEAKER_TURN.finditer(text[:pos]):
+        if match.end() > lo:
+            lo = match.end()
+    while lo < pos and lo < len(text) and text[lo] in " \t":
+        lo += 1
+    return lo
+
+
+def enclosing_sentence(text: str, start: int, end: int) -> tuple[int, int]:
+    """Return the enclosing sentence ``[lo, hi)`` covering ``[start, end)``."""
+    start = max(0, min(start, len(text)))
+    end = max(start, min(end, len(text)))
+    lo = prev_sentence_break(text, start)
+    hi = next_sentence_break(text, end if end < len(text) else max(0, len(text) - 1))
+    if hi < end:
+        hi = end
+    if lo > start:
+        lo = start
+    return lo, max(hi, end)
 
 
 def _overlay(rules: Optional[TextRuleOverlay]) -> TextRuleOverlay:
@@ -50,11 +106,17 @@ def _canonical_digits(value: str) -> str:
 
 
 class TermExclusionFilter:
-    """Drop spans whose folded surface is an excluded role / filler word."""
+    """Drop spans whose folded surface is an excluded role / filler word.
+
+    After noise tokens are removed from the surface, an empty remainder or an
+    exact exclude-term match is dropped. A filler glued inside a longer span
+    is not an exclude-term match — that is ``noise_terms``'s job.
+    """
 
     def __init__(self, overlay: Optional[TextRuleOverlay] = None):
         ov = _overlay(overlay)
         self._terms = {_fold_surface(t) for t in ov.exclude_terms if t}
+        self._noise = noise_set(overlay=ov)
         self._patterns = []
         for raw in ov.exclude_patterns:
             try:
@@ -71,9 +133,10 @@ class TermExclusionFilter:
                 else ""
             )
             folded = _fold_surface(surface)
-            if folded and folded in self._terms:
+            stripped = folded_without_noise(surface, self._noise)
+            if not stripped or stripped in self._terms or (folded and folded in self._terms):
                 continue
-            if any(p.search(surface or "") or p.search(folded) for p in self._patterns):
+            if any(p.search(surface or "") or p.search(folded) or p.search(stripped) for p in self._patterns):
                 continue
             out.append(cand)
         return out
@@ -188,13 +251,7 @@ class ContextSpanExtender:
             start += 1
         if start >= len(text):
             return None
-        speaker = _SPEAKER_TURN.search(text, start)
-        end = speaker.start() if speaker else len(text)
-        stops = [p for p in (text.find(".", start), text.find("؟", start), text.find("!", start), text.find("\n", start)) if p >= 0]
-        if stops:
-            stop = min(stops)
-            if stop < end:
-                end = stop
+        end = next_sentence_break(text, start)
         remainder = text[start:end]
         head = _ADDRESS_HEAD.search(remainder)
         if not head:
@@ -203,6 +260,10 @@ class ContextSpanExtender:
         clause = remainder[head.start():]
         trimmed = _TRAIL_PUNCT.sub("", clause)
         trimmed = _TRAIL_FILLER.sub("", trimmed)
+        # Also strip operator noise-lexicon tokens from the edges.
+        noise = noise_set()
+        ts, te = strip_edge_noise(trimmed, 0, len(trimmed), noise)
+        trimmed = trimmed[ts:te]
         trimmed = _TRAIL_PUNCT.sub("", trimmed)
         if not trimmed.strip():
             return None
@@ -364,9 +425,14 @@ class BoundaryNormalizer:
 
     Runs after all producers so it fixes regex, NER and preprocess spans alike.
     Entity types whose value legitimately ends in punctuation are exempt.
+    After punctuation trimming, whole leading/trailing noise tokens are
+    stripped until stable.
     """
 
     name = "boundary_normalize"
+
+    def __init__(self, overlay: Optional[TextRuleOverlay] = None):
+        self._noise = noise_set(overlay=overlay) if overlay is not None else noise_set()
 
     def apply(self, candidates: Sequence[Candidate], text: str) -> list[Candidate]:
         out: list[Candidate] = []
@@ -378,6 +444,9 @@ class BoundaryNormalizer:
             lead = len(surface) - len(surface.lstrip(_LEAD_STRIP))
             trail = len(surface) - len(_EDGE_TRIM.sub("", surface[lead:])) - lead
             start, end = cand.start + lead, cand.end - trail
+            if end <= start:
+                continue
+            start, end = strip_edge_noise(text, start, end, self._noise)
             if end <= start:
                 continue
             if (start, end) == (cand.start, cand.end):
@@ -398,7 +467,7 @@ def apply_text_rule_filters(
     stage = ContextSpanExtender(ov).apply(stage, text)
     stage = NumberContextClassifier(ov).apply(stage, text)
     stage = TermExclusionFilter(ov).apply(stage, text)
-    stage = BoundaryNormalizer().apply(stage, text)
+    stage = BoundaryNormalizer(ov).apply(stage, text)
     return stage
 
 

@@ -274,6 +274,45 @@ def test_sglang_default_is_qwen_awq():
     assert p._effective_model() == "openai/Qwen/Qwen2.5-14B-Instruct-AWQ"
 
 
+def test_sglang_hf_id_gets_openai_prefix_even_without_model_prefix():
+    """LiteLLM rejects bare Qwen/… ids with 'LLM Provider NOT provided'."""
+    from redibis.enrich.providers import LiteLLMProvider
+
+    gptq = "Qwen/Qwen2.5-32B-Instruct-GPTQ-Int4"
+    p = LiteLLMProvider(
+        name="sglang",
+        model=gptq,
+        litellm_model=gptq,
+        model_prefix="",
+        api_base="http://0.0.0.0:8001/v1",
+    )
+    assert p._effective_model() == f"openai/{gptq}"
+
+    via_default = LiteLLMProvider(
+        name="sglang",
+        model="",
+        litellm_model=gptq,
+        model_prefix="",
+        api_base="http://0.0.0.0:8001/v1",
+    )
+    assert via_default._effective_model() == f"openai/{gptq}"
+
+
+def test_user_overlay_api_base_keeps_sglang_openai_prefix(tmp_path, monkeypatch):
+    from redibis.enrich.providers import load_provider_configs
+
+    cfg = tmp_path / "llm_providers.json"
+    cfg.write_text(json.dumps({"providers": {
+        "sglang": {"api_base": "http://0.0.0.0:8001/v1"},
+    }}))
+    monkeypatch.setenv("REDIBIS_LLM_PROVIDERS", str(cfg))
+    merged = load_provider_configs()
+    assert merged["sglang"]["model_prefix"] == "openai"
+    assert merged["sglang"]["api_base"] == "http://0.0.0.0:8001/v1"
+    p = get_provider("sglang", model="Qwen/Qwen2.5-32B-Instruct-GPTQ-Int4")
+    assert p._effective_model() == "openai/Qwen/Qwen2.5-32B-Instruct-GPTQ-Int4"
+
+
 def test_gemini_plus_huggingface_id_reroutes_to_sglang():
     from redibis.enrich.providers import LiteLLMProvider, looks_like_huggingface_model
 

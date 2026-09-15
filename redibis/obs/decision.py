@@ -65,6 +65,11 @@ _ALLOWED_INPUT_KEYS = _PATTERN_METADATA_KEYS | frozenset({
     "gliner_min",
     "llm_min",
     "pack_layers",
+    "mode",
+    "engine_type",
+    "llm_type",
+    "validated",
+    "span",
 })
 
 # Heuristic for non-pattern strings: emails, phones, long free text.

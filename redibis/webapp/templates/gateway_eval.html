@@ -64,6 +64,7 @@
           <label>Tag <select id="evFilterTag"><option value="">all</option></select></label>
           <label class="gw-check"><input id="evMismatches" type="checkbox"/> mismatches only</label>
           <label class="gw-check"><input id="evNearMiss" type="checkbox"/> near-misses only</label>
+          <label class="gw-check"><input id="evContested" type="checkbox"/> LLM/engine disagreements</label>
         </div>
         <textarea id="evText" class="gw-input"
                   placeholder="Paste a case here, then highlight expected PII…"
@@ -111,6 +112,10 @@
       </section>
 
       <aside class="gw-side">
+        <div class="gw-card" id="gwRulesCard">
+          <h2>Detection rules</h2>
+          <div id="evRules"></div>
+        </div>
         <div class="gw-card">
           <h2>Cases</h2>
           <div id="evCases" class="gw-eval-cases"></div>
@@ -134,12 +139,28 @@
           <div id="evSpanTable"></div>
           <div id="evWhy" class="gw-hint" hidden></div>
           <div class="gw-eval-actions">
-            <button id="evActExclude" type="button" class="btn btn-ghost btn-sm" disabled>+ exclude term</button>
-            <button id="evActCue" type="button" class="btn btn-ghost btn-sm" disabled>+ context cue</button>
-            <button id="evActNumber" type="button" class="btn btn-ghost btn-sm" disabled>+ number rule</button>
-            <button id="evActAccept" type="button" class="btn btn-ghost btn-sm" disabled>accept as expected</button>
-            <button id="evActAdvisory" type="button" class="btn btn-ghost btn-sm" disabled>mark advisory</button>
-            <button id="evActPatch" type="button" class="btn btn-ghost btn-sm" disabled>Download corpus patch</button>
+            <button id="evActExclude" type="button" class="btn btn-ghost btn-sm" disabled title="Select a span row first">+ exclude term</button>
+            <button id="evActNoise" type="button" class="btn btn-ghost btn-sm" disabled title="Select a span row first">+ noise term</button>
+            <button id="evActCue" type="button" class="btn btn-ghost btn-sm" disabled title="Select a span row first">+ context cue</button>
+            <button id="evActNumber" type="button" class="btn btn-ghost btn-sm" disabled title="Select a span row first">+ number rule</button>
+            <button id="evActAccept" type="button" class="btn btn-ghost btn-sm" disabled title="Select a span row first">accept as expected</button>
+            <button id="evActAdvisory" type="button" class="btn btn-ghost btn-sm" disabled title="Select a span row first">mark advisory</button>
+            <button id="evActPatch" type="button" class="btn btn-ghost btn-sm" disabled title="Queue an action first">Download corpus patch</button>
+            <label class="gw-check" title="Also keep the action in the corpus-patch queue">
+              <input id="evAlsoQueue" type="checkbox"/> also queue for corpus patch
+            </label>
+          </div>
+          <div id="evInlineForm" class="gw-inline-form" hidden></div>
+          <p id="evActHint" class="gw-hint">Select a span in the table to enable actions.</p>
+        </div>
+        <div class="gw-card" id="evLlmCard" hidden>
+          <h2>LLM log</h2>
+          <p class="gw-hint">Transcripts are fetched only when you press Show. Process-local ring of the last 200 calls on this worker.</p>
+          <div id="evLlmSummary" class="gw-hint"></div>
+          <div id="evLlm" hidden></div>
+          <div class="gw-pol-actions">
+            <button id="evLlmShow" type="button" class="btn btn-ghost btn-sm">Show LLM log</button>
+            <button id="evLlmDownload" type="button" class="btn btn-ghost btn-sm">Download LLM log</button>
           </div>
         </div>
         <div class="gw-card" id="evEntityCard" hidden>
@@ -177,6 +198,8 @@
     window.GW_MAX_CHARS = {{ ui_max_chars }};
     window.GW_EVAL_MAX_CASES = {{ eval_max_cases }};
     window.REDIBIS_VERSION = {{ (redibis_version or "")|tojson }};
+    window.GW_RENDER_V = {{ (render_v or "")|tojson }};
+    window.GW_RULES_V = {{ (rules_v or "")|tojson }};
   </script>
   <script src="/static/auth.js"></script>
   <script type="module" src="/static/gateway_eval.js?v={{ js_v }}"></script>

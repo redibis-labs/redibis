@@ -1,0 +1,43 @@
+{
+  "kind": "redibis.text_eval_parity",
+  "cases": {
+    "sample.free_text_pii/address-guards": [
+      {
+        "start": 8,
+        "end": 37,
+        "entity_type": "LOCATION",
+        "engine": "regex",
+        "score": 0.86
+      }
+    ],
+    "sample.free_text_pii/email-en": [
+      {
+        "start": 8,
+        "end": 25,
+        "entity_type": "EMAIL_ADDRESS",
+        "engine": "regex",
+        "score": 0.85
+      }
+    ],
+    "sample.free_text_pii/long-document-tail-name": [
+      {
+        "start": 6005,
+        "end": 6020,
+        "entity_type": "PERSON",
+        "engine": "regex",
+        "score": 0.83
+      }
+    ],
+    "sample.free_text_pii/phone-trailing-punct": [
+      {
+        "start": 5,
+        "end": 16,
+        "entity_type": "PHONE_NUMBER",
+        "engine": "preprocess",
+        "score": 0.92
+      }
+    ],
+    "sample.free_text_pii/spoken-phone": [],
+    "sample.free_text_pii/spoken-phone-with-fillers": []
+  }
+}

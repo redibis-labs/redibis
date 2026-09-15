@@ -326,15 +326,46 @@ class LiteLLMProvider(EnrichmentProvider):
     supports_json: bool = True
     supports_json_schema: bool = False
 
+    def _infer_model_prefix(self) -> str:
+        """LiteLLM vendor prefix for this provider (never a HuggingFace org).
+
+        HuggingFace ids such as ``Qwen/Qwen2.5-32B-Instruct-GPTQ-Int4`` are not
+        LiteLLM providers. OpenAI-compatible servers (SGLang, vLLM, LM Studio)
+        must be called as ``openai/<served-id>`` (or ``hosted_vllm/…``).
+        """
+        prefix = (self.model_prefix or "").strip()
+        if prefix:
+            return prefix
+        litellm = (self.litellm_model or "").strip()
+        if "/" in litellm:
+            head = litellm.split("/", 1)[0]
+            if head.lower() in _LITELLM_VENDOR_PREFIXES:
+                return head
+        name = (self.name or "").strip().lower()
+        if name in ("vllm", "hosted_vllm"):
+            return "hosted_vllm"
+        if name == "ollama":
+            return "ollama"
+        if name in _LOCAL_OPENAI_COMPAT or name.startswith("sglang"):
+            return "openai"
+        api_base = (self.api_base or self.endpoint_url or "").strip()
+        if api_base:
+            return "openai"
+        return ""
+
     def _effective_model(self) -> str:
         """Resolve the LiteLLM model string from the config + optional override."""
-        if not self.model:
+        source = (self.model or self.litellm_model or "").strip()
+        if not source:
             return self.litellm_model
-        bare = normalize_model_id(self.model, model_prefix=self.model_prefix)
-        prefix = (self.model_prefix or "").strip()
-        # Never send HuggingFace org/name ids through Gemini/Vertex.
-        if looks_like_huggingface_model(bare) or looks_like_huggingface_model(self.model):
+        prefix = self._infer_model_prefix()
+        bare = normalize_model_id(source, model_prefix=prefix)
+        # Never send HuggingFace org/name ids through Gemini/Vertex — and never
+        # send them to LiteLLM unprefixed (BadRequestError: provider not provided).
+        if looks_like_huggingface_model(bare) or looks_like_huggingface_model(source):
             if prefix.lower() in _CLOUD_PROVIDERS_HF_REROUTE or prefix.lower() == "google":
+                prefix = "openai"
+            elif not prefix:
                 prefix = "openai"
         if prefix and not bare.startswith(prefix + "/"):
             return f"{prefix}/{bare}"
@@ -449,6 +480,12 @@ class LiteLLMProvider(EnrichmentProvider):
                 msg += (
                     ". This server may reject response_format=json_object. "
                     "Set supports_json=false on the provider profile and retry."
+                )
+            elif "llm provider not provided" in err_text:
+                msg += (
+                    ". HuggingFace org/name ids are not LiteLLM vendors. For SGLang or "
+                    "any OpenAI-compatible server pass openai/<served-id>, e.g. "
+                    "openai/Qwen/Qwen2.5-32B-Instruct-GPTQ-Int4."
                 )
             raise EnrichmentError(redact(msg, secrets=_secrets)) from e
         finally:
@@ -638,8 +675,32 @@ def load_provider_configs(config_path: Optional[str] = None) -> dict:
     base = _read_providers(_DEFAULT_FILE)
     path = _config_path(config_path)
     if path != _DEFAULT_FILE and path.exists():
-        base.update(_read_providers(path))
+        base = _merge_provider_maps(base, _read_providers(path))
     return base
+
+
+def _merge_provider_maps(base: dict, overlay: dict) -> dict:
+    """Overlay user provider entries onto packaged defaults without dropping fields.
+
+    A user file that only sets ``api_base`` on ``sglang`` must keep the packaged
+    ``model_prefix`` (``openai``). Replacing the whole dict would send bare
+    ``Qwen/…`` ids to LiteLLM and raise ``LLM Provider NOT provided``.
+    """
+    out = dict(base)
+    for name, cfg in (overlay or {}).items():
+        if name in out and isinstance(out[name], dict) and isinstance(cfg, dict):
+            merged = dict(out[name])
+            merged.update(cfg)
+            base_params = out[name].get("params")
+            overlay_params = cfg.get("params")
+            if isinstance(base_params, dict) and isinstance(overlay_params, dict):
+                params = dict(base_params)
+                params.update(overlay_params)
+                merged["params"] = params
+            out[name] = merged
+        else:
+            out[name] = cfg
+    return out
 
 
 def _read_providers(path: Path) -> dict:

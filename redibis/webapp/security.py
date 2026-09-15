@@ -46,10 +46,13 @@ _GET_MUTATE_NAME = re.compile(r"reset|delete|clear|trigger|apply|merge|approve")
 # POST endpoints that compute and return, and write nothing. Exempt from the
 # explorer mutation denial, but NOT from authentication or CSRF. Keep this
 # list short; do not add /api/pii/text/ — those routes stay admin-only.
+# PUT /api/gateway/rules writes persisted settings, so it is NOT covered.
 READ_ONLY_POST_PREFIXES = ("/api/gateway/",)
 
 
 def is_read_only_post(path: str) -> bool:
+    if path.startswith("/api/gateway/rules") and not path.startswith("/api/gateway/rules/dry-run"):
+        return False
     return any(path.startswith(p) for p in READ_ONLY_POST_PREFIXES)
 
 

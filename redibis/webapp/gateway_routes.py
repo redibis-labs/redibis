@@ -31,7 +31,7 @@ from redibis.webapp.security import SlidingWindowLimiter
 
 logger = logging.getLogger("redibis.webapp.gateway")
 
-UI_MAX_CHARS = 20_000
+UI_MAX_CHARS = 200_000
 SCAN_LIMIT = 30
 SCAN_WINDOW_S = 60
 # Free-standing guard checks (no PII highlighting) get their own, slightly
@@ -71,11 +71,13 @@ class GatewayScanBody(BaseModel):
     llm_provider: str = ""
     llm_model: str = ""
     llm_api_key: str = Field(default="", max_length=2048)
+    equation: str = "independent"
     # Opt-in safety analysers — heuristic checks are free; an LLM judge is
     # additionally used only when the corresponding gateway.* capability
     # role is configured (Settings → LLM → Capability roles).
     check_toxicity: bool = False
     check_prompt_injection: bool = False
+    draft_rules: Optional[dict] = None
 
 
 class GatewaySuggestBody(GatewayScanBody):
@@ -162,10 +164,21 @@ def _actor(request: Request) -> str:
     return getattr(user, "username", "") or "anonymous"
 
 
+def _ui_max_chars() -> int:
+    gw = getattr(_redibis_config(), "text_gateway", None)
+    return int(getattr(gw, "ui_max_chars", UI_MAX_CHARS) or UI_MAX_CHARS)
+
+
+def _scan_max_chars() -> int:
+    gw = getattr(_redibis_config(), "text_gateway", None)
+    return int(getattr(gw, "scan_max_chars", UI_MAX_CHARS) or UI_MAX_CHARS)
+
+
 def _clip(text: str) -> tuple[str, int, bool]:
     original = text or ""
     original_n = len(original)
-    return original[:UI_MAX_CHARS], original_n, original_n > UI_MAX_CHARS
+    cap = _ui_max_chars()
+    return original[:cap], original_n, original_n > cap
 
 
 def _guard(request: Request, text: str) -> tuple[str, int, bool]:
@@ -323,6 +336,12 @@ def envelope(
         "run_uuid": _pick(d, "run_uuid", default="") or "",
         "provenance_degraded": bool(_pick(d, "provenance_degraded", default=False)),
     }
+    if d.get("coverage"):
+        out["text_meta"]["coverage"] = dict(d["coverage"])
+        analysers["pii"]["coverage"] = dict(d["coverage"])
+    if d.get("arbitration"):
+        analysers["pii"]["arbitration"] = dict(d["arbitration"])
+        out["arbitration"] = dict(d["arbitration"])
     if d.get("provenance"):
         out["provenance"] = d["provenance"]
     return out
@@ -333,13 +352,8 @@ def _llm_trace(
     run_id: str,
     requested: bool,
     result: Any,
-    include_transcripts: bool,
 ) -> dict:
-    """Admin-facing LLM usage + transcripts for this Gateway run.
-
-    Explorers still learn whether a model ran (``used`` / ``call_count``) but
-    never receive prompt or response bodies.
-    """
+    """Scan-envelope LLM summary. Transcripts live on GET /api/gateway/llm-log/{run}."""
     from redibis.enrich.llm_logging import get_recent_llm_calls
 
     d = result.to_dict(return_text=True) if result is not None and hasattr(result, "to_dict") else {}
@@ -349,13 +363,15 @@ def _llm_trace(
     calls = get_recent_llm_calls(
         run_id=rid,
         limit=200,
-        include_transcripts=include_transcripts,
+        include_transcripts=False,
     ) if rid else []
     pii_ran = "llm" in engines
     skip = str(unavailable.get("llm") or "")
     used = pii_ran or any((c.get("status") or "") == "ok" for c in calls)
     if not requested and not calls and not pii_ran:
         skip = skip or "not requested"
+    cov = getattr(result, "coverage", None) if result is not None else None
+    per = dict(cov) if isinstance(cov, dict) else {}
     return {
         "requested": bool(requested),
         "used": bool(used),
@@ -365,7 +381,8 @@ def _llm_trace(
         "run_id": rid,
         "providers": sorted({str(c.get("provider") or "") for c in calls if c.get("provider")}),
         "models": sorted({str(c.get("model_id") or "") for c in calls if c.get("model_id")}),
-        "calls": calls,
+        "windows_scanned": int(per.get("llm_windows_scanned") or 0),
+        "windows_total": int(per.get("llm_windows_total") or 0),
     }
 
 
@@ -387,16 +404,12 @@ def _attach_llm_trace(
     result: Any,
     run_id: str,
 ) -> dict:
-    from redibis.webapp.pii_text_routes import role_may_see_full_provenance
-
-    include = role_may_see_full_provenance(request)
     if not payload.get("run_uuid"):
         payload["run_uuid"] = run_id
     payload["llm"] = _llm_trace(
         run_id=run_id or str(payload.get("run_uuid") or ""),
         requested=requested,
         result=result,
-        include_transcripts=include,
     )
     return payload
 
@@ -563,7 +576,7 @@ def _scan_kwargs(body: GatewayScanBody, max_chars: int) -> dict:
     if gw_cfg is not None:
         preprocess = bool(getattr(gw_cfg, "obfuscation_preprocess", True))
         expanders = list(getattr(gw_cfg, "obfuscation_expanders", None) or [])
-    return {
+    kwargs = {
         "language": body.language,
         "engines": body.engines,
         "min_score": body.min_score,
@@ -575,8 +588,75 @@ def _scan_kwargs(body: GatewayScanBody, max_chars: int) -> dict:
         "llm_provider": body.llm_provider,
         "llm_model": body.llm_model,
         "llm_api_key": (body.llm_api_key or "").strip(),
+        "equation": getattr(body, "equation", None) or "independent",
         "preprocess_obfuscation": preprocess,
         "preprocess_expanders": expanders,
+    }
+    return kwargs
+
+
+def _scan_service(draft_rules: Optional[dict] = None):
+    """Return the shared service, or a one-shot overlay for ``draft_rules``."""
+    if not draft_rules:
+        return _svc()
+    from redibis.pii.text_rules import TextRuleOverlay, merge_text_rules
+    from redibis.services.text_pii_service import TextPIIService
+
+    base = getattr(getattr(_svc(), "_ruleset", None), "text_rules", None)
+    overlay = merge_text_rules(base, TextRuleOverlay.from_dict(draft_rules))
+    return TextPIIService(
+        redibis_config=_redibis_config(),
+        text_rules_overlay=overlay,
+        skip_stored_text_rules=True,
+        merge_builtin_text_rules=False,
+        ner_backend=getattr(_svc(), "_ner", None),
+    )
+
+
+def _span_diff(before: list[dict], after: list[dict]) -> dict:
+    """Per-span diff for a dry-run: added, removed, retyped, resized."""
+
+    def _key(s: dict) -> tuple:
+        return (s.get("start"), s.get("end"), str(s.get("entity_type") or ""))
+
+    before_map = {_key(s): s for s in before}
+    after_map = {_key(s): s for s in after}
+    added = [s for k, s in after_map.items() if k not in before_map]
+    removed = [s for k, s in before_map.items() if k not in after_map]
+    retyped: list[dict] = []
+    resized: list[dict] = []
+    leftover_after = list(added)
+    leftover_before = list(removed)
+    still_added: list[dict] = []
+    for a in leftover_after:
+        match = None
+        for b in leftover_before:
+            same_off = a.get("start") == b.get("start") and a.get("end") == b.get("end")
+            overlap = (
+                a.get("start") is not None
+                and b.get("start") is not None
+                and a.get("end") is not None
+                and b.get("end") is not None
+                and a["start"] < b["end"]
+                and a["end"] > b["start"]
+            )
+            if same_off and a.get("entity_type") != b.get("entity_type"):
+                retyped.append({"before": b, "after": a})
+                match = b
+                break
+            if overlap and a.get("entity_type") == b.get("entity_type") and not same_off:
+                resized.append({"before": b, "after": a})
+                match = b
+                break
+        if match is not None:
+            leftover_before = [x for x in leftover_before if x is not match]
+        else:
+            still_added.append(a)
+    return {
+        "added": still_added,
+        "removed": leftover_before,
+        "retyped": retyped,
+        "resized": resized,
     }
 
 
@@ -632,15 +712,10 @@ def _prepare_evaluation(body: GatewayEvaluationBody, actor: str) -> tuple[dict, 
             status_code=413,
             detail=f"evaluation exceeds max cases ({EVAL_MAX_CASES})",
         )
-    oversized = [
-        case["id"] for case in dataset["cases"] if len(case["text"]) > UI_MAX_CHARS
-    ]
-    if oversized:
-        raise HTTPException(
-            status_code=413,
-            detail=f"{len(oversized)} case(s) exceed {UI_MAX_CHARS} characters",
-        )
-    total_chars = sum(len(case["text"]) for case in dataset["cases"])
+    # Oversized cases are scanned (head clipped, flagged truncated, gate fails)
+    # rather than 413'd. The limiter budget uses the scanned length.
+    scan_cap = _scan_max_chars()
+    total_chars = sum(min(len(case["text"]), scan_cap) for case in dataset["cases"])
     if total_chars > EVAL_MAX_TOTAL_CHARS:
         raise HTTPException(
             status_code=413,
@@ -686,7 +761,7 @@ def _prepare_evaluation(body: GatewayEvaluationBody, actor: str) -> tuple[dict, 
         "llm_provider": body.llm_provider,
         "llm_model": body.llm_model,
         "llm_api_key": (body.llm_api_key or "").strip(),
-        "max_chars": UI_MAX_CHARS,
+        "max_chars": _scan_max_chars(),
         "overlap_iou": body.overlap_iou,
         "preprocess_obfuscation": bool(
             getattr(gw_cfg, "obfuscation_preprocess", True)
@@ -782,7 +857,9 @@ def register_gateway_routes(
                 request,
                 js_v=asset_v_fn("gateway.js"),
                 css_v=asset_v_fn("gateway.css"),
-                ui_max_chars=UI_MAX_CHARS,
+                render_v=asset_v_fn("gateway_render.mjs"),
+                rules_v=asset_v_fn("gateway_rules.mjs"),
+                ui_max_chars=_ui_max_chars(),
             ),
         )
         _no_store(resp)
@@ -797,7 +874,9 @@ def register_gateway_routes(
                 request,
                 js_v=asset_v_fn("gateway_eval.js"),
                 css_v=asset_v_fn("gateway.css"),
-                ui_max_chars=UI_MAX_CHARS,
+                render_v=asset_v_fn("gateway_render.mjs"),
+                rules_v=asset_v_fn("gateway_rules.mjs"),
+                ui_max_chars=_ui_max_chars(),
                 eval_max_cases=EVAL_MAX_CASES,
                 redibis_version=REDIBIS_VERSION,
             ),
@@ -814,7 +893,8 @@ def register_gateway_routes(
                 request,
                 js_v=asset_v_fn("gateway_usecase.js"),
                 css_v=asset_v_fn("gateway.css"),
-                ui_max_chars=UI_MAX_CHARS,
+                render_v=asset_v_fn("gateway_render.mjs"),
+                ui_max_chars=_ui_max_chars(),
                 uc_id="",
             ),
         )
@@ -830,7 +910,8 @@ def register_gateway_routes(
                 request,
                 js_v=asset_v_fn("gateway_usecase.js"),
                 css_v=asset_v_fn("gateway.css"),
-                ui_max_chars=UI_MAX_CHARS,
+                render_v=asset_v_fn("gateway_render.mjs"),
+                ui_max_chars=_ui_max_chars(),
                 uc_id=uc_id,
             ),
         )
@@ -858,7 +939,7 @@ def register_gateway_routes(
                 request,
                 js_v=asset_v_fn("gateway_run.js"),
                 css_v=asset_v_fn("gateway.css"),
-                ui_max_chars=UI_MAX_CHARS,
+                ui_max_chars=_ui_max_chars(),
                 run_uuid=run_uuid,
                 usecase_id=usecase_id,
                 report_css=report_css(),
@@ -906,6 +987,156 @@ def register_gateway_routes(
                 ),
             },
             "default_llm": default_llm,
+        }
+        return _json_no_store(payload)
+
+    @app.get("/api/gateway/rules")
+    async def gateway_get_rules() -> Any:
+        from redibis.pii.text_rules import compile_layered_text_rules, default_text_rules
+        from redibis.webapp.pii_text_routes import _load_stored_text_rules
+
+        stored = _load_stored_text_rules()
+        cfg = _redibis_config()
+        gw = getattr(cfg, "text_gateway", None)
+        config_rules = getattr(gw, "rules", None) if gw is not None else None
+        pack_docs: list = []
+        pack_labels: list[str] = []
+        stack = getattr(_svc(), "_eval_pack_stack", None)
+        if stack is not None:
+            named = dict(getattr(stack, "text_gateway_rules", None) or {})
+            sources = dict(getattr(stack, "text_gateway_rule_sources", None) or {})
+            for stem, doc in named.items():
+                pack_docs.append(doc)
+                pack_labels.append(str(sources.get(stem) or f"pack:{stem}"))
+        overlay, sources_tuple = compile_layered_text_rules(
+            pack_docs=pack_docs,
+            pack_source_labels=pack_labels,
+            config_rules=config_rules,
+            persisted_rules=stored,
+        )
+        return _json_no_store({
+            "rules": overlay.to_dict(),
+            "sources": list(sources_tuple),
+            "defaults": default_text_rules().to_dict(),
+            "stored": stored or {},
+            "persisted_outside_pack": bool(stored),
+        })
+
+    @app.put("/api/gateway/rules")
+    async def gateway_put_rules(request: Request, body: dict) -> Any:
+        from redibis.webapp.security import auth_enabled, role_can
+
+        user = getattr(request.state, "user", None)
+        role = getattr(user, "role", "") or ""
+        if auth_enabled() and not role_can(role, "mutate"):
+            raise HTTPException(status_code=403, detail="admin only")
+        from redibis.pii.text_rules import TextRuleOverlay, compile_text_rules
+        from redibis.webapp.pii_text_routes import _save_stored_text_rules
+
+        overlay = TextRuleOverlay.from_dict(body.get("rules") if "rules" in (body or {}) else body)
+        loc = _save_stored_text_rules(overlay.to_dict())
+        return _json_no_store({
+            "status": "saved",
+            "location": str(loc) if loc else "",
+            "stored": overlay.to_dict(),
+            "rules": compile_text_rules(overlay).to_dict(),
+            "persisted_outside_pack": True,
+        })
+
+    @app.post("/api/gateway/rules/dry-run")
+    async def gateway_rules_dry_run(body: dict) -> Any:
+        from redibis.pii.text_rules import TextRuleOverlay, merge_text_rules
+        from redibis.services.text_pii_service import TextPIIService
+
+        text = str((body or {}).get("text") or "")
+        draft = (body or {}).get("draft_rules") or (body or {}).get("rules") or {}
+        language = str((body or {}).get("language") or "en")
+        engines = str((body or {}).get("engines") or "regex")
+        min_score = float((body or {}).get("min_score") or 0.35)
+        gw_cfg = getattr(_redibis_config(), "text_gateway", None)
+        preprocess = bool(getattr(gw_cfg, "obfuscation_preprocess", True)) if gw_cfg else True
+        expanders = list(getattr(gw_cfg, "obfuscation_expanders", None) or []) if gw_cfg else []
+        before = _call(
+            _svc().scan,
+            text,
+            language=language,
+            engines=engines,
+            min_score=min_score,
+            return_text=True,
+            preprocess_obfuscation=preprocess,
+            preprocess_expanders=expanders,
+            max_chars=_scan_max_chars(),
+        )
+        overlay = merge_text_rules(
+            getattr(getattr(_svc(), "_ruleset", None), "text_rules", None),
+            TextRuleOverlay.from_dict(draft),
+        )
+        after_svc = TextPIIService(
+            redibis_config=_redibis_config(),
+            text_rules_overlay=overlay,
+            skip_stored_text_rules=True,
+            merge_builtin_text_rules=False,
+            ner_backend=getattr(_svc(), "_ner", None),
+        )
+        after = _call(
+            after_svc.scan,
+            text,
+            language=language,
+            engines=engines,
+            min_score=min_score,
+            return_text=True,
+            preprocess_obfuscation=preprocess,
+            preprocess_expanders=expanders,
+            max_chars=_scan_max_chars(),
+        )
+        return _json_no_store({
+            "before": before.to_dict(return_text=True),
+            "after": after.to_dict(return_text=True),
+            "diff": _span_diff(
+                list(before.to_dict(return_text=True).get("spans") or []),
+                list(after.to_dict(return_text=True).get("spans") or []),
+            ),
+        })
+
+    @app.get("/api/gateway/llm-log/{run_uuid}")
+    async def gateway_llm_log(request: Request, run_uuid: str) -> Any:
+        from redibis.enrich.llm_logging import get_recent_llm_calls
+        from redibis.webapp.pii_text_routes import role_may_see_full_provenance
+
+        rid = (run_uuid or "").strip()
+        include = role_may_see_full_provenance(request)
+        calls = get_recent_llm_calls(run_id=rid, limit=200, include_transcripts=include) if rid else []
+        if not calls:
+            return _json_no_store({
+                "run_uuid": rid,
+                "available": False,
+                "reason": "log not retained for this run",
+                "calls": [],
+                "retention": {
+                    "kind": "process_local_ring",
+                    "maxlen": 200,
+                    "note": (
+                        "Transcripts live in a process-local ring buffer "
+                        "(maxlen 200). They are available only for recent runs "
+                        "from the worker that served them. Multi-worker "
+                        "deployments may legitimately return empty."
+                    ),
+                },
+            })
+        payload = {
+            "run_uuid": rid,
+            "available": True,
+            "calls": calls,
+            "transcripts_withheld": not include,
+            "retention": {
+                "kind": "process_local_ring",
+                "maxlen": 200,
+                "note": (
+                    "Transcripts live in a process-local ring buffer "
+                    "(maxlen 200). They are available only for recent runs "
+                    "from the worker that served them."
+                ),
+            },
         }
         return _json_no_store(payload)
 
@@ -1198,10 +1429,10 @@ def register_gateway_routes(
         language = body.language or uc.language or "ar"
         dataset = _dataset_from_usecase(uc, language=language)
         total_chars = len(uc.text or "")
-        if total_chars > UI_MAX_CHARS:
+        if total_chars > _ui_max_chars():
             raise HTTPException(
                 status_code=413,
-                detail=f"use case exceeds {UI_MAX_CHARS} characters",
+                detail=f"use case exceeds {_ui_max_chars()} characters",
             )
         draft = body.draft_rules if body.draft_rules is not None else dict(uc.rule_edits or {})
         options = {
@@ -1212,7 +1443,7 @@ def register_gateway_routes(
             "llm_provider": "",
             "llm_model": "",
             "llm_api_key": "",
-            "max_chars": UI_MAX_CHARS,
+            "max_chars": _scan_max_chars(),
             "overlap_iou": 0.5,
             "preprocess_obfuscation": True,
             "preprocess_expanders": [],
@@ -1246,14 +1477,15 @@ def register_gateway_routes(
         text, original_n, truncated = _guard(request, body.text)
         t0 = time.perf_counter()
         cfg = _redibis_config()
-        kwargs = _scan_kwargs(body, UI_MAX_CHARS)
+        kwargs = _scan_kwargs(body, _scan_max_chars())
         from redibis.webapp.pii_text_routes import role_may_see_full_provenance
 
         kwargs["include_provenance"] = (
             str(provenance).lower() == "full" and role_may_see_full_provenance(request)
         )
+        svc = _scan_service(getattr(body, "draft_rules", None))
         with _gateway_llm_run() as run_id:
-            result = _call(_svc().scan, text, **kwargs)
+            result = _call(svc.scan, text, **kwargs)
             guards = _run_guards(body, text, cfg)
         payload = envelope(
             result,
@@ -1320,8 +1552,8 @@ def register_gateway_routes(
 
             def _do_scan():
                 with _gateway_llm_run() as run_id:
-                    result = _svc().scan(
-                        text, progress_cb=_on_stage, **_scan_kwargs(body, UI_MAX_CHARS)
+                    result = _scan_service(getattr(body, "draft_rules", None)).scan(
+                        text, progress_cb=_on_stage, **_scan_kwargs(body, _scan_max_chars())
                     )
                     # Guards may call an external LLM (network I/O) when the
                     # matching text_gateway.*_llm_enabled flag is set — keep
@@ -1477,7 +1709,7 @@ def register_gateway_routes(
             text,
             policy=policy,
             policy_id=body.policy_id,
-            scan_kwargs=_scan_kwargs(body, UI_MAX_CHARS),
+            scan_kwargs=_scan_kwargs(body, _scan_max_chars()),
         )
         payload = envelope(
             result, truncated=truncated, original_char_count=original_n

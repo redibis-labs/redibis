@@ -121,6 +121,10 @@
       </section>
 
       <aside class="gw-side">
+        <div class="gw-card" id="gwRulesCard">
+          <h2>Detection rules</h2>
+          <div id="gwRules"></div>
+        </div>
         <div class="gw-card">
           <h2>Summary</h2>
           <div id="gwSummary" class="gw-empty">Nothing scanned yet.</div>
@@ -131,9 +135,13 @@
         </div>
         <div class="gw-card" id="gwLlmCard" hidden>
           <h2>LLM log</h2>
-          <p class="gw-hint">Whether a model ran, what was sent, and what came back. Admin sees the full transcript; explorers see usage only.</p>
-          <div id="gwLlm"></div>
-          <button id="gwLlmDownload" type="button" class="btn btn-ghost btn-sm">Download LLM log</button>
+          <p class="gw-hint">Whether a model ran. Transcripts are fetched only when you press Show LLM log. The log is a process-local ring of the last 200 calls on this worker.</p>
+          <div id="gwLlmSummary" class="gw-hint"></div>
+          <div id="gwLlm" hidden></div>
+          <div class="gw-pol-actions">
+            <button id="gwLlmShow" type="button" class="btn btn-ghost btn-sm">Show LLM log</button>
+            <button id="gwLlmDownload" type="button" class="btn btn-ghost btn-sm">Download LLM log</button>
+          </div>
         </div>
         <div class="gw-card" id="gwMetaCard" hidden>
           <h2>Provenance</h2>
@@ -167,6 +175,8 @@
   <script>
     window.REDIBIS_USER = {% if user %}{"username":"{{ user.username }}","role":"{{ user.role }}"}{% else %}null{% endif %};
     window.GW_MAX_CHARS = {{ ui_max_chars }};
+    window.GW_RENDER_V = {{ (render_v or "")|tojson }};
+    window.GW_RULES_V = {{ (rules_v or "")|tojson }};
   </script>
   <script src="/static/auth.js"></script>
   <script type="module" src="/static/gateway.js?v={{ js_v }}"></script>

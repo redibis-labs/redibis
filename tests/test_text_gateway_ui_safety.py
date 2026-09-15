@@ -15,7 +15,8 @@ def test_no_web_storage_or_innerhtml_of_user_text():
     mjs = (STATIC / "gateway_render.mjs").read_text(encoding="utf-8")
     usecase_js = (STATIC / "gateway_usecase.js").read_text(encoding="utf-8")
     run_js = (STATIC / "gateway_run.js").read_text(encoding="utf-8")
-    blob = js + "\n" + eval_js + "\n" + mjs + "\n" + usecase_js + "\n" + run_js
+    rules_js = (STATIC / "gateway_rules.mjs").read_text(encoding="utf-8")
+    blob = js + "\n" + eval_js + "\n" + mjs + "\n" + usecase_js + "\n" + run_js + "\n" + rules_js
     assert "localStorage" not in blob
     assert "sessionStorage" not in blob
     assert "indexedDB" not in blob
@@ -25,6 +26,7 @@ def test_no_web_storage_or_innerhtml_of_user_text():
     assert "innerHTML" not in mjs
     assert "innerHTML" not in usecase_js
     assert "innerHTML" not in run_js
+    assert "innerHTML" not in rules_js
     assert "insertAdjacentHTML" not in blob
     assert "document.write" not in blob
 
@@ -258,6 +260,45 @@ def test_evaluations_page_has_llm_api_key_field():
     js = (STATIC / "gateway_eval.js").read_text(encoding="utf-8")
     assert 'id="evLlmKey"' in html
     assert "llm_api_key" in js
+
+
+def test_gateway_modules_are_cache_busted():
+    gw = (TEMPLATES / "gateway.html").read_text(encoding="utf-8")
+    ev = (TEMPLATES / "gateway_eval.html").read_text(encoding="utf-8")
+    uc = (TEMPLATES / "gateway_usecase.html").read_text(encoding="utf-8")
+    js = (STATIC / "gateway.js").read_text(encoding="utf-8")
+    eval_js = (STATIC / "gateway_eval.js").read_text(encoding="utf-8")
+    usecase_js = (STATIC / "gateway_usecase.js").read_text(encoding="utf-8")
+    for html in (gw, ev, uc):
+        assert "GW_RENDER_V" in html
+    assert "GW_RULES_V" in gw and "GW_RULES_V" in ev
+    for blob in (js, eval_js, usecase_js):
+        assert "gateway_render.mjs?v=${window.GW_RENDER_V" in blob
+    assert "gateway_rules.mjs?v=${window.GW_RULES_V" in js
+    assert "gateway_rules.mjs?v=${window.GW_RULES_V" in eval_js
+
+
+def test_evaluation_actions_do_not_use_window_prompt():
+    html = (TEMPLATES / "gateway_eval.html").read_text(encoding="utf-8")
+    js = (STATIC / "gateway_eval.js").read_text(encoding="utf-8")
+    rules = (STATIC / "gateway_rules.mjs").read_text(encoding="utf-8")
+    assert "window.prompt" not in js
+    assert "window.prompt" not in rules
+    assert 'id="evActNoise"' in html
+    assert "evActHint" in html
+    assert "askInline" in js
+    assert "/api/gateway/rules" in rules
+    assert "/api/gateway/llm-log/" in js
+    assert "Show LLM log" in html
+
+
+def test_llm_log_is_fetched_on_demand():
+    js = (STATIC / "gateway.js").read_text(encoding="utf-8")
+    html = (TEMPLATES / "gateway.html").read_text(encoding="utf-8")
+    assert "/api/gateway/llm-log/" in js
+    assert "Show LLM log" in html
+    assert "fetchLlmLog" in js
+    assert "toggleLlmLog" in js
 
 
 def test_usecase_pages_linked_from_gateway_nav():

@@ -21,6 +21,7 @@ from redibis.pii.text_preprocess.expanders._util import (
     fold_indic_digits,
     label_near,
     load_yaml_lexicon,
+    noise_set,
     tokenize_with_spans,
 )
 from redibis.pii.text_preprocess.registry import register_text_expander
@@ -440,12 +441,13 @@ class ArabicSpokenDigitsExpander:
         tokens = _expand_wa_tokens(tokenize_with_spans(text))
         spans: list[SurfaceSpan] = []
         seen: set[tuple[int, int, str]] = set()
+        noise = noise_set(ctx)
         i = 0
         while i < len(tokens):
             emitted = False
             for prefer_teens in (True, False):
                 run = self._consume_run(
-                    tokens, i, text, prefer_teens=prefer_teens,
+                    tokens, i, text, prefer_teens=prefer_teens, noise=noise,
                 )
                 if run is None:
                     continue
@@ -505,6 +507,7 @@ class ArabicSpokenDigitsExpander:
         text: str,
         *,
         prefer_teens: bool,
+        noise: frozenset[str] = frozenset(),
     ) -> Optional[tuple[int, int, str, int]]:
         first_tok = tokens[start_idx][0]
         first_clean = _clean_token(first_tok)
@@ -521,7 +524,13 @@ class ArabicSpokenDigitsExpander:
         while idx < len(tokens):
             tok_start, tok_end = tokens[idx][1], tokens[idx][2]
             cleaned = _clean_token(tokens[idx][0])
-            if not cleaned or cleaned in _SKIP_SEPS:
+            # Noise tokens are transparent: skip without extending last_end or
+            # counting as spoken atoms, same as _SKIP_SEPS. A filler *between*
+            # digits still sits inside first_start..last_end (contiguous span);
+            # leading/trailing fillers stay outside because last_end is not
+            # advanced. Middle fillers cannot be excluded without breaking
+            # text[start:end] integrity.
+            if not cleaned or cleaned in _SKIP_SEPS or cleaned in noise:
                 idx += 1
                 consumed += 1
                 continue

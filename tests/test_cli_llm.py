@@ -141,6 +141,7 @@ def test_local_openai_compat_injects_empty_api_key(monkeypatch):
     assert not p.api_key
     out = p.complete("sys", "user", json_mode=False)
     assert out == "ok"
+    assert captured["model"] == "openai/Qwen/Qwen2.5-7B-Instruct"
     assert captured["kwargs"].get("api_key") == "EMPTY"
     assert "api_base" in captured["kwargs"]
 

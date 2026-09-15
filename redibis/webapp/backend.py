@@ -389,30 +389,31 @@ def _require_session(session_id: str):
 # Sessions
 # ═══════════════════════════════════════════════════════════════════════════
 
-@app.post("/api/sessions")
-async def create_session(
-    file: UploadFile = File(...),
-    table: str = Form("data.uploaded"),
-    scan_mode: str = Form("both"),
-    equation: str = Form("independent"),
-    pii_engines: str = Form("both"),
-    pii_regex_confidence: float = Form(0.80),
-    pii_gliner_confidence: float = Form(0.40),
-    pii_llm_confidence: float = Form(0.82),
-    pii_gliner_model: str = Form(""),
-    pii_models_dir: str = Form(""),
-    pii_gliner_always_run: bool = Form(False),
-    selected_columns: Optional[str] = Form(None),
-    pii_regex_config: Optional[str] = Form(None),
-    quality_config: Optional[str] = Form(None),
-    auto_merge_contract: bool = Form(False),
-    automerge: str = Form("none"),
+def _create_session_from_bytes(
+    file_bytes: bytes,
+    *,
+    table: str = "data.uploaded",
+    scan_mode: str = "both",
+    equation: str = "independent",
+    pii_engines: str = "both",
+    pii_regex_confidence: float = 0.80,
+    pii_gliner_confidence: float = 0.40,
+    pii_llm_confidence: float = 0.82,
+    pii_gliner_model: str = "",
+    pii_models_dir: str = "",
+    pii_gliner_always_run: bool = False,
+    selected_columns: Optional[str] = None,
+    pii_regex_config: Optional[str] = None,
+    quality_config: Optional[str] = None,
+    auto_merge_contract: bool = False,
+    automerge: str = "none",
 ) -> dict:
+    """Shared body for session creation — one path for uploads and for files
+    picked out of the server-side sample data library."""
     from redibis.services.session_service import session_manager, GlobalConfig
     from redibis.pii.regex_overrides import RegexSet
     from redibis.quality.rule_set import QualityRuleSet
 
-    file_bytes = await file.read()
     cols = json.loads(selected_columns) if selected_columns else None
     masking_default_locale = _redibis_config().masking.default_locale
     cc = GlobalConfig(
@@ -454,6 +455,163 @@ async def create_session(
             session.persist_to_disk()
     return {"session_id": session.session_id, "status": session.status,
             "common_config": cc.to_dict()}
+
+
+@app.post("/api/sessions")
+async def create_session(
+    file: UploadFile = File(...),
+    table: str = Form("data.uploaded"),
+    scan_mode: str = Form("both"),
+    equation: str = Form("independent"),
+    pii_engines: str = Form("both"),
+    pii_regex_confidence: float = Form(0.80),
+    pii_gliner_confidence: float = Form(0.40),
+    pii_llm_confidence: float = Form(0.82),
+    pii_gliner_model: str = Form(""),
+    pii_models_dir: str = Form(""),
+    pii_gliner_always_run: bool = Form(False),
+    selected_columns: Optional[str] = Form(None),
+    pii_regex_config: Optional[str] = Form(None),
+    quality_config: Optional[str] = Form(None),
+    auto_merge_contract: bool = Form(False),
+    automerge: str = Form("none"),
+) -> dict:
+    return _create_session_from_bytes(
+        await file.read(),
+        table=table,
+        scan_mode=scan_mode,
+        equation=equation,
+        pii_engines=pii_engines,
+        pii_regex_confidence=pii_regex_confidence,
+        pii_gliner_confidence=pii_gliner_confidence,
+        pii_llm_confidence=pii_llm_confidence,
+        pii_gliner_model=pii_gliner_model,
+        pii_models_dir=pii_models_dir,
+        pii_gliner_always_run=pii_gliner_always_run,
+        selected_columns=selected_columns,
+        pii_regex_config=pii_regex_config,
+        quality_config=quality_config,
+        auto_merge_contract=auto_merge_contract,
+        automerge=automerge,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Server-side sample data library
+# ═══════════════════════════════════════════════════════════════════════════
+
+class SampleScanBody(BaseModel):
+    """Start a scan from a file already on the redibis host."""
+
+    root: str = ""
+    path: str
+    table: str = ""
+    scan_mode: str = "both"
+    equation: str = "independent"
+    pii_engines: str = "both"
+    pii_regex_confidence: float = 0.80
+    pii_gliner_confidence: float = 0.40
+    pii_llm_confidence: float = 0.82
+    pii_gliner_model: str = ""
+    pii_models_dir: str = ""
+    pii_gliner_always_run: bool = False
+    selected_columns: Optional[list] = None
+    pii_regex_config: Optional[str] = None
+    quality_config: Optional[str] = None
+    auto_merge_contract: bool = False
+    automerge: str = "none"
+
+
+def _sample_data_cfg():
+    return _redibis_config().sample_data
+
+
+def _sample_http_error(exc: Exception) -> HTTPException:
+    from redibis.services.sample_data import SampleDataDisabled, SampleDataError
+
+    if isinstance(exc, SampleDataDisabled):
+        return HTTPException(status_code=404, detail=str(exc))
+    if isinstance(exc, SampleDataError):
+        return HTTPException(status_code=400, detail=str(exc))
+    return HTTPException(status_code=500, detail="sample data request failed")
+
+
+def _sample_table_name(explicit: str, stem: str) -> str:
+    if explicit.strip():
+        return explicit.strip()
+    safe = re.sub(r"[^A-Za-z0-9_]", "_", stem) or "sample"
+    return f"data.{safe}"
+
+
+@app.get("/api/sample-data")
+async def sample_data_index(root: str = "") -> dict:
+    """List loadable sample files. ``{"enabled": false}`` when unconfigured."""
+    from redibis.services.sample_data import SampleDataDisabled, list_files
+
+    cfg = _sample_data_cfg()
+    try:
+        payload = list_files(root, cfg)
+    except SampleDataDisabled:
+        return {"enabled": False, "roots": [], "files": []}
+    except Exception as exc:
+        raise _sample_http_error(exc) from exc
+    payload["enabled"] = True
+    return payload
+
+
+@app.get("/api/sample-data/preview")
+async def sample_data_preview(path: str, root: str = "", rows: int = 20) -> dict:
+    from redibis.services.sample_data import preview
+
+    try:
+        return preview(root, path, rows=max(1, min(int(rows), 200)), cfg=_sample_data_cfg())
+    except Exception as exc:
+        raise _sample_http_error(exc) from exc
+
+
+@app.post("/api/sessions/from-sample")
+async def create_session_from_sample(body: SampleScanBody) -> dict:
+    """Create a scan session from a server-side sample file (no upload)."""
+    from redibis.services.sample_data import read_bytes, resolve
+
+    cfg = _sample_data_cfg()
+    if not bool(getattr(cfg, "allow_scan", True)):
+        raise HTTPException(
+            status_code=403,
+            detail="sample_data.allow_scan is false — browsing only",
+        )
+    try:
+        resolved = resolve(body.root, body.path, cfg)
+        _name, file_bytes = read_bytes(body.root, body.path, cfg)
+    except Exception as exc:
+        raise _sample_http_error(exc) from exc
+
+    logger.info(
+        "sample_data scan root=%s path=%s bytes=%s",
+        body.root or "(default)", body.path, len(file_bytes),
+    )
+    result = _create_session_from_bytes(
+        file_bytes,
+        table=_sample_table_name(body.table, resolved.stem),
+        scan_mode=body.scan_mode,
+        equation=body.equation,
+        pii_engines=body.pii_engines,
+        pii_regex_confidence=body.pii_regex_confidence,
+        pii_gliner_confidence=body.pii_gliner_confidence,
+        pii_llm_confidence=body.pii_llm_confidence,
+        pii_gliner_model=body.pii_gliner_model,
+        pii_models_dir=body.pii_models_dir,
+        pii_gliner_always_run=body.pii_gliner_always_run,
+        selected_columns=(
+            json.dumps(body.selected_columns) if body.selected_columns else None
+        ),
+        pii_regex_config=body.pii_regex_config,
+        quality_config=body.quality_config,
+        auto_merge_contract=body.auto_merge_contract,
+        automerge=body.automerge,
+    )
+    result["source"] = {"kind": "sample_data", "root": body.root, "path": body.path}
+    return result
 
 
 @app.get("/api/sessions")

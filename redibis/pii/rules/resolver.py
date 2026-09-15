@@ -74,15 +74,26 @@ class SpanResolver:
             ),
         )
         selected: list[Candidate] = []
+        losers_for: list[list[Candidate]] = []
         for c in ordered:
-            if any(_overlaps(c, s) for s in selected):
+            hit = [i for i, s in enumerate(selected) if _overlaps(c, s)]
+            if hit:
+                for i in hit:
+                    losers_for[i].append(c)
                 continue
             selected.append(c)
-        selected.sort(key=lambda c: (c.start or 0, -(c.score)))
-        return tuple(self._to_detection(c) for c in selected)
+            losers_for.append([])
+        paired = sorted(
+            zip(selected, losers_for),
+            key=lambda pair: (pair[0].start or 0, -(pair[0].score)),
+        )
+        return tuple(self._to_detection(winner, losers) for winner, losers in paired)
 
     @staticmethod
-    def _to_detection(c: Candidate) -> Detection:
+    def _to_detection(c: Candidate, losers: Sequence[Candidate] = ()) -> Detection:
+        ordered_losers = tuple(
+            sorted(losers, key=_authority, reverse=True)
+        )
         return Detection(
             entity_type=c.entity_type,
             score=c.score,
@@ -95,7 +106,7 @@ class SpanResolver:
             validator=c.validator,
             context_boost=c.context_boost,
             is_proposal=c.is_proposal,
-            evidence=(c,),
+            evidence=(c, *ordered_losers),
             canonical=c.canonical or "",
         )
 

@@ -86,6 +86,7 @@ class TextScanner:
                 logger.debug("progress_cb failed at stage=%s", stage, exc_info=True)
 
         cfg = config or TextScanConfig()
+        original_n = len(text if text is not None else "")
         raw = text if text is not None else ""
         truncated = False
         if len(raw) > cfg.max_chars:
@@ -98,12 +99,21 @@ class TextScanner:
             arabic=cfg.arabic or (cfg.language or "").startswith("ar"),
             group="free_text",
             entities=cfg.entities,
+            text_rules=getattr(self.ruleset, "text_rules", None),
+            ner_window_chars=int(getattr(cfg, "ner_window_chars", 1200) or 1200),
+            ner_window_overlap=int(getattr(cfg, "ner_window_overlap", 200) or 200),
+            ner_max_windows=int(getattr(cfg, "ner_max_windows", 200) or 200),
         )
         _emit("validate", char_count=len(raw), truncated=truncated)
 
         candidates: list[Candidate] = []
         engines_ran: list[str] = []
         engines_unavailable: dict[str, str] = {}
+        coverage_engines: dict[str, float] = {}
+        coverage_reasons: dict[str, str] = {}
+        scanned_frac = (len(raw) / original_n) if original_n else 1.0
+        if truncated:
+            coverage_reasons["scanner"] = f"clipped at max_chars ({cfg.max_chars})"
 
         # Deterministic spoken / obfuscated expanders (original offsets).
         pre_hits: list[Candidate] = []
@@ -127,6 +137,7 @@ class TextScanner:
             if "regex" in engines:
                 candidates.extend(regex_hits)
                 engines_ran.append("regex")
+                coverage_engines["regex"] = scanned_frac
         _emit("regex", hits=len(regex_hits) if "regex" in engines else 0)
 
         if "phone" in engines:
@@ -135,6 +146,7 @@ class TextScanner:
             )
             candidates.extend(phone_hits)
             engines_ran.append("phone")
+            coverage_engines["phone"] = scanned_frac
             _emit("phone", hits=len(phone_hits))
         else:
             _emit("phone", hits=0, skipped=True)
@@ -145,7 +157,17 @@ class TextScanner:
                 ner_hits = self._ner.recognize(raw, ctx)
                 candidates.extend(ner_hits)
                 engines_ran.append("ner")
-                _emit("ner", hits=len(ner_hits))
+                ner_cov = dict(getattr(self._ner, "last_coverage", None) or {})
+                ner_frac = float(ner_cov.get("fraction") or 1.0) * scanned_frac
+                coverage_engines["ner"] = round(ner_frac, 4)
+                if ner_cov.get("reasons"):
+                    coverage_reasons.update({
+                        str(k): str(v) for k, v in dict(ner_cov.get("reasons") or {}).items()
+                    })
+                _emit("ner", hits=len(ner_hits), **({
+                    "windows_scanned": ner_cov.get("windows_scanned"),
+                    "windows_total": ner_cov.get("windows_total"),
+                } if ner_cov else {}))
             else:
                 reason = str(health.get("error") or "NER backend not loadable")
                 engines_unavailable["ner"] = reason
@@ -175,7 +197,19 @@ class TextScanner:
                 if llm_hits:
                     candidates.extend(llm_hits)
                 engines_ran.append("llm")
-                _emit("llm", hits=len(llm_hits or []))
+                llm_cov = dict(getattr(active_llm, "last_coverage", None) or {})
+                llm_frac = float(llm_cov.get("fraction") or 1.0) * scanned_frac
+                coverage_engines["llm"] = round(llm_frac, 4)
+                if llm_cov.get("reasons"):
+                    coverage_reasons.update({
+                        str(k): str(v) for k, v in dict(llm_cov.get("reasons") or {}).items()
+                    })
+                _emit(
+                    "llm",
+                    hits=len(llm_hits or []),
+                    windows_scanned=llm_cov.get("windows_scanned"),
+                    windows_total=llm_cov.get("windows_total"),
+                )
             except Exception as exc:
                 logger.warning("LLM text refinement skipped: %s", exc)
                 engines_unavailable["llm"] = str(exc)
@@ -209,12 +243,35 @@ class TextScanner:
         except Exception as exc:
             logger.warning("text rule filters skipped: %s", exc)
 
+        equation = str(getattr(cfg, "equation", None) or "independent")
+        include_arb = bool(getattr(cfg, "include_arbitration", False))
+        arb_records: list = []
+        try:
+            from redibis.pii.span_arbiter import arbitrate, stamp_detections, summarize_arbitration
+
+            reviews = list(getattr(active_llm, "last_reviews", None) or []) if llm_ran else []
+            candidates, arb_records = arbitrate(
+                candidates,
+                text=raw,
+                mode=equation,
+                llm_ran=llm_ran,
+                reviews=reviews,
+            )
+        except Exception as exc:
+            logger.warning("span arbitration skipped: %s", exc)
+            arb_records = []
+
         detections = self._resolver.resolve(
             candidates,
             min_score=cfg.min_score,
             mode=cfg.resolve,
             entities=cfg.entities,
         )
+        if arb_records:
+            try:
+                detections = tuple(stamp_detections(detections, arb_records))
+            except Exception as exc:
+                logger.debug("arbitration stamp skipped: %s", exc)
         _emit("resolve", detections=len(detections))
 
         # Enforce source-slice integrity
@@ -242,6 +299,24 @@ class TextScanner:
         for d in checked:
             counts[d.entity_type] = counts.get(d.entity_type, 0) + 1
 
+        coverage = {
+            "char_count": len(raw),
+            "original_char_count": original_n,
+            "scanned_fraction": round(scanned_frac, 4),
+            "per_engine": coverage_engines,
+            "reasons": coverage_reasons,
+        }
+        llm_cov = dict(getattr(active_llm, "last_coverage", None) or {}) if cfg.use_llm else {}
+        if llm_cov:
+            coverage["llm_windows_scanned"] = llm_cov.get("windows_scanned") or 0
+            coverage["llm_windows_total"] = llm_cov.get("windows_total") or 0
+        arbitration: dict = {}
+        if equation != "independent" or include_arb:
+            from redibis.pii.span_arbiter import summarize_arbitration
+
+            arbitration = summarize_arbitration(
+                arb_records, mode=equation, include_records=include_arb,
+            )
         result = DetectionResult(
             kind="span",
             detections=tuple(checked),
@@ -253,6 +328,8 @@ class TextScanner:
             char_count=len(raw),
             truncated=truncated,
             engines_unavailable=engines_unavailable,
+            coverage=coverage,
+            arbitration=arbitration,
         )
         _emit("done", entity_count=len(checked), llm_ran=llm_ran)
         return result

@@ -108,6 +108,9 @@ _HELP_PATHS: list[list[str]] = [
     ["behavior", "signals", "--help"],
     ["behavior", "suggest", "--help"],
     ["behavior", "draft-from", "--help"],
+    ["pii", "text", "--help"],
+    ["pii", "text-llm-check", "--help"],
+    ["pii", "text-batch", "--help"],
 ]
 
 

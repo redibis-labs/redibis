@@ -100,7 +100,8 @@ def canonical_span(
         out["grade"] = grade
     else:
         out["grade"] = "strict"
-    for key in ("score", "engine", "recognizer", "validator", "canonical", "note", "defect"):
+    for key in ("score", "engine", "recognizer", "validator", "canonical", "note", "defect",
+                "agreement", "arbitration_rule", "llm_verdict", "llm_score", "llm_reason"):
         if value.get(key) not in (None, ""):
             out[key] = value[key]
     if not out.get("canonical"):

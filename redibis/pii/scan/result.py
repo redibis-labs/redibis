@@ -63,6 +63,11 @@ class Detection:
     is_proposal: bool = False
     evidence: tuple[Candidate, ...] = ()
     canonical: str = ""
+    agreement: str = ""              # "" when nothing contested this span
+    arbitration_rule: str = ""
+    llm_verdict: str = ""            # "PII" | "NOT_PII" | "UNSURE" | ""
+    llm_score: Optional[float] = None
+    llm_reason: str = ""             # scrubbed
 
     def to_dict(self, *, return_text: bool = True) -> dict:
         d = {
@@ -79,6 +84,16 @@ class Detection:
         }
         if self.canonical:
             d["canonical"] = self.canonical
+        if self.agreement:
+            d["agreement"] = self.agreement
+        if self.arbitration_rule:
+            d["arbitration_rule"] = self.arbitration_rule
+        if self.llm_verdict:
+            d["llm_verdict"] = self.llm_verdict
+        if self.llm_score is not None:
+            d["llm_score"] = self.llm_score
+        if self.llm_reason:
+            d["llm_reason"] = self.llm_reason
         if return_text:
             d["text"] = self.text
         else:
@@ -113,6 +128,8 @@ class DetectionResult:
     provenance_degraded_reason: str = ""
     run_uuid: str = ""
     provenance: Optional[Mapping[str, object]] = None
+    coverage: Mapping[str, object] = field(default_factory=dict)
+    arbitration: Mapping[str, object] = field(default_factory=dict)
 
     @property
     def spans(self) -> tuple[Detection, ...]:
@@ -140,6 +157,10 @@ class DetectionResult:
             "provenance_degraded": self.provenance_degraded,
             "run_uuid": self.run_uuid,
         }
+        if self.coverage:
+            d["coverage"] = dict(self.coverage)
+        if self.arbitration:
+            d["arbitration"] = dict(self.arbitration)
         if self.provenance_degraded_reason:
             d["provenance_degraded_reason"] = self.provenance_degraded_reason
         if self.provenance:
@@ -161,10 +182,18 @@ class TextScanConfig:
     return_text: bool = True
     resolve: str = "priority"  # "priority" | "longest" | "all"
     use_llm: bool = False
-    max_chars: int = 50_000
+    max_chars: int = 200_000
     entities: tuple[str, ...] = ()
     default_region: str = "EG"
     arabic: bool = False
     # Deterministic spoken/obfuscated expanders (Gateway default on).
     preprocess_obfuscation: bool = False
     preprocess_expanders: tuple[str, ...] = ()
+    ner_window_chars: int = 1200
+    ner_window_overlap: int = 200
+    ner_max_windows: int = 200
+    llm_window_chars: int = 3500
+    llm_window_overlap: int = 300
+    llm_max_windows: int = 8
+    equation: str = "independent"  # same vocabulary as column decide_pii
+    include_arbitration: bool = False

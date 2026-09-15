@@ -117,6 +117,7 @@
     window.REDIBIS_USER = {% if user %}{"username":"{{ user.username }}","role":"{{ user.role }}"}{% else %}null{% endif %};
     window.GW_MAX_CHARS = {{ ui_max_chars }};
     window.GW_USECASE_ID = {{ (uc_id or "")|tojson }};
+    window.GW_RENDER_V = {{ (render_v or "")|tojson }};
   </script>
   <script src="/static/auth.js"></script>
   <script type="module" src="/static/gateway_usecase.js?v={{ js_v }}"></script>

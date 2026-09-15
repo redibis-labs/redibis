@@ -186,6 +186,15 @@ def _post(client: TestClient, path: str, payload: dict, csrf: str | None = None)
     return client.post(path, json=payload, headers=headers)
 
 
+def _put(client: TestClient, path: str, payload: dict):
+    token = client.cookies.get(CSRF_COOKIE) or ""
+    return client.put(
+        path,
+        json=payload,
+        headers={"X-CSRF-Token": token, "Accept": "application/json"},
+    )
+
+
 def _explorer(client: TestClient):
     get_auth_store().create_user("reader", EXPLORER_PW, role="explorer")
     assert _login(client, "reader", EXPLORER_PW).status_code == 200
@@ -506,6 +515,29 @@ def test_evaluation_rejects_invalid_dataset(client):
     assert r.status_code == 400
 
 
+def test_evaluation_does_not_413_a_300k_case(client):
+    _explorer(client)
+    email = "alice@example.com"
+    text = f"Contact {email} please " + ("x" * 300_000)
+    dataset = {
+        "kind": "redibis.text_span_eval_dataset",
+        "schema_version": "1.0",
+        "offset_unit": "unicode_codepoint",
+        "cases": [{
+            "id": "long-300k",
+            "text": text,
+            "language": "en",
+            "expected_spans": [{
+                "start": text.find(email),
+                "end": text.find(email) + len(email),
+                "entity_type": "EMAIL_ADDRESS",
+            }],
+        }],
+    }
+    r = _post(client, "/api/gateway/evaluations/run", {"dataset": dataset})
+    assert r.status_code == 200, r.text
+
+
 def test_evaluation_registry_compare_and_corpus_patch(client):
     _explorer(client)
     r = _post(client, "/api/gateway/evaluations/run", {"dataset": EVAL_DATASET, "label": "a"})
@@ -616,10 +648,7 @@ def test_envelope_includes_llm_usage_without_transcripts_for_explorer(client):
     assert llm["used"] is False
     assert llm["call_count"] == 0
     assert llm["skip_reason"] == "not requested"
-    for call in llm.get("calls") or []:
-        assert "system_prompt" not in call
-        assert "user_prompt" not in call
-        assert "response" not in call
+    assert "calls" not in llm
 
 
 def test_admin_scan_returns_llm_prompt_and_response(client, monkeypatch):
@@ -629,11 +658,19 @@ def test_admin_scan_returns_llm_prompt_and_response(client, monkeypatch):
     _admin(client)
     r = _post(client, "/api/gateway/scan", {"text": "alice@example.com", "use_llm": True})
     assert r.status_code == 200, r.text
-    llm = r.json()["llm"]
+    body = r.json()
+    llm = body["llm"]
     assert llm["requested"] is True
     assert llm["used"] is True
     assert llm["call_count"] >= 1
-    call = llm["calls"][0]
+    assert "calls" not in llm
+    run_id = llm["run_id"] or body.get("run_uuid")
+    log = client.get(f"/api/gateway/llm-log/{run_id}")
+    assert log.status_code == 200, log.text
+    payload = log.json()
+    assert payload["available"] is True
+    assert payload["transcripts_withheld"] is False
+    call = payload["calls"][0]
     assert call["system_prompt"] == "You are a PII span detector."
     assert "alice@example.com" in call["user_prompt"]
     assert call["response"] == '{"spans":[]}'
@@ -650,7 +687,14 @@ def test_explorer_scan_strips_llm_transcripts(client, monkeypatch):
     llm = r.json()["llm"]
     assert llm["used"] is True
     assert llm["call_count"] >= 1
-    call = llm["calls"][0]
+    assert "calls" not in llm
+    run_id = llm["run_id"] or r.json().get("run_uuid")
+    log = client.get(f"/api/gateway/llm-log/{run_id}")
+    assert log.status_code == 200, log.text
+    payload = log.json()
+    assert payload["available"] is True
+    assert payload["transcripts_withheld"] is True
+    call = payload["calls"][0]
     assert "system_prompt" not in call
     assert "user_prompt" not in call
     assert "response" not in call
@@ -678,4 +722,56 @@ def test_admin_can_export_llm_calls(client, monkeypatch):
     assert body["call_count"] >= 1
     assert "system_prompt" in body["calls"][0]
     assert "bob@example.com" in body["calls"][0]["user_prompt"]
+
+
+def test_explorer_can_get_and_dry_run_rules_but_not_put(client):
+    _explorer(client)
+    got = client.get("/api/gateway/rules")
+    assert got.status_code == 200, got.text
+    body = got.json()
+    assert "rules" in body
+    assert "noise_terms" in body["defaults"]
+    assert "ner_stoplist" in body["defaults"]
+    dry = _post(client, "/api/gateway/rules/dry-run", {
+        "text": "الرقم زيرو واحد ايوة خمسة",
+        "language": "ar",
+        "engines": "regex",
+        "draft_rules": {"noise_terms": ["ايوة"]},
+    })
+    assert dry.status_code == 200, dry.text
+    assert "diff" in dry.json()
+    denied = _put(client, "/api/gateway/rules", {"rules": {"noise_terms": ["ايوة"]}})
+    assert denied.status_code == 403
+
+
+def test_admin_can_put_gateway_rules(client):
+    from redibis.webapp.backend import get_config_store
+
+    store = get_config_store()
+    prior = store.load_global_settings().get("pii_text_rules")
+    try:
+        _admin(client)
+        r = _put(client, "/api/gateway/rules", {"rules": {"noise_terms": ["nonce-term"]}})
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["status"] == "saved"
+        assert "nonce-term" in (body.get("stored") or {}).get("noise_terms", [])
+        stored = client.get("/api/gateway/rules").json()
+        assert "nonce-term" in (stored.get("stored") or {}).get("noise_terms", [])
+    finally:
+        gs = store.load_global_settings()
+        if prior is None:
+            gs.pop("pii_text_rules", None)
+        else:
+            gs["pii_text_rules"] = prior
+        store.save_global_settings(gs)
+
+
+def test_missing_llm_log_returns_available_false(client):
+    _explorer(client)
+    r = client.get("/api/gateway/llm-log/not-a-real-run")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["available"] is False
+    assert "not retained" in (body.get("reason") or "")
 

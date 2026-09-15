@@ -249,6 +249,17 @@ def evaluate_gates(
                 if delta < -abs(float(drop)):
                     fail(str(entity), "value", "f1", cur_f1, prev_f1 - abs(float(drop)), extra=f"drop {delta}")
 
+    truncated = list(report.get("truncated_cases") or [])
+    if truncated:
+        fail(
+            "*",
+            "coverage",
+            "truncated",
+            len(truncated),
+            0,
+            extra=",".join(str(x) for x in truncated),
+        )
+
     passed = not failures
     named = ""
     if failures:

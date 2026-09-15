@@ -1,8 +1,14 @@
 """Operator-updatable Text Gateway rule overlay.
 
 The shipped regex catalogue stays read-only. Operators add exclusions, patterns,
-sentence-level context cues, and quantity units via ``text_gateway.rules``,
-``GET/PUT /api/pii/text/rules``, or a pack later. Compiled into ``RuleSet``.
+sentence-level context cues, quantity units, a noise lexicon, and a NER
+stoplist via ``text_gateway.rules``, ``GET/PUT /api/pii/text/rules``,
+``/api/gateway/rules``, or a pack later. Compiled into ``RuleSet``.
+
+``exclude_terms`` deletes a candidate whose *entire* folded surface equals a
+term. ``noise_terms`` makes a token transparent to every detection stage — it
+never breaks a spoken-digit run and is stripped from span edges. Keep the two
+lists apart.
 """
 
 from __future__ import annotations
@@ -74,6 +80,32 @@ def _unique(items: tuple[str, ...] | list[str]) -> tuple[str, ...]:
     return tuple(out)
 
 
+def _merge_stoplist(
+    left: Mapping[str, tuple[str, ...]],
+    right: Mapping[str, tuple[str, ...]],
+) -> dict[str, tuple[str, ...]]:
+    out: dict[str, tuple[str, ...]] = {str(k): tuple(v) for k, v in (left or {}).items()}
+    for key, vals in (right or {}).items():
+        et = str(key).strip() or "*"
+        out[et] = _unique(tuple(out.get(et, ())) + tuple(vals or ()))
+    return out
+
+
+def _stoplist_from_mapping(raw: Any) -> dict[str, tuple[str, ...]]:
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, tuple[str, ...]] = {}
+    for key, vals in raw.items():
+        et = str(key).strip()
+        if not et:
+            continue
+        if et != "*":
+            et = et.upper().replace(" ", "_")
+        items = vals if isinstance(vals, (list, tuple)) else [vals]
+        out[et] = _unique(tuple(str(x) for x in items))
+    return out
+
+
 @dataclass(frozen=True)
 class TextRuleOverlay:
     """Additive detection policy for free-text / Text Gateway scans."""
@@ -83,6 +115,12 @@ class TextRuleOverlay:
     patterns: Optional[RegexOverrides] = None
     context_cues: Mapping[str, ContextCue] = field(default_factory=dict)
     quantity_units: tuple[str, ...] = ()
+    # Tokens that are invisible to every detection stage. They never break a
+    # spoken-digit / digit-cluster run and are stripped from span edges.
+    # Distinct from ``exclude_terms``, which drops a whole-span equality match.
+    noise_terms: tuple[str, ...] = ()
+    # entity_type -> surfaces NER may never emit. "*" applies to all types.
+    ner_stoplist: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         cues = {
@@ -95,6 +133,8 @@ class TextRuleOverlay:
             "patterns": self.patterns.to_dict() if self.patterns else {"add": {}, "remove": [], "replace_all": False},
             "context_cues": cues,
             "quantity_units": list(self.quantity_units),
+            "noise_terms": list(self.noise_terms),
+            "ner_stoplist": {k: list(v) for k, v in self.ner_stoplist.items()},
         }
 
     @classmethod
@@ -129,6 +169,8 @@ class TextRuleOverlay:
             patterns=patterns,
             context_cues=cues,
             quantity_units=_unique(tuple(str(x) for x in (data.get("quantity_units") or []))),
+            noise_terms=_unique(tuple(str(x) for x in (data.get("noise_terms") or []))),
+            ner_stoplist=_stoplist_from_mapping(data.get("ner_stoplist")),
         )
 
     def merge(self, other: Optional["TextRuleOverlay"]) -> "TextRuleOverlay":
@@ -151,6 +193,8 @@ class TextRuleOverlay:
             patterns=_merge_regex(self.patterns, other.patterns),
             context_cues=cues,
             quantity_units=_unique(self.quantity_units + other.quantity_units),
+            noise_terms=_unique(self.noise_terms + other.noise_terms),
+            ner_stoplist=_merge_stoplist(self.ner_stoplist, other.ner_stoplist),
         )
 
     def triggers_for(self, entity_type: str) -> tuple[str, ...]:
@@ -334,6 +378,18 @@ def default_text_rules() -> TextRuleOverlay:
             "أيام", "يوم", "أسبوع", "اسابيع", "week", "weeks",
             "شهر", "months", "days", "minutes", "دقيقة",
         ],
+        "noise_terms": [
+            # Arabic confirmations / fillers
+            "تمام", "تماما", "تماماً", "نعم", "ايوة", "أيوة", "ايوه", "أيوه",
+            "افندم", "أفندم", "اه", "أه", "اهه", "أهه", "ماشي", "طيب", "اوكي",
+            "حاضر", "خلاص", "يعني", "امم",
+            # Latin
+            "ok", "okay", "yes", "yeah", "yep", "mm", "mmm", "hmm", "uh", "um",
+            "aha", "right", "sure",
+        ],
+        "ner_stoplist": {
+            "*": ["agent", "caller", "الوكيل", "المتصل"],
+        },
     })
 
 

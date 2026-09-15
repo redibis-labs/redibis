@@ -120,3 +120,44 @@ quantity_units:
   - days
   - minutes
   - دقيقة
+noise_terms:
+  - تمام
+  - تماما
+  - تماماً
+  - نعم
+  - ايوة
+  - أيوة
+  - ايوه
+  - أيوه
+  - افندم
+  - أفندم
+  - اه
+  - أه
+  - اهه
+  - أهه
+  - ماشي
+  - طيب
+  - اوكي
+  - حاضر
+  - خلاص
+  - يعني
+  - امم
+  - ok
+  - okay
+  - yes
+  - yeah
+  - yep
+  - mm
+  - mmm
+  - hmm
+  - uh
+  - um
+  - aha
+  - right
+  - sure
+ner_stoplist:
+  "*":
+    - agent
+    - caller
+    - الوكيل
+    - المتصل

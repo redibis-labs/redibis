@@ -285,17 +285,15 @@ class RuleSetCompiler:
         sources_map = dict(getattr(stack, "text_gateway_rule_sources", None) or {})
         pack_docs: list[Any] = []
         pack_labels: list[str] = []
-        applied = [L for L in (stack.layers or []) if L.source != "builtin"]
-        top = applied[-1] if applied else (stack.layers[-1] if stack.layers else None)
         for name, doc in named.items():
             pack_docs.append(doc)
             label = sources_map.get(name)
             if label:
                 pack_labels.append(str(label))
-            elif top is not None:
-                pack_labels.append(f"pack:{top.id}@{top.version}:{name}")
             else:
-                pack_labels.append(f"pack:{name}")
+                # Honest absence beats a guessed layer. A pack doc missing from
+                # sources_map is not attributed to the last applied overlay.
+                pack_labels.append(f"pack:unknown:{name}")
         from redibis.pii.text_rules import compile_layered_text_rules
 
         text_rules, sources = compile_layered_text_rules(

@@ -52,6 +52,10 @@ class RecognizeContext:
     group: str = "free_text"
     column_name: str = ""
     entities: tuple[str, ...] = ()
+    text_rules: object | None = None  # TextRuleOverlay; expanders read noise_terms
+    ner_window_chars: int = 1200
+    ner_window_overlap: int = 200
+    ner_max_windows: int = 200
 
 
 @runtime_checkable
@@ -399,6 +403,41 @@ class PhoneRecognizer:
             return False
 
 
+class _NerStoplist:
+    """Drop or shrink NER spans whose surface is in the overlay stoplist."""
+
+    def __init__(self, overlay) -> None:
+        from redibis.pii.text_preprocess.expanders._util import folded_without_noise, noise_set
+
+        raw = dict(getattr(overlay, "ner_stoplist", None) or {}) if overlay is not None else {}
+        self._all = {folded_without_noise(t, frozenset()) for t in raw.get("*", ()) if t}
+        self._by_type: dict[str, set[str]] = {}
+        for et, terms in raw.items():
+            if et == "*":
+                continue
+            self._by_type[str(et).upper()] = {
+                folded_without_noise(t, frozenset()) for t in (terms or ()) if t
+            }
+        self._noise = noise_set(overlay=overlay)
+
+    def apply(self, text: str, start: int, end: int, entity_type: str) -> tuple[int, int, str] | None:
+        from redibis.pii.text_preprocess.expanders._util import folded_without_noise, strip_edge_noise
+
+        if end <= start or start < 0 or end > len(text):
+            return None
+        ns, ne = strip_edge_noise(text, start, end, self._noise)
+        if ne <= ns:
+            return None
+        surface = text[ns:ne]
+        folded = folded_without_noise(surface, self._noise)
+        blocked = self._all | self._by_type.get(entity_type, set())
+        if folded and folded in blocked:
+            return None
+        if not folded:
+            return None
+        return ns, ne, surface
+
+
 class NerRecognizer:
     """NER backend span extraction (GLiNER / remote)."""
 
@@ -407,8 +446,10 @@ class NerRecognizer:
     def __init__(self, ruleset: RuleSet, backend: object | None = None):
         self._ruleset = ruleset
         self._backend = backend
+        self.last_coverage: dict[str, object] = {}
 
     def recognize(self, text: str, ctx: RecognizeContext) -> list[Candidate]:
+        self.last_coverage = {}
         if not text or self._backend is None:
             return []
         analyze_text = getattr(self._backend, "analyze_text", None)
@@ -416,22 +457,38 @@ class NerRecognizer:
             return []
         labels = list(self._ruleset.ner_labels)
         phrases = dict(self._ruleset.ner_phrases)
-        try:
-            spans = analyze_text(text, labels=labels, phrases=phrases)
-        except TypeError:
-            # Older backends without phrases= — still run
+
+        def _one(chunk: str):
             try:
-                spans = analyze_text(text, labels=labels)
-            except Exception as exc:
-                logger.warning("NER analyze_text failed: %s", exc)
-                return []
+                return analyze_text(chunk, labels=labels, phrases=phrases)
+            except TypeError:
+                return analyze_text(chunk, labels=labels)
+
+        from redibis.pii.ner_window import map_windows
+
+        try:
+            spans, coverage = map_windows(
+                text,
+                _one,
+                target_chars=int(getattr(ctx, "ner_window_chars", 1200) or 1200),
+                overlap_chars=int(getattr(ctx, "ner_window_overlap", 200) or 200),
+                max_windows=int(getattr(ctx, "ner_max_windows", 200) or 200),
+            )
         except Exception as exc:
             logger.warning("NER analyze_text failed: %s", exc)
             return []
+        self.last_coverage = coverage
+        backend_cov = getattr(self._backend, "last_coverage", None)
+        if isinstance(backend_cov, dict) and backend_cov.get("reasons"):
+            reasons = dict(coverage.get("reasons") or {})
+            reasons.update(dict(backend_cov.get("reasons") or {}))
+            coverage = dict(coverage)
+            coverage["reasons"] = reasons
+            self.last_coverage = coverage
 
+        gate = _NerStoplist(getattr(ctx, "text_rules", None))
         out: list[Candidate] = []
         for span in spans or []:
-            # NERSpan dataclass or dict
             if hasattr(span, "start"):
                 start = int(span.start)
                 end = int(span.end)
@@ -451,7 +508,6 @@ class NerRecognizer:
             if start < 0 or end > len(text) or start >= end:
                 continue
             if text[start:end] != matched and matched:
-                # Prefer source-slice validation
                 if text[start:end]:
                     matched = text[start:end]
                 else:
@@ -459,8 +515,11 @@ class NerRecognizer:
             et = self._map_ner_label(label)
             if not et or not _entity_allowed(et, ctx.entities):
                 continue
+            gated = gate.apply(text, start, end, et)
+            if gated is None:
+                continue
+            start, end, matched = gated
             if score < self._ruleset.thresholds.gliner_min * 0.5:
-                # Soft floor; SpanResolver applies min_score later
                 pass
             out.append(Candidate(
                 entity_type=et,

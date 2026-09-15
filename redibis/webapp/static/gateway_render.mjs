@@ -192,7 +192,7 @@ export function overlayFromMatchClasses(expected, predicted, rows, proposals) {
   return out;
 }
 
-export function classifyBanners({ truncated, maxChars, wantedEngines, enginesRan, spanCount }) {
+export function classifyBanners({ truncated, maxChars, wantedEngines, enginesRan, spanCount, coverage }) {
   const out = [];
   const ran = enginesRan || [];
   if (truncated) {
@@ -201,6 +201,18 @@ export function classifyBanners({ truncated, maxChars, wantedEngines, enginesRan
       text: `Only the first ${Number(maxChars).toLocaleString()} characters were scanned. Findings cover that portion only.`,
     });
   }
+  const per = (coverage && coverage.per_engine) || {};
+  const reasons = (coverage && coverage.reasons) || {};
+  Object.keys(per).forEach((engine) => {
+    const frac = Number(per[engine]);
+    if (!(frac < 1)) return;
+    const pct = Math.round(frac * 100);
+    const why = reasons[engine] ? " — " + reasons[engine] : "";
+    out.push({
+      kind: "block",
+      text: `${engine.toUpperCase()} covered ${pct}% of the document${why}. Partial scan — findings may miss the tail.`,
+    });
+  });
   if ((wantedEngines === "both" || wantedEngines === "ner") && !ran.includes("ner")) {
     out.push({
       kind: "warn",
@@ -228,6 +240,10 @@ export function renderHighlights(container, text, spans, documentRef) {
     const mark = doc.createElement("mark");
     mark.className = `gw-hl gw-${classOf(seg.top.entity_type, seg.top.eval_kind)}`;
     if (seg.allProposals) mark.classList.add("gw-proposal");
+    const contested = ["type_conflict", "boundary_conflict", "vetoed"];
+    if (seg.spans.some((s) => contested.includes(s.agreement))) {
+      mark.classList.add("gw-contested");
+    }
     mark.dir = "auto";
     mark.style.unicodeBidi = "isolate";
     mark.dataset.abbr = abbr(seg.top.entity_type);
@@ -241,6 +257,10 @@ export function renderHighlights(container, text, spans, documentRef) {
         context_boost: s.context_boost,
         is_proposal: s.is_proposal,
         eval_kind: s.eval_kind,
+        agreement: s.agreement,
+        arbitration_rule: s.arbitration_rule,
+        llm_verdict: s.llm_verdict,
+        llm_score: s.llm_score,
         start: s.start,
         end: s.end,
       }))

@@ -46,10 +46,38 @@ def _scan_case(svc: Any, case: Mapping[str, Any], options: Mapping[str, Any]) ->
         "llm_api_key": options.get("llm_api_key") or "",
         "preprocess_obfuscation": bool(options.get("preprocess_obfuscation", True)),
         "preprocess_expanders": list(options.get("preprocess_expanders") or []),
+        "equation": str(options.get("equation") or options.get("arbitration") or "independent"),
     }
+    text = case["text"]
     if options.get("max_chars") is not None:
-        kwargs["max_chars"] = options["max_chars"]
-    return svc.scan(case["text"], **kwargs)
+        max_chars = int(options["max_chars"])
+        kwargs["max_chars"] = max_chars
+        if len(text) > max_chars:
+            # Scan the head and mark truncated rather than 413'ing the case.
+            result = svc.scan(text[:max_chars], **kwargs)
+            try:
+                from dataclasses import replace
+
+                cov = dict(getattr(result, "coverage", None) or {})
+                orig = len(text)
+                frac = round(max_chars / orig, 4) if orig else 1.0
+                cov["char_count"] = max_chars
+                cov["original_char_count"] = orig
+                cov["scanned_fraction"] = frac
+                reasons = dict(cov.get("reasons") or {})
+                reasons["eval"] = f"clipped at max_chars ({max_chars})"
+                cov["reasons"] = reasons
+                per = dict(cov.get("per_engine") or {})
+                for engine in list(per):
+                    per[engine] = min(float(per[engine] or 0), frac)
+                if not per:
+                    per["regex"] = frac
+                cov["per_engine"] = per
+                result = replace(result, truncated=True, coverage=cov, char_count=max_chars)
+            except (TypeError, ValueError):
+                pass
+            return result
+    return svc.scan(text, **kwargs)
 
 
 def evaluate_with_service(
@@ -83,6 +111,7 @@ def evaluate_with_service(
     predictions: dict[str, Any] = {}
     engines_ran: set[str] = set()
     engines_unavailable: dict[str, str] = {}
+    truncated_cases: list[str] = []
     ruleset_id = ""
     ruleset_version = ""
     total = len(normalized["cases"])
@@ -112,6 +141,13 @@ def evaluate_with_service(
         engines_ran.update(getattr(result, "engines_ran", ()) or ())
         ruleset_id = getattr(result, "ruleset_id", "") or ruleset_id
         ruleset_version = getattr(result, "ruleset_version", "") or ruleset_version
+        case_truncated = bool(getattr(result, "truncated", False))
+        cov = getattr(result, "coverage", None) or {}
+        per_engine = dict(cov.get("per_engine") or {}) if isinstance(cov, dict) else {}
+        if any(float(v) < 1.0 for v in per_engine.values()):
+            case_truncated = True
+        if case_truncated:
+            truncated_cases.append(case["id"])
     if progress_cb is not None:
         progress_cb("score", {"percent": 100})
     profile_id = str(opts.get("normalization") or opts.get("normalization_profile") or PROFILE_V1_ID)
@@ -141,6 +177,7 @@ def evaluate_with_service(
         "engines": opts.get("engines") or "both",
         "min_score": float(opts.get("min_score") or 0.35),
         "use_llm": bool(opts.get("use_llm")),
+        "equation": str(opts.get("equation") or "independent"),
         "llm_provider": opts.get("llm_provider") or "",
         "llm_model": opts.get("llm_model") or "",
         "preprocess_obfuscation": bool(opts.get("preprocess_obfuscation", True)),
@@ -157,6 +194,26 @@ def evaluate_with_service(
         "engines_unavailable": engines_unavailable,
     }
     extra.update(collect_scan_inventory(svc, opts))
+    if truncated_cases:
+        extra["truncated_cases"] = list(truncated_cases)
+        report["truncated"] = True
+        report["truncated_cases"] = list(truncated_cases)
+        for case in report.get("cases") or []:
+            if case.get("id") in truncated_cases:
+                case["truncated"] = True
+        if not report.get("gates"):
+            report["gates"] = {
+                "passed": False,
+                "failures": [{
+                    "entity": "*",
+                    "tier": "coverage",
+                    "metric": "truncated",
+                    "got": len(truncated_cases),
+                    "need": 0,
+                    "detail": ",".join(truncated_cases),
+                }],
+                "summary": f"fail: * coverage truncated {len(truncated_cases)} < 0",
+            }
     if not checksum:
         if overlay is None:
             extra["provenance_degraded"] = True

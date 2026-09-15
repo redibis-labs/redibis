@@ -589,6 +589,10 @@ def _run_pii(args) -> int:
 
     if args.pii_action == "text":
         return _run_pii_text(args)
+    if args.pii_action == "text-llm-check":
+        return _run_pii_text_llm_check(args)
+    if args.pii_action == "text-batch":
+        return _run_pii_text_batch(args)
     if args.pii_action == "eval":
         return _run_pii_eval(args)
     if args.pii_action == "eval-build":
@@ -845,7 +849,7 @@ def _record_cli_run(result, *, text: str, kind: str) -> None:
         pass
 
 
-def _print_provenance_footer(result, args) -> None:
+def _print_provenance_footer(result, args, *, stdout: bool = True) -> None:
     uid = getattr(result, "provenance_uuid", "") or ""
     run_uid = getattr(result, "run_uuid", "") or ""
     degraded = bool(getattr(result, "provenance_degraded", False))
@@ -856,7 +860,7 @@ def _print_provenance_footer(result, args) -> None:
         bits.append(f"run_uuid={run_uid}")
     if degraded:
         bits.append("provenance_degraded=true")
-    if bits:
+    if bits and stdout:
         print("  " + "  ".join(bits))
     out = getattr(args, "provenance_out", None)
     if not out:
@@ -892,7 +896,14 @@ def _pii_text_input(args) -> str:
         path = args.file
         if path == "-":
             return sys.stdin.read()
-        return Path(path).read_text(encoding="utf-8")
+        file_path = Path(path)
+        if file_path.is_dir():
+            print(
+                "pii text: --file is a directory — use `redibis pii text-batch --input <dir>`",
+                file=sys.stderr,
+            )
+            raise SystemExit(2)
+        return file_path.read_text(encoding="utf-8")
     text = getattr(args, "text", None)
     if text == "-":
         return sys.stdin.read()
@@ -903,11 +914,116 @@ def _pii_text_input(args) -> str:
     raise SystemExit("pii text: provide TEXT, --file, or stdin")
 
 
+def _llm_flags(p) -> None:
+    """LLM refiner selection, shared by every free-text CLI command."""
+    p.add_argument(
+        "--use-llm",
+        action="store_true",
+        help="run the LLM refiner in addition to the deterministic engines",
+    )
+    p.add_argument(
+        "--llm-provider",
+        default="",
+        help="provider name from the registry (sglang, vllm, ollama, "
+             "llama_cpp, lmstudio). Cloud providers are refused on the "
+             "free-text path unless pii.llm.allow_external_raw_text is set.",
+    )
+    p.add_argument("--llm-model", default="", help="model id for that provider")
+    p.add_argument(
+        "--llm-api-key",
+        default="",
+        help="per-run key. Prefer the provider's env var; this is visible "
+             "in shell history and the process list.",
+    )
+    p.add_argument(
+        "--llm-endpoint",
+        default="",
+        help="base URL for a local server, e.g. http://127.0.0.1:8000/v1",
+    )
+    p.add_argument(
+        "--require-llm",
+        action="store_true",
+        help="exit 3 if the LLM was requested but did not run "
+             "(1 = gate failure, 2 = usage error, 3 = requested engine missing)",
+    )
+
+
+def _text_scan_flags(p) -> None:
+    """Scan options shared by ``pii text`` and ``pii text-batch``."""
+    p.add_argument("--language", default="en")
+    p.add_argument("--engines", default="both", help="regex|ner|both|phone or comma list")
+    p.add_argument("--min-score", type=float, default=0.35)
+    p.add_argument("--resolve", choices=["priority", "longest", "all"], default="priority")
+    p.add_argument("--entities", help="comma-separated entity types")
+    p.add_argument(
+        "--equation",
+        "--arbitration",
+        dest="equation",
+        choices=["independent", "strict", "balanced", "lenient"],
+        default="independent",
+        help="span arbitration mode (same vocabulary as column decide_pii; "
+             "independent = today's behaviour). --arbitration is an alias.",
+    )
+    p.add_argument("--no-text", action="store_true", help="omit matched substrings in JSON")
+    p.add_argument(
+        "--require-ner",
+        action="store_true",
+        help="exit 3 if NER was requested but did not run",
+    )
+
+
+def _cli_use_llm(args) -> bool:
+    return bool(
+        getattr(args, "use_llm", False)
+        or getattr(args, "llm_provider", "")
+        or getattr(args, "llm_model", "")
+        or getattr(args, "llm_endpoint", "")
+    )
+
+
+def _warn_engines_unavailable(result, *, prefix: str = "pii text") -> None:
+    unavailable = dict(getattr(result, "engines_unavailable", None) or {})
+    for engine, reason in unavailable.items():
+        print(
+            f"{prefix}: WARNING {engine} requested but did not run — {reason}",
+            file=sys.stderr,
+        )
+
+
+def _missing_engine_exit(result, args) -> int:
+    """Return 3 when a required engine was requested but did not run, else 0."""
+    unavailable = dict(getattr(result, "engines_unavailable", None) or {})
+    ran = set(getattr(result, "engines_ran", ()) or ())
+    if _cli_use_llm(args) and getattr(args, "require_llm", False):
+        if "llm" not in ran or "llm" in unavailable:
+            reason = unavailable.get("llm") or "llm did not run"
+            print(f"pii text: LLM requested but did not run — {reason}", file=sys.stderr)
+            return 3
+    engines = (getattr(args, "engines", "both") or "both").lower()
+    ner_requested = engines in ("both", "all", "ner") or "ner" in engines.split(",")
+    if getattr(args, "require_ner", False) and ner_requested:
+        if "ner" not in ran or "ner" in unavailable:
+            reason = unavailable.get("ner") or "ner did not run"
+            print(f"pii text: NER requested but did not run — {reason}", file=sys.stderr)
+            return 3
+    return 0
+
+
+_AGREE_MARK = {
+    "confirmed": "✓",
+    "unconfirmed": "·",
+    "type_conflict": "!",
+    "boundary_conflict": "~",
+    "vetoed": "⊘",
+    "llm_only": "+",
+}
+
+
 def _run_pii_text(args) -> int:
     """``redibis pii text`` — free-text span scan."""
     import json
     from redibis.config import RedibisConfig
-    from redibis.services.text_pii_service import TextPIIService
+    from redibis.services.text_pii_service import TextPIIService, TextPIIServiceError
 
     cfg = RedibisConfig.from_yaml(args.config) if getattr(args, "config", None) else RedibisConfig()
     svc = TextPIIService(redibis_config=cfg)
@@ -915,37 +1031,366 @@ def _run_pii_text(args) -> int:
     entities = ()
     if getattr(args, "entities", None):
         entities = tuple(e.strip() for e in args.entities.split(",") if e.strip())
-    result = svc.scan(
-        text,
-        language=getattr(args, "language", "en") or "en",
-        engines=getattr(args, "engines", "both") or "both",
-        min_score=float(getattr(args, "min_score", 0.35)),
-        return_text=not getattr(args, "no_text", False),
-        resolve=getattr(args, "resolve", "priority") or "priority",
-        use_llm=bool(getattr(args, "use_llm", False)),
-        entities=list(entities),
-    )
+    use_llm = _cli_use_llm(args)
+    explain = getattr(args, "explain", None)
+    try:
+        result = svc.scan(
+            text,
+            language=getattr(args, "language", "en") or "en",
+            engines=getattr(args, "engines", "both") or "both",
+            min_score=float(getattr(args, "min_score", 0.35)),
+            return_text=not getattr(args, "no_text", False),
+            resolve=getattr(args, "resolve", "priority") or "priority",
+            use_llm=use_llm,
+            entities=list(entities),
+            llm_provider=getattr(args, "llm_provider", "") or "",
+            llm_model=getattr(args, "llm_model", "") or "",
+            llm_api_key=getattr(args, "llm_api_key", "") or "",
+            llm_endpoint=getattr(args, "llm_endpoint", "") or "",
+            equation=getattr(args, "equation", "independent") or "independent",
+            include_arbitration=explain is not None,
+        )
+    except TextPIIServiceError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1 if int(getattr(exc, "status_code", 400) or 400) >= 400 else 2
+    _warn_engines_unavailable(result)
+    missing = _missing_engine_exit(result, args)
     if getattr(args, "redact", False):
         print(svc.redact(text, result))
-        return 0
+        _record_cli_run(result, text=text, kind="cli_scan")
+        _print_provenance_footer(result, args)
+        return missing
     as_json = bool(getattr(args, "json", False)) or getattr(args, "format", None) == "json"
     if as_json:
         print(json.dumps(result.to_dict(return_text=not getattr(args, "no_text", False)), indent=2, ensure_ascii=False))
-        return 0
-    # table (default)
-    print(f"{'ENTITY':<18} {'START':>5} {'END':>5} {'SCORE':>6} {'ENGINE':<8} TEXT")
-    print("-" * 80)
+        if explain is not None:
+            _print_span_explain(result, int(explain), text=text)
+        _record_cli_run(result, text=text, kind="cli_scan")
+        _print_provenance_footer(result, args, stdout=False)
+        return missing
+    print(f"{'ENTITY':<18} {'START':>5} {'END':>5} {'SCORE':>6} {'ENGINE':<8} {'AGREE':<5} TEXT")
+    print("-" * 86)
     for s in result.detections:
         txt = (s.text or "")[:40]
         prop = " *" if s.is_proposal else ""
+        mark = _AGREE_MARK.get(getattr(s, "agreement", "") or "", "")
         print(
             f"{s.entity_type:<18} {s.start or 0:>5} {s.end or 0:>5} "
-            f"{s.score:>6.2f} {s.engine:<8} {txt}{prop}"
+            f"{s.score:>6.2f} {s.engine:<8} {mark:<5} {txt}{prop}"
         )
-    print(f"\n{len(result.detections)} span(s)  engines={list(result.engines_ran)}")
+    footer = f"\n{len(result.detections)} span(s)  engines={list(result.engines_ran)}"
+    arb = dict(getattr(result, "arbitration", None) or {})
+    if arb.get("mode") and arb.get("mode") != "independent":
+        footer += (
+            f"  arbitration={arb.get('mode')} contested={arb.get('contested', 0)}"
+            f" vetoed={arb.get('vetoed', 0)}"
+        )
+    print(footer)
+    if explain is not None:
+        _print_span_explain(result, int(explain), text=text)
     _record_cli_run(result, text=text, kind="cli_scan")
     _print_provenance_footer(result, args)
+    return missing
+
+
+def _print_span_explain(result, index: int, *, text: str) -> None:
+    import json
+    if index < 0 or index >= len(result.detections):
+        print(f"pii text: --explain {index} out of range (0..{len(result.detections) - 1})", file=sys.stderr)
+        return
+    d = result.detections[index]
+    competing = []
+    for c in getattr(d, "evidence", ()) or ():
+        competing.append({
+            "entity_type": c.entity_type,
+            "engine": c.engine,
+            "score": c.score,
+            "start": c.start,
+            "end": c.end,
+            "validator": c.validator,
+            "is_proposal": c.is_proposal,
+        })
+    records = list((getattr(result, "arbitration", None) or {}).get("records") or [])
+    match = None
+    for rec in records:
+        span = rec.get("span") or []
+        if len(span) == 2 and span[0] == d.start and span[1] == d.end:
+            match = rec
+            break
+    payload = {
+        "index": index,
+        "entity_type": d.entity_type,
+        "start": d.start,
+        "end": d.end,
+        "engine": d.engine,
+        "score": d.score,
+        "validator": d.validator,
+        "agreement": getattr(d, "agreement", "") or "",
+        "arbitration_rule": getattr(d, "arbitration_rule", "") or "",
+        "llm_verdict": getattr(d, "llm_verdict", "") or "",
+        "llm_score": getattr(d, "llm_score", None),
+        "llm_reason": getattr(d, "llm_reason", "") or "",
+        "competing": competing,
+        "record": match,
+    }
+    print(json.dumps(payload, indent=2, ensure_ascii=False), file=sys.stderr)
+
+
+def _run_pii_text_llm_check(args) -> int:
+    """``redibis pii text-llm-check`` — probe the local LLM without operator text."""
+    import time
+    from urllib.parse import urlparse
+
+    from redibis.config import RedibisConfig
+    from redibis.pii.text_llm import LlmTextRefiner
+    from redibis.services.text_pii_service import TextPIIService, TextPIIServiceError
+
+    cfg = RedibisConfig.from_yaml(args.config) if getattr(args, "config", None) else RedibisConfig()
+    provider_name = (getattr(args, "llm_provider", "") or "").strip()
+    model = (getattr(args, "llm_model", "") or "").strip()
+    endpoint = (getattr(args, "llm_endpoint", "") or "").strip()
+    key = (getattr(args, "llm_api_key", "") or "").strip() or None
+    svc = TextPIIService(redibis_config=cfg)
+    path = "unresolved"
+    try:
+        if provider_name:
+            refiner = svc._build_llm_override(
+                provider_name, model, api_key=key, endpoint_url=endpoint or None,
+            )
+            path = "request override"
+        else:
+            refiner = svc._try_llm() or LlmTextRefiner(redibis_config=cfg, api_key=key)
+        provider, model_id, resolved_path = refiner.resolve_with_path()
+        path = resolved_path
+        host = ""
+        for attr in ("api_base", "endpoint_url", "base_url"):
+            raw = getattr(provider, attr, "") or ""
+            if raw:
+                host = urlparse(str(raw)).hostname or ""
+                break
+        if not host and endpoint:
+            host = urlparse(endpoint).hostname or ""
+        refiner._assert_local_provider(
+            provider_name or getattr(provider, "name", "") or ""
+        )
+        t0 = time.perf_counter()
+        _ = refiner._call_model(
+            'Reply with {"spans":[],"review":[]} only.\nText:\nSynthetic probe TCK-0000.',
+            system="You are a PII span detector. Return JSON only.",
+        )
+        latency_ms = (time.perf_counter() - t0) * 1000
+    except TextPIIServiceError as exc:
+        print(f"pii text-llm-check: not ready — {exc}", file=sys.stderr)
+        return 3
+    except Exception as exc:
+        print(f"pii text-llm-check: not ready — {exc}", file=sys.stderr)
+        return 3
+    print(f"status=ready path={path}")
+    print(f"provider={getattr(provider, 'name', provider_name) or provider_name or 'resolved'}")
+    print(f"model={model_id}")
+    print(f"endpoint_host={host or '(none)'}")
+    print(f"latency_ms={latency_ms:.1f}")
+    print("gate=local-only passed")
     return 0
+
+
+def _run_pii_text_batch(args) -> int:
+    """``redibis pii text-batch`` — scan a directory / JSONL / CSV of documents."""
+    import json
+    import sys as _sys
+    from pathlib import Path
+
+    from redibis.config import RedibisConfig
+    from redibis.pii.run_store import record_run
+    from redibis.pii.text_batch import (
+        BatchRunConfig,
+        build_scan_report,
+        documents_from_csv,
+        documents_from_directory,
+        documents_from_jsonl,
+        documents_from_list,
+        render_text_batch_html,
+        run_text_batch,
+        write_findings_csv,
+    )
+    from redibis.services.text_pii_service import TextPIIService, TextPIIServiceError
+
+    sources = [
+        bool(getattr(args, "input", None)),
+        bool(getattr(args, "input_list", None)),
+        bool(getattr(args, "jsonl", None)),
+        bool(getattr(args, "csv", None)),
+    ]
+    if sum(sources) != 1:
+        print(
+            "pii text-batch: provide exactly one of --input, --input-list, --jsonl, --csv",
+            file=sys.stderr,
+        )
+        return 2
+
+    try:
+        if getattr(args, "input", None):
+            root = Path(args.input)
+            if not root.is_dir():
+                print(f"pii text-batch: --input is not a directory: {root}", file=sys.stderr)
+                return 2
+            docs = documents_from_directory(
+                root,
+                glob_pat=getattr(args, "glob", None) or "*.txt",
+                recursive=bool(getattr(args, "recursive", False)),
+            )
+        elif getattr(args, "input_list", None):
+            docs = documents_from_list(Path(args.input_list))
+        elif getattr(args, "jsonl", None):
+            jpath = args.jsonl
+            stream = _sys.stdin if jpath == "-" else None
+            docs = documents_from_jsonl(
+                Path(jpath) if jpath != "-" else Path("-"),
+                text_field=getattr(args, "text_field", None) or "body",
+                id_field=getattr(args, "id_field", None) or "",
+                stream=stream,
+            )
+        else:
+            docs = documents_from_csv(
+                Path(args.csv),
+                text_column=getattr(args, "text_column", None) or "note",
+                id_column=getattr(args, "id_column", None) or "",
+            )
+    except ValueError as exc:
+        print(f"pii text-batch: {exc}", file=sys.stderr)
+        return 2
+    except FileNotFoundError as exc:
+        print(f"pii text-batch: {exc}", file=sys.stderr)
+        return 2
+
+    entities = ()
+    if getattr(args, "entities", None):
+        entities = tuple(e.strip() for e in args.entities.split(",") if e.strip())
+    gw_max = 50_000
+    cfg_obj = RedibisConfig.from_yaml(args.config) if getattr(args, "config", None) else RedibisConfig()
+    gw = getattr(cfg_obj, "text_gateway", None)
+    if gw is not None:
+        gw_max = int(getattr(gw, "max_chars", None) or getattr(gw, "ui_max_chars", None) or 50_000)
+    max_chars = int(getattr(args, "max_chars", 0) or gw_max or 50_000)
+    out_dir = Path(args.out_dir) if getattr(args, "out_dir", None) else None
+    if getattr(args, "resume", False) and out_dir is None:
+        print("pii text-batch: --resume requires --out-dir", file=sys.stderr)
+        return 2
+    if out_dir is None and not getattr(args, "out", None):
+        print("pii text-batch: provide --out-dir and/or --out", file=sys.stderr)
+        return 2
+
+    svc = TextPIIService(redibis_config=cfg_obj)
+    if getattr(args, "deidentify", False):
+        from redibis.pii.deid.policy import DeidPolicy
+        svc.register_policy(DeidPolicy.redact_all())
+    run_cfg = BatchRunConfig(
+        language=getattr(args, "language", "en") or "en",
+        engines=getattr(args, "engines", "both") or "both",
+        min_score=float(getattr(args, "min_score", 0.35)),
+        resolve=getattr(args, "resolve", "priority") or "priority",
+        use_llm=_cli_use_llm(args),
+        llm_provider=getattr(args, "llm_provider", "") or "",
+        llm_model=getattr(args, "llm_model", "") or "",
+        llm_api_key=getattr(args, "llm_api_key", "") or "",
+        llm_endpoint=getattr(args, "llm_endpoint", "") or "",
+        equation=getattr(args, "equation", "independent") or "independent",
+        entities=entities,
+        return_text=not getattr(args, "no_text", False),
+        include_text_in_report=bool(getattr(args, "include_text", False)),
+        include_arbitration=bool(getattr(args, "include_arbitration", False)),
+        max_chars=max_chars,
+        workers=int(getattr(args, "workers", 1) or 1),
+        continue_on_error=not bool(getattr(args, "fail_fast", False)),
+        resume=bool(getattr(args, "resume", False)),
+        limit=int(getattr(args, "limit", 0) or 0),
+        require_llm=bool(getattr(args, "require_llm", False)),
+        require_ner=bool(getattr(args, "require_ner", False)),
+        deidentify=bool(getattr(args, "deidentify", False)),
+        policy_id=getattr(args, "policy_id", "") or "default",
+        quiet=bool(getattr(args, "quiet", False)),
+    )
+    try:
+        run = run_text_batch(svc, docs, run_cfg, out_dir=out_dir)
+    except TextPIIServiceError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        print(f"pii text-batch: {exc}", file=sys.stderr)
+        return 2
+
+    include_text = bool(getattr(args, "include_text", False)) and not getattr(args, "no_text", False)
+    report = build_scan_report(run, cfg=run_cfg, include_text=include_text)
+    # Never put matched substrings in the aggregate report unless asked.
+    if not include_text:
+        report.pop("matched_text", None)
+
+    payloads_for_csv: list[dict] = []
+    if out_dir is not None:
+        (out_dir / "scan-report.json").write_text(
+            json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8",
+        )
+        (out_dir / "scan-report.html").write_text(
+            render_text_batch_html(report), encoding="utf-8",
+        )
+        (out_dir / "errors.json").write_text(
+            json.dumps(run.errors, indent=2, ensure_ascii=False) + "\n", encoding="utf-8",
+        )
+        doc_dir = out_dir / "documents"
+        if doc_dir.is_dir():
+            for p in sorted(doc_dir.glob("*.json")):
+                try:
+                    payloads_for_csv.append(json.loads(p.read_text(encoding="utf-8")))
+                except (OSError, json.JSONDecodeError):
+                    continue
+        write_findings_csv(
+            payloads_for_csv,
+            out_dir / "findings.csv",
+            include_text=not getattr(args, "no_text", False) and include_text,
+        )
+
+    out_stream = getattr(args, "out", None)
+    fmt = getattr(args, "format", None) or "jsonl"
+    if out_stream:
+        dest = Path(out_stream)
+        if fmt == "json":
+            dest.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        else:
+            lines = []
+            for row in run.documents:
+                lines.append(json.dumps(row, ensure_ascii=False))
+            dest.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+
+    if fmt == "table" and not getattr(args, "quiet", False):
+        agg = run.aggregates
+        docs_agg = agg.get("documents") or {}
+        print(
+            f"scanned={docs_agg.get('scanned', 0)} errored={docs_agg.get('errored', 0)} "
+            f"skipped={docs_agg.get('skipped', 0)} findings={agg.get('findings', 0)} "
+            f"contested={agg.get('contested', 0)}"
+        )
+    elif fmt == "json" and not out_stream:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+
+    # One run-registry row for the batch; per-document digests, never raw text.
+    try:
+        record_run(
+            kind="cli_text_batch",
+            text=None,
+            case_count=len(run.documents),
+            outcome={
+                "aggregates": {
+                    k: v for k, v in run.aggregates.items()
+                    if k != "score_distribution"
+                },
+                "document_digests": len(run.manifest),
+            },
+            actor="cli",
+        )
+    except Exception:
+        pass
+
+    return int(run.exit_code or 0)
 
 
 def _run_pii_eval_build(args) -> int:
@@ -1038,6 +1483,7 @@ def _eval_service_and_options(args, cfg):
         "rules_checksum": checksum,
         "rules_source": rules_source,
         "pack_stack_header": pack_header,
+        "equation": getattr(args, "equation", None) or "independent",
     }
     return svc, options
 
@@ -1230,8 +1676,17 @@ def _run_pii_deid(args) -> int:
         print("pii deid: require --policy, --policy-file, or --default STRATEGY", file=sys.stderr)
         return 2
 
+    scan_kwargs = {
+        "use_llm": _cli_use_llm(args),
+        "llm_provider": getattr(args, "llm_provider", "") or "",
+        "llm_model": getattr(args, "llm_model", "") or "",
+        "llm_api_key": getattr(args, "llm_api_key", "") or "",
+        "llm_endpoint": getattr(args, "llm_endpoint", "") or "",
+    }
     try:
-        _result, deid = svc.deidentify(text, policy=policy, policy_id=None)
+        _result, deid = svc.deidentify(
+            text, policy=policy, policy_id=None, scan_kwargs=scan_kwargs,
+        )
     except TextPIIServiceError as exc:
         print(str(exc), file=sys.stderr)
         return 1
@@ -2652,12 +3107,8 @@ def main(argv: Optional[list[str]] = None):
     p_pii_text = pii_sub.add_parser("text", help="scan free text for PII spans")
     p_pii_text.add_argument("text", nargs="?", help="text to scan (or '-' for stdin)")
     p_pii_text.add_argument("--file", help="read text from file ('-' = stdin)")
-    p_pii_text.add_argument("--language", default="en")
-    p_pii_text.add_argument("--engines", default="both", help="regex|ner|both|phone or comma list")
-    p_pii_text.add_argument("--min-score", type=float, default=0.35)
-    p_pii_text.add_argument("--resolve", choices=["priority", "longest", "all"], default="priority")
-    p_pii_text.add_argument("--entities", help="comma-separated entity types")
-    p_pii_text.add_argument("--use-llm", action="store_true")
+    _text_scan_flags(p_pii_text)
+    _llm_flags(p_pii_text)
     p_pii_text.add_argument("--json", action="store_true")
     p_pii_text.add_argument(
         "--format",
@@ -2666,12 +3117,62 @@ def main(argv: Optional[list[str]] = None):
         help="output format (default: table for TTY, or use --json)",
     )
     p_pii_text.add_argument("--redact", action="store_true", help="print text with [ENTITY] replacements")
-    p_pii_text.add_argument("--no-text", action="store_true", help="omit matched substrings in JSON")
     p_pii_text.add_argument("--config", help="redibis.yaml")
     p_pii_text.add_argument(
         "--provenance-out",
         help="write the full ScanProvenance record to this JSON file",
     )
+    p_pii_text.add_argument(
+        "--explain",
+        type=int,
+        default=None,
+        metavar="SPAN_INDEX",
+        help="print the arbitration record for one 0-based span index",
+    )
+
+    p_pii_llm_check = pii_sub.add_parser(
+        "text-llm-check",
+        help="probe the free-text LLM refiner against a synthetic string (never operator text)",
+    )
+    _llm_flags(p_pii_llm_check)
+    p_pii_llm_check.add_argument("--config", help="redibis.yaml")
+
+    p_pii_text_batch = pii_sub.add_parser(
+        "text-batch",
+        help="scan a directory, JSONL, or CSV of documents for PII spans",
+    )
+    p_pii_text_batch.add_argument("--input", help="directory of documents")
+    p_pii_text_batch.add_argument("--glob", default="*.txt", help="glob under --input (default *.txt)")
+    p_pii_text_batch.add_argument("--recursive", action="store_true")
+    p_pii_text_batch.add_argument("--input-list", help="file with one path per line")
+    p_pii_text_batch.add_argument("--jsonl", help="JSONL file ('-' = stdin)")
+    p_pii_text_batch.add_argument("--text-field", default="body")
+    p_pii_text_batch.add_argument("--id-field", default="")
+    p_pii_text_batch.add_argument("--csv", help="CSV file")
+    p_pii_text_batch.add_argument("--text-column", default="note")
+    p_pii_text_batch.add_argument("--id-column", default="")
+    _text_scan_flags(p_pii_text_batch)
+    _llm_flags(p_pii_text_batch)
+    p_pii_text_batch.add_argument("--workers", type=int, default=1)
+    p_pii_text_batch.add_argument("--max-chars", type=int, default=0, help="per-document cap (0 = config default)")
+    p_pii_text_batch.add_argument("--fail-fast", action="store_true")
+    p_pii_text_batch.add_argument("--continue-on-error", action="store_true", default=True)
+    p_pii_text_batch.add_argument("--resume", action="store_true", help="skip ids already in --out-dir")
+    p_pii_text_batch.add_argument("--limit", type=int, default=0, help="scan only the first N documents")
+    p_pii_text_batch.add_argument("--quiet", action="store_true")
+    p_pii_text_batch.add_argument("--out-dir", help="write scan-report.json, documents/, findings.csv")
+    p_pii_text_batch.add_argument("--out", help="write a single stream (json/jsonl)")
+    p_pii_text_batch.add_argument(
+        "--format", choices=["json", "jsonl", "table", "csv"], default="jsonl",
+    )
+    p_pii_text_batch.add_argument(
+        "--include-text",
+        action="store_true",
+        help="include matched substrings in scan-report.json and findings.csv (default off)",
+    )
+    p_pii_text_batch.add_argument("--deidentify", action="store_true")
+    p_pii_text_batch.add_argument("--policy-id", default="default")
+    p_pii_text_batch.add_argument("--config", help="redibis.yaml")
 
     p_pii_eval = pii_sub.add_parser(
         "eval", help="batch scan and score a portable text-span evaluation dataset"
@@ -2702,6 +3203,15 @@ def main(argv: Optional[list[str]] = None):
         "--engines", default="both", help="regex|ner|both|phone or comma list"
     )
     p_pii_eval.add_argument("--min-score", type=float, default=0.35)
+    p_pii_eval.add_argument(
+        "--equation",
+        "--arbitration",
+        dest="equation",
+        choices=["independent", "strict", "balanced", "lenient"],
+        default="independent",
+        help="span arbitration mode. independent is the golden-parity default. "
+             "--arbitration is an alias.",
+    )
     p_pii_eval.add_argument("--use-llm", action="store_true")
     p_pii_eval.add_argument("--llm-provider", default="")
     p_pii_eval.add_argument("--llm-model", default="")
@@ -2781,6 +3291,7 @@ def main(argv: Optional[list[str]] = None):
     p_pii_deid.add_argument("-o", "--out", help="write de-identified text to file")
     p_pii_deid.add_argument("--json", action="store_true", help="emit audit JSON on stderr")
     p_pii_deid.add_argument("--config", help="redibis.yaml")
+    _llm_flags(p_pii_deid)
     p_pii_deid.add_argument(
         "--provenance-out",
         help="write the full ScanProvenance record to this JSON file",

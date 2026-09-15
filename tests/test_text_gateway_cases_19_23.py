@@ -52,6 +52,27 @@ def test_fixture_is_portable_eval_dataset():
     assert len(normalized["cases"]) == 5
 
 
+def _assert_slice_integrity(text: str, result) -> None:
+    for d in result.detections:
+        if d.start is None or d.end is None:
+            continue
+        assert text[d.start:d.end] == d.text, (
+            d.entity_type, d.start, d.end, d.text, text[d.start:d.end]
+        )
+
+
+def _inject_fillers(text: str, start: int, end: int, a: str, b: str) -> tuple[str, int, int]:
+    inner = text[start:end]
+    parts = inner.split()
+    if len(parts) < 4:
+        raise AssertionError(f"span too short to inject fillers: {inner!r}")
+    i1 = max(1, len(parts) // 3)
+    i2 = max(i1 + 1, (2 * len(parts)) // 3)
+    new_inner = " ".join(parts[:i1] + [a] + parts[i1:i2] + [b] + parts[i2:])
+    new_text = text[:start] + new_inner + text[end:]
+    return new_text, start, start + len(new_inner)
+
+
 def _find_span(result, start: int, end: int, entity: str):
     for d in result.detections:
         if d.entity_type == entity and d.start == start and d.end == end:
@@ -63,6 +84,7 @@ def _assert_expected(case_id, *, cfg, extra_check=None, case=None):
     row = case or _case(case_id)
     text = row["text"]
     result = _scanner().scan(text, cfg)
+    _assert_slice_integrity(text, result)
     missing, drifted = [], []
     for span in row["expected_spans"]:
         if _find_span(result, span["start"], span["end"], span["entity_type"]):
@@ -140,3 +162,38 @@ def test_widened_gold_fails_as_boundary_drift():
     with pytest.raises(AssertionError) as exc:
         _assert_expected("case-20", cfg=BENCH, case=row)
     assert "BOUNDARY DRIFT" in str(exc.value)
+
+
+@pytest.mark.parametrize("case_id", ["case-20", "case-23"])
+@pytest.mark.parametrize("cfg,label", [(BENCH, "bench"), (GATEWAY, "gateway")])
+def test_filler_injection_keeps_spoken_phone_canonical(case_id, cfg, label):
+    """ايوة / تمام inside a dictated run must not split the phone.
+
+    Middle fillers stay inside a contiguous ``text[start:end]`` span (Unicode
+    offsets cannot punch a hole). Leading/trailing fillers are stripped.
+    Canonical digits must match the uninjected scan.
+    """
+    row = _case(case_id)
+    text = row["text"]
+    gold = next(s for s in row["expected_spans"] if s["entity_type"] == "PHONE_NUMBER")
+    baseline = _scanner().scan(text, cfg)
+    _assert_slice_integrity(text, baseline)
+    base_phone = next(
+        d for d in baseline.detections
+        if d.entity_type == "PHONE_NUMBER"
+        and max(0, min(d.end, gold["end"]) - max(d.start, gold["start"])) > 0
+    )
+    injected, new_start, new_end = _inject_fillers(
+        text, gold["start"], gold["end"], "ايوة", "تمام"
+    )
+    result = _scanner().scan(injected, cfg)
+    _assert_slice_integrity(injected, result)
+    phones = [
+        d for d in result.detections
+        if d.entity_type == "PHONE_NUMBER"
+        and max(0, min(d.end, new_end) - max(d.start, new_start)) > 0
+    ]
+    assert phones, "filler split the spoken-digit run"
+    got = phones[0]
+    assert (got.canonical or base_phone.canonical) == (base_phone.canonical or got.canonical)
+    assert (got.end - got.start) <= (new_end - new_start)

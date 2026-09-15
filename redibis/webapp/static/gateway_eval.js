@@ -1,4 +1,4 @@
-import {
+const {
   overlayEvalSpans,
   overlayFromMatchClasses,
   paintBanners,
@@ -6,9 +6,10 @@ import {
   selectionOffsets,
   sliceCodepoints,
   toChars,
-} from "./gateway_render.mjs";
+} = await import(`./gateway_render.mjs?v=${window.GW_RENDER_V || ""}`);
+const { askInline, createRulesEditor } = await import(`./gateway_rules.mjs?v=${window.GW_RULES_V || window.GW_RENDER_V || ""}`);
 
-const MAX = Number(window.GW_MAX_CHARS || 20000);
+const MAX = Number(window.GW_MAX_CHARS || 200000);
 const MAX_CASES = Number(window.GW_EVAL_MAX_CASES || 100);
 const DATASET_KIND = "redibis.text_span_eval_dataset";
 const REPORT_KIND = "redibis.text_span_eval_report";
@@ -42,6 +43,20 @@ let catalogue = [];
 let evalAbort = null;
 let draftActions = [];
 let selectedMatch = null;
+let selectedSpan = null;
+let lastEvalRunUuid = "";
+let lastLlmLog = null;
+const rulesEditor = $("evRules")
+  ? createRulesEditor($("evRules"), {
+    getText: () => (currentCase() && currentCase().text) || (textEl && textEl.value) || "",
+    getLanguage: () => langEl.value,
+    getEngines: () => ($("evEngines") && $("evEngines").value) || "regex",
+    getMinScore: () => Number(($("evMinScore") && $("evMinScore").value) || 0.35),
+    onError: (err) => paintBanners(bannerEl, [{ kind: "warn", text: err.message }]),
+    onSaved: () => paintBanners(bannerEl, [{ kind: "ok", text: "Rules saved as default." }]),
+    onPreview: () => paintBanners(bannerEl, [{ kind: "ok", text: "Preview updated." }]),
+  })
+  : null;
 const CLASS_TINT = {
   exact: "exact", equivalent: "exact", superset: "near", subset: "near",
   overlap_partial: "near", split: "near", merged: "near",
@@ -203,6 +218,16 @@ function renderSpans() {
     });
     row.appendChild(label);
     row.appendChild(del);
+    row.addEventListener("click", (ev) => {
+      if (ev.target === del) return;
+      selectedSpan = {
+        text: sliceCodepoints(c.text || "", span.start, span.end),
+        entity_type: span.entity_type,
+        span,
+      };
+      selectedMatch = null;
+      setActionButtonsEnabled(true);
+    });
     spansEl.appendChild(row);
   });
 }
@@ -236,13 +261,20 @@ function filteredMatchRows(reportCase) {
   const tag = ($("evFilterTag") && $("evFilterTag").value) || "";
   const mismatches = $("evMismatches") && $("evMismatches").checked;
   const near = $("evNearMiss") && $("evNearMiss").checked;
+  const contested = $("evContested") && $("evContested").checked;
   const tags = reportCase.tags || [];
   if (tag && tags.indexOf(tag) === -1) return [];
+  const contestedKinds = ["type_conflict", "boundary_conflict", "vetoed"];
   return (reportCase.match_classes || []).filter((row) => {
     if (cls && row.class !== cls) return false;
     if (ent && row.expected_type !== ent && row.got_type !== ent) return false;
     if (mismatches && (row.class === "exact" || row.class === "equivalent")) return false;
     if (near && !(Number(row.coverage || 0) >= 0.9 && row.class !== "exact")) return false;
+    if (contested) {
+      const pred = (reportCase.predicted_spans || [])[row.predicted_index] || {};
+      const a = pred.agreement || row.agreement || "";
+      if (!contestedKinds.includes(a)) return false;
+    }
     return true;
   });
 }
@@ -476,6 +508,42 @@ function renderTagTable() {
   });
 }
 
+function setActionButtonsEnabled(on, hint) {
+  const ids = ["evActExclude", "evActNoise", "evActCue", "evActNumber", "evActAccept", "evActAdvisory"];
+  ids.forEach((id) => {
+    const btn = $(id);
+    if (!btn) return;
+    btn.disabled = !on;
+    if (!on) btn.title = hint || "Select a span first";
+    else btn.title = "";
+  });
+  const hintEl = $("evActHint");
+  if (hintEl) {
+    hintEl.textContent = on
+      ? "Actions apply to the selected span and the draft rules panel."
+      : (hint || "Select a span in the table to enable actions.");
+  }
+}
+
+function selectedSurface() {
+  if (selectedMatch) {
+    const row = selectedMatch.row;
+    const reportCase = selectedMatch.reportCase;
+    const pred = (reportCase.predicted_spans || [])[row.predicted_index] || {};
+    const gold = (reportCase.expected_spans || [])[row.expected_index] || {};
+    const span = pred.start != null ? pred : gold;
+    return {
+      text: span.text || sliceCodepoints((reportCase.text || currentCase().text || ""), span.start, span.end),
+      entity_type: row.got_type || row.expected_type || entityEl.value,
+      span,
+      row,
+      reportCase,
+    };
+  }
+  if (selectedSpan) return selectedSpan;
+  return null;
+}
+
 function selectMatchRow(row, reportCase) {
   selectedMatch = { row, reportCase };
   const why = $("evWhy");
@@ -493,9 +561,11 @@ function selectMatchRow(row, reportCase) {
       "score " + (pred.score == null ? "—" : pred.score),
     ].filter(Boolean).join(" · ");
   }
-  ["evActExclude", "evActCue", "evActNumber", "evActAccept", "evActAdvisory", "evActPatch"].forEach((id) => {
+  ["evActExclude", "evActNoise", "evActCue", "evActNumber", "evActAccept", "evActAdvisory"].forEach((id) => {
     if ($(id)) $(id).disabled = false;
   });
+  if ($("evActPatch") && draftActions.length) $("evActPatch").disabled = false;
+  setActionButtonsEnabled(true);
 }
 
 function fillFilterOptions() {
@@ -667,8 +737,11 @@ async function runEvaluation() {
       overlap_iou: 0.5,
       normalization: "v1",
       tier: ["strict", "value", "overlap", "type"],
+      draft_rules: rulesEditor && rulesEditor.getDraft() || undefined,
     }, { signal: evalAbort.signal });
     if (!lastReport) return;
+    lastEvalRunUuid = (lastReport.provenance && lastReport.provenance.run_uuid) || lastReport.run_uuid || "";
+    renderEvalLlm(lastReport);
     downloadReportBtn.disabled = false;
     viewMode = "view";
     const exact = lastReport.exact && lastReport.exact.micro || {};
@@ -835,7 +908,7 @@ downloadReportBtn.addEventListener("click", () => {
   if (lastReport) downloadJson("gateway-eval-report.json", lastReport);
 });
 $("evClear").addEventListener("click", resetAll);
-["evFilterClass", "evFilterEntity", "evFilterTag", "evMismatches", "evNearMiss"].forEach((id) => {
+["evFilterClass", "evFilterEntity", "evFilterTag", "evMismatches", "evNearMiss", "evContested"].forEach((id) => {
   const el = $(id);
   if (el) el.addEventListener("change", () => renderAll());
 });
@@ -857,30 +930,84 @@ function queueAction(action, extra) {
   if ($("evActPatch")) $("evActPatch").disabled = false;
   paintBanners(bannerEl, [{ kind: "ok", text: "Queued " + action + " (" + draftActions.length + ")." }]);
 }
+function alsoQueue() {
+  return !!( $("evAlsoQueue") && $("evAlsoQueue").checked );
+}
+
+function applyDraftAndPreview(field, value, extra) {
+  if (!rulesEditor) return;
+  if (field === "context_cues") {
+    rulesEditor.addTerm("context_cues", value, extra && extra.entity_type);
+  } else {
+    rulesEditor.addTerm(field, value);
+  }
+  rulesEditor.preview();
+  if (alsoQueue() && selectedMatch) {
+    queueAction(extra && extra.queueAction || field, { term: value, trigger: value, pattern: value, ...extra });
+  }
+}
+
 if ($("evActExclude")) $("evActExclude").addEventListener("click", () => {
-  const term = window.prompt("Exclude term");
-  if (term) queueAction("exclude_term", { term });
+  const sel = selectedSurface();
+  askInline($("evInlineForm"), {
+    label: "Exclude term",
+    value: sel && sel.text || "",
+    onOk: (term) => {
+      if (!term) return;
+      applyDraftAndPreview("exclude_terms", term, { queueAction: "exclude_term" });
+    },
+  });
+});
+if ($("evActNoise")) $("evActNoise").addEventListener("click", () => {
+  const sel = selectedSurface();
+  askInline($("evInlineForm"), {
+    label: "Noise term (ignored entirely)",
+    value: sel && sel.text || "",
+    onOk: (term) => {
+      if (!term) return;
+      applyDraftAndPreview("noise_terms", term, { queueAction: "noise_term" });
+    },
+  });
 });
 if ($("evActCue")) $("evActCue").addEventListener("click", () => {
-  const trigger = window.prompt("Context cue trigger");
-  if (trigger && selectedMatch) {
-    queueAction("context_cue", {
-      trigger,
-      entity_type: selectedMatch.row.expected_type || selectedMatch.row.got_type,
-    });
-  }
+  const sel = selectedSurface();
+  askInline($("evInlineForm"), {
+    label: "Context cue trigger",
+    value: sel && sel.text || "",
+    onOk: (trigger) => {
+      if (!trigger) return;
+      applyDraftAndPreview("context_cues", trigger, {
+        entity_type: sel && sel.entity_type,
+        queueAction: "context_cue",
+      });
+    },
+  });
 });
 if ($("evActNumber")) $("evActNumber").addEventListener("click", () => {
-  const pattern = window.prompt("Number rule pattern (regex)");
-  if (pattern && selectedMatch) {
-    queueAction("number_rule", {
-      pattern,
-      entity_type: selectedMatch.row.expected_type || selectedMatch.row.got_type || "PHONE_NUMBER",
-    });
-  }
+  const sel = selectedSurface();
+  askInline($("evInlineForm"), {
+    label: "Number rule pattern (regex)",
+    value: sel && sel.text ? sel.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") : "",
+    onOk: (pattern) => {
+      if (!pattern) return;
+      if (alsoQueue() && selectedMatch) {
+        queueAction("number_rule", {
+          pattern,
+          entity_type: sel && sel.entity_type || "PHONE_NUMBER",
+        });
+      }
+      paintBanners(bannerEl, [{ kind: "ok", text: "Number rule queued in the draft. Use Preview to inspect." }]);
+    },
+  });
 });
-if ($("evActAccept")) $("evActAccept").addEventListener("click", () => queueAction("accept_as_expected"));
-if ($("evActAdvisory")) $("evActAdvisory").addEventListener("click", () => queueAction("mark_advisory"));
+if ($("evActAccept")) $("evActAccept").addEventListener("click", () => {
+  if (selectedMatch) queueAction("accept_as_expected");
+  else paintBanners(bannerEl, [{ kind: "info", text: "Accept as expected needs a scored span-table row." }]);
+});
+if ($("evActAdvisory")) $("evActAdvisory").addEventListener("click", () => {
+  if (selectedMatch) queueAction("mark_advisory");
+  else paintBanners(bannerEl, [{ kind: "info", text: "Mark advisory needs a scored span-table row." }]);
+});
 if ($("evActPatch")) $("evActPatch").addEventListener("click", async () => {
   if (!draftActions.length) return;
   const res = await fetch("/api/gateway/evaluations/corpus-patch", {
@@ -931,5 +1058,75 @@ resultEl.addEventListener("mouseover", (ev) => {
 });
 resultEl.addEventListener("mouseout", hideTip);
 
+function renderEvalLlm(report) {
+  const card = $("evLlmCard");
+  if (!card) return;
+  const llm = (report && report.llm) || (report && report.scan_config && report.scan_config.use_llm ? { used: true, requested: true } : null);
+  if (!llm && !lastEvalRunUuid) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  const summary = $("evLlmSummary");
+  if (summary) {
+    const bits = [
+      llm && llm.used ? "used" : (llm && llm.requested ? "requested" : "idle"),
+      lastEvalRunUuid ? ("run " + lastEvalRunUuid.slice(0, 8)) : "",
+    ].filter(Boolean);
+    summary.textContent = bits.join(" · ");
+  }
+  const body = $("evLlm");
+  if (body) body.hidden = true;
+}
+
+async function toggleEvalLlm() {
+  const body = $("evLlm");
+  const btn = $("evLlmShow");
+  if (!body) return;
+  if (!body.hidden) {
+    body.hidden = true;
+    if (btn) btn.textContent = "Show LLM log";
+    return;
+  }
+  if (!lastEvalRunUuid) {
+    body.hidden = false;
+    body.textContent = "No evaluation run id yet.";
+    return;
+  }
+  const res = await fetch("/api/gateway/llm-log/" + encodeURIComponent(lastEvalRunUuid));
+  const log = await res.json().catch(() => ({ available: false, reason: "fetch failed" }));
+  lastLlmLog = log;
+  body.textContent = "";
+  if (log.available === false) {
+    body.appendChild(document.createTextNode(log.reason || "log not retained for this run"));
+  } else {
+    if (log.transcripts_withheld) {
+      const n = document.createElement("p");
+      n.className = "gw-hint";
+      n.appendChild(document.createTextNode("Transcripts withheld for this role."));
+      body.appendChild(n);
+    }
+    (log.calls || []).forEach((call) => {
+      const pre = document.createElement("pre");
+      pre.className = "gw-llm-pre";
+      pre.appendChild(document.createTextNode(
+        [call.provider, call.model_id, call.status].filter(Boolean).join(" · ") + "\n" +
+        (call.user_prompt || "") + "\n---\n" + (call.response || "")
+      ));
+      body.appendChild(pre);
+    });
+  }
+  body.hidden = false;
+  if (btn) btn.textContent = "Hide";
+}
+
+if ($("evLlmShow")) $("evLlmShow").addEventListener("click", toggleEvalLlm);
+if ($("evLlmDownload")) $("evLlmDownload").addEventListener("click", async () => {
+  if (!lastEvalRunUuid) return;
+  const log = lastLlmLog || await fetch("/api/gateway/llm-log/" + encodeURIComponent(lastEvalRunUuid)).then((r) => r.json());
+  downloadJson("llm-log-" + lastEvalRunUuid.slice(0, 8) + ".json", log);
+});
+
+setActionButtonsEnabled(false);
 selectCase(0);
 loadHealth();
