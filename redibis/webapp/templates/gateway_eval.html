@@ -104,6 +104,12 @@
           <label class="gw-check">
             <input id="evUseLlm" type="checkbox"/> Use LLM refiner
           </label>
+          <label class="gw-check">
+            <input id="evLlmVerdict" type="checkbox"/> Independent LLM verdict
+          </label>
+          <label class="gw-check">
+            <input id="evRecommend" type="checkbox"/> Tuning recommendations
+          </label>
           <label id="evLlmKeyWrap" class="gw-inline" hidden title="Session-only. Not stored.">API key
             <input id="evLlmKey" type="password" autocomplete="off" placeholder="optional" size="18"/>
           </label>
@@ -120,6 +126,7 @@
           <h2>Cases</h2>
           <div id="evCases" class="gw-eval-cases"></div>
           <button id="evAddCase" type="button" class="btn btn-ghost" style="width:100%;margin-top:8px">Add case</button>
+          <div id="evRenameHost" class="gw-inline-form" hidden></div>
         </div>
         <div class="gw-card">
           <h2>Expected spans</h2>
@@ -178,11 +185,43 @@
           <button id="evCompare" type="button" class="btn btn-ghost" style="width:100%">Compare</button>
           <div id="evCompareOut" class="gw-hint"></div>
         </div>
+        <div class="gw-card" id="evSessionCard">
+          <h2>Session</h2>
+          <p class="gw-hint">Save cases under session_name / date / usecases.</p>
+          <input id="evSessionName" type="text" placeholder="session name" style="width:100%;margin-bottom:6px"/>
+          <div class="gw-pol-actions">
+            <button id="evSessionSave" type="button" class="btn btn-ghost btn-sm">Save case to session</button>
+            <button id="evSessionSaveAll" type="button" class="btn btn-ghost btn-sm">Save all cases</button>
+            <button id="evSessionOpen" type="button" class="btn btn-ghost btn-sm">Open session</button>
+          </div>
+          <label class="gw-check"><input id="evAutoTrim" type="checkbox"/> Auto-trim accepted spans</label>
+          <div id="evSessionList" class="gw-hint"></div>
+        </div>
+        <div class="gw-card" id="evVerdictCard" hidden>
+          <h2>LLM verdict</h2>
+          <div id="evVerdictMeta" class="gw-hint"></div>
+          <div class="gw-pol-actions">
+            <button id="evVerdictAcceptAll" type="button" class="btn btn-ghost btn-sm">Accept all</button>
+            <button id="evVerdictAcceptAgree" type="button" class="btn btn-ghost btn-sm">Accept where engine agrees</button>
+            <button id="evVerdictAcceptLlmOnly" type="button" class="btn btn-ghost btn-sm">Accept LLM-only</button>
+          </div>
+          <div id="evVerdictList"></div>
+          <div id="evVerdict" class="gw-result" hidden></div>
+        </div>
+        <div class="gw-card" id="evRecommendCard" hidden>
+          <h2>Recommendations</h2>
+          <p class="gw-hint">Advisory only. Nothing is applied until you add it to the draft.</p>
+          <div id="evRecommendList"></div>
+          <div class="gw-pol-actions">
+            <button id="evRecommendDownload" type="button" class="btn btn-ghost btn-sm">Download recommendations</button>
+          </div>
+        </div>
         <div class="gw-card">
           <h2>Dataset</h2>
           <input id="evFile" type="file" accept="application/json,.json" hidden/>
           <button id="evImport" type="button" class="btn btn-ghost" style="width:100%">Import JSON</button>
-          <button id="evDownload" type="button" class="btn btn-ghost" style="width:100%">Download dataset</button>
+          <button id="evDownload" type="button" class="btn btn-ghost" style="width:100%">Download all cases</button>
+          <button id="evDownloadCase" type="button" class="btn btn-ghost" style="width:100%">Download this case</button>
           <button id="evDownloadReport" type="button" class="btn btn-ghost" style="width:100%" disabled>Download report</button>
           <button id="evClear" type="button" class="btn btn-red" style="width:100%">Clear</button>
         </div>
@@ -200,6 +239,7 @@
     window.REDIBIS_VERSION = {{ (redibis_version or "")|tojson }};
     window.GW_RENDER_V = {{ (render_v or "")|tojson }};
     window.GW_RULES_V = {{ (rules_v or "")|tojson }};
+    window.GW_CURATION_V = {{ (curation_v or "")|tojson }};
   </script>
   <script src="/static/auth.js"></script>
   <script type="module" src="/static/gateway_eval.js?v={{ js_v }}"></script>

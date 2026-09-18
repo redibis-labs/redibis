@@ -11,6 +11,7 @@ var S={view:"homepage",aboutOpen:false,settingsOpen:false,stab:"data",
   // Server-side sample data library (browse + scan without uploading)
   sampleLibOpen:false,sampleLib:null,sampleLibRoot:"",sampleLibFilter:"",
   sampleLibBusy:false,sampleLibErr:"",sampleRef:null,
+  samplePathDraft:"",samplePathErr:"",
   // Debug page state
   debugSessions:[],debugSelSid:null,debugSession:null,debugRawJson:false,
   debugFlushBusy:false,debugSessionsLoading:false,_debugBootstrapped:false,
@@ -102,9 +103,9 @@ var cfg = {
 function set(p){Object.assign(S,p);render()}
 function E(s){return s==null?"":String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
 function attrQ(s){return E(s).replace(/'/g,"&#39;")}
-function sessionActive(){return !!(S.file||S.sid)}
-// Ready view only when a file is loaded in this browser tab — never for sid-only restores.
-function scanLanding(){return S.file?"ready":"homepage"}
+function sessionActive(){return !!(S.file||S.sampleRef||S.sid)}
+// Ready view when a file or server CSV is loaded in this browser tab — never for sid-only restores.
+function scanLanding(){return (S.file||S.sampleRef)?"ready":"homepage"}
 function goNewUpload(){resetSession()}
 function continueRestoredSession(){if(S.sid||S.result)set({view:"ready"});else set({view:"homepage"})}
 
@@ -153,7 +154,7 @@ async function createSessionFromCurrentSource(){
   if(S.sampleRef){
     sess=await POST("/api/sessions/from-sample",buildSampleSessionBody());
   }else{
-    if(!S.file) throw new Error("No file selected — upload a CSV or pick a server sample.");
+    if(!S.file) throw new Error("No file selected — enter a CSV path or browse the server samples folder.");
     sess=await POST("/api/sessions",buildSessionFormData());
   }
   S.sid=sess.session_id;
@@ -198,6 +199,7 @@ function clearScanState(){
   if(location.search) history.replaceState(null,"",window.location.pathname);
   Object.assign(S,{
     file:null,fname:"",rows:0,cols:0,columns:[],sampleRef:null,
+    samplePathDraft:"",samplePathErr:"",
     sid:null,table:null,scope:null,prog:0,pmsg:"",logs:[],result:null,
     sample:null,scanDone:false,scanLinks:{},
     approved:{items:[],summary:{}},apprSel:null,apprPreview:null,
@@ -435,6 +437,8 @@ async function getSampleJson(url){
 }
 
 async function openSampleLib(){
+  var el=document.getElementById("csvPath");
+  if(el) S.samplePathDraft=el.value;
   S.sampleLibOpen=true;S.sampleLibBusy=true;S.sampleLibErr="";S.sampleLibFilter="";render();
   try{
     S.sampleLib=await getSampleJson("/api/sample-data"+(S.sampleLibRoot?"?root="+encodeURIComponent(S.sampleLibRoot):""));
@@ -450,16 +454,52 @@ async function switchSampleRoot(name){
   await openSampleLib();
 }
 
+function isCsvPath(p){
+  return /\.csv$/i.test(String(p||"").trim());
+}
+
+function loadTypedCsv(){
+  var el=document.getElementById("csvPath");
+  var raw=el?el.value:(S.samplePathDraft||"");
+  S.samplePathDraft=String(raw||"").trim();
+  return loadCsvFromPath(S.samplePathDraft);
+}
+
+async function loadCsvFromPath(path){
+  path=String(path||"").trim();
+  if(!path){
+    S.samplePathErr="enter a CSV name or a full path";
+    render();
+    return;
+  }
+  if(!isCsvPath(path)){
+    S.samplePathErr="only .csv files are accepted";
+    render();
+    return;
+  }
+  S.samplePathErr="";
+  await pickSample(path);
+}
+
 async function pickSample(path){
-  S.sampleLibBusy=true;S.sampleLibErr="";render();
+  if(!isCsvPath(path)){
+    S.sampleLibBusy=false;
+    S.sampleLibErr="only .csv files are accepted";
+    S.samplePathErr=S.sampleLibErr;
+    render();
+    return;
+  }
+  S.sampleLibBusy=true;S.sampleLibErr="";S.samplePathErr="";render();
   try{
-    var root=S.sampleLibRoot||"";
+    var looksAbs=/^[/\\]/.test(path)||/^[A-Za-z]:[\\/]/.test(path);
+    var root=looksAbs?"":(S.sampleLibRoot||"");
     var pv=await getSampleJson("/api/sample-data/preview?path="+encodeURIComponent(path)+
                      (root?"&root="+encodeURIComponent(root):""));
     S.sid=null;S.result=null;S.scanDone=false;S.table=null;S.restoredSession=false;
     clearLastSession();
     S.file=null;
-    S.sampleRef={root:root,path:path};
+    S.sampleRef={root:pv.root||root,path:pv.path||path};
+    S.samplePathDraft=S.sampleRef.path;
     S.fname=pv.name||path;
     S.cols=(pv.columns||[]).length;
     S.rows=pv.row_count==null?0:pv.row_count;
@@ -469,6 +509,7 @@ async function pickSample(path){
   }catch(e){
     S.sampleLibBusy=false;
     S.sampleLibErr=e.message||"could not read that file";
+    S.samplePathErr=S.sampleLibErr;
     render();
   }
 }
@@ -485,11 +526,12 @@ function vSampleLib(){
   else if(S.sampleLibErr) body="<div class=\"hint\" style=\"padding:16px 0;color:var(--red)\">"+E(S.sampleLibErr)+"</div>";
   else if(!lib||lib.enabled===false)
     body="<div class=\"hint\" style=\"padding:16px 0\">No sample data root is available.<br/><br/>"+
-         "The picker defaults to the folder the server was started from. Set <code>sample_data.roots</code> "+
+         "Drop CSV files into <code>redibis/webapp/samples</code>, set <code>sample_data.roots</code> "+
          "in <code>REDIBIS_CONFIG</code>, or <code>REDIBIS_SAMPLE_DATA_DIR=/path/to/samples</code>, then reopen this panel.</div>";
   else{
     var q=(S.sampleLibFilter||"").toLowerCase();
     var files=(lib.files||[]).filter(function(f){
+      if(!isCsvPath(f.path||f.name||"")) return false;
       return !q||f.path.toLowerCase().indexOf(q)>=0;
     });
     var roots=(lib.roots||[]);
@@ -519,7 +561,7 @@ function vSampleLib(){
             "</td></tr>";
         }).join("")
       : "<tr><td colspan=\"3\" class=\"hint\" style=\"padding:16px 0\">"+
-        (lib.files&&lib.files.length?"nothing matches that filter":"no loadable files under this root")+
+        (lib.files&&lib.files.length?"nothing matches that filter":"no CSV files under this root")+
         "</td></tr>";
     body=rootBar+
       "<input id=\"sampleLibFilter\" class=\"input\" style=\"width:100%;margin-bottom:10px\" "+
@@ -533,8 +575,8 @@ function vSampleLib(){
   return "<div class=\"modal-bg\" onclick=\"if(event.target===this)set({sampleLibOpen:false})\">"+
     "<div class=\"modal\" style=\"max-width:720px;text-align:left\">"+
       "<button class=\"modal-x\" onclick=\"set({sampleLibOpen:false})\">×</button>"+
-      "<div style=\"font-size:20px;font-weight:700;color:var(--ink);margin-bottom:4px\">server sample data</div>"+
-      "<div class=\"hint\" style=\"margin-bottom:14px\">files already on the machine running redibis — no upload</div>"+
+      "<div style=\"font-size:20px;font-weight:700;color:var(--ink);margin-bottom:4px\">server CSVs</div>"+
+      "<div class=\"hint\" style=\"margin-bottom:14px\">files already on the machine running redibis — CSV only</div>"+
       body+
     "</div></div>";
 }
@@ -2509,6 +2551,8 @@ function render(){
   }
 }
 function renderInner(){
+  var csvEl=document.getElementById("csvPath");
+  if(csvEl) S.samplePathDraft=csvEl.value;
   // Nav tabs
   var has=sessionActive();
   var ts=[{id:"scan",l:"scan",vs:["homepage","ready","scanning","quality-config","quality-review"]},{id:"data",l:"data",vs:["data"]},{id:"results",l:"results",vs:["results","pii","quality","pii-discover","pii-playground","quality-discover","subcontracts","subcontract-edit"]},{id:"approved",l:"approved",vs:["approved","approved-edit"]},{id:"contracts",l:"contracts",vs:["contracts","contract-detail","contract-pii","contract-quality","contract-definitions"]}];
@@ -2576,20 +2620,33 @@ function renderInner(){
   document.getElementById("overlays").innerHTML=ov;
 
   bind();
+  if((S.view==="homepage"||S.view==="ready")&&!S.sampleLib&&!S._sampleLibMetaTried){
+    S._sampleLibMetaTried=true;
+    getSampleJson("/api/sample-data").then(function(lib){
+      S.sampleLib=lib;S.sampleLibRoot=lib.root||"";
+      if(S.view==="homepage"||S.view==="ready") render();
+    }).catch(function(){});
+  }
+  var csvFocus=document.getElementById("csvPath");
+  if(csvFocus&&!S.sampleLibOpen&&!S.aboutOpen&&S.view==="homepage") csvFocus.focus();
 }
 
 // ── Views ──
-function uploadDropzoneHtml(){
-  return "<div class=\"dropzone\" id=\"dz\">"+
-    "<input type=\"file\" id=\"fi\" accept=\".csv,.parquet,.xlsx\" style=\"display:none\"/>"+
-    "<div class=\"dz-icon\">↑</div>"+
-    "<div class=\"dz-label\">drop your CSV here</div>"+
-    "<div class=\"dz-hint\">or click to browse · csv / parquet / xlsx</div>"+
+function csvPathPickerHtml(){
+  var val=S.samplePathDraft||(S.sampleRef&&S.sampleRef.path)||"";
+  var err=S.samplePathErr||"";
+  var base=(S.sampleLib&&S.sampleLib.root_path)||"webapp/samples";
+  return "<div class=\"csv-path-row\">"+
+    "<input id=\"csvPath\" class=\"csv-path-input\" type=\"text\" spellcheck=\"false\" autocomplete=\"off\" "+
+      "placeholder=\"customers.csv or "+E(base)+"/file.csv\" "+
+      "value=\""+E(val)+"\" "+
+      "onkeydown=\"if(event.key==='Enter'){event.preventDefault();loadTypedCsv()}\"/>"+
+    "<button class=\"btn btn-ghost btn-sm\" type=\"button\" title=\"Browse server CSVs\" "+
+      "onclick=\"event.preventDefault();openSampleLib()\">browse</button>"+
+    "<button class=\"btn btn-red btn-sm\" type=\"button\" onclick=\"loadTypedCsv()\">use →</button>"+
   "</div>"+
-  "<div class=\"row\" style=\"justify-content:center;margin-top:10px\">"+
-    "<button class=\"btn btn-ghost btn-sm\" onclick=\"event.stopPropagation();openSampleLib()\">"+
-      "▤ use a file already on the server</button>"+
-  "</div>";
+  "<div class=\"dz-hint\">CSV only · a name resolves under <code>"+E(base)+"</code>, or paste a full path</div>"+
+  (err?"<div class=\"hint\" style=\"color:var(--red);margin-top:8px\">"+E(err)+"</div>":"");
 }
 
 function vHome(){
@@ -2599,11 +2656,11 @@ function vHome(){
       "<div class=\"cbox\" style=\"width:760px;max-width:100%;margin-bottom:20px;border:2px solid var(--amber,#f59e0b)\">"+
         "<div class=\"stitle mb10\">previous session available</div>"+
         "<div style=\"font-size:.85rem;color:var(--muted);margin-bottom:12px\">"+
-          E(S.table||S.fname||"session")+" — upload a new file below, or continue where you left off."+
+          E(S.table||S.fname||"session")+" — choose a new CSV below, or continue where you left off."+
         "</div>"+
         "<div class=\"row\" style=\"gap:8px;justify-content:center\">"+
           "<button class=\"btn btn-red btn-sm\" onclick=\"continueRestoredSession()\">continue session →</button>"+
-          "<button class=\"btn btn-ghost btn-sm\" onclick=\"goNewUpload()\">reset & new upload</button>"+
+          "<button class=\"btn btn-ghost btn-sm\" onclick=\"goNewUpload()\">reset &amp; new CSV</button>"+
         "</div>"+
       "</div>";
   }
@@ -2611,9 +2668,9 @@ function vHome(){
   return "<main class=\"page\"><div class=\"home-wrap\">"+
     restoredBanner+
     (showUploadHome?
-      "<div class=\"home-title\">start by uploading a CSV</div>"+
-      "<div class=\"home-sub\">drop a file to profile its quality, detect PII, and draft an ODCS contract</div>"+
-      uploadDropzoneHtml()
+      "<div class=\"home-title\">start with a CSV</div>"+
+      "<div class=\"home-sub\">enter a name under the web app samples/ folder, a full path, or browse the server</div>"+
+      csvPathPickerHtml()
       :"")+
     (S.scanDone?"<div class=\"stitle\" style=\"margin-top:24px\">scan results</div>"+
       "<div class=\"row\" style=\"gap:8px;flex-wrap:wrap\">"+
@@ -2667,26 +2724,26 @@ function vReady(){
       "<div class=\"stitle log-toggle\" onclick=\"toggleLog()\" style=\"margin-top:8px\"><span id=\"logArrow\">▾</span> scan log ("+S.logs.length+")</div>" + logHtml +
       "<div class=\"row\" style=\"gap:8px;margin-top:16px\">" +
         "<button class=\"btn btn-ghost\" id=\"btnCancel\" style=\"color:var(--red);border-color:var(--red)\">✗ cancel scan</button>" +
-        (S.result ? "<button class=\"btn btn-ghost\" style=\"color:var(--ink);border-color:var(--ink)\" onclick=\"resetSession()\">← reset & new upload</button>" : "") +
+        (S.result ? "<button class=\"btn btn-ghost\" style=\"color:var(--ink);border-color:var(--ink)\" onclick=\"resetSession()\">← reset &amp; new CSV</button>" : "") +
       "</div>";
     scanBlock = prg + scanBlock;
   } else if(S.result && !S.restoredSession) {
     // Done — show reset option below the artifacts
-    scanBlock = "<div style='margin-top:16px;text-align:center'><button class=\"btn btn-ghost\" onclick=\"resetSession()\">← reset & new upload</button></div>";
+    scanBlock = "<div style='margin-top:16px;text-align:center'><button class=\"btn btn-ghost\" onclick=\"resetSession()\">← reset &amp; new CSV</button></div>";
   }
 
   var uploadBlock="";
-  if(!S.file && !S.restoredSession){
+  if(!S.file && !S.sampleRef && !S.restoredSession){
     uploadBlock=
       "<div class=\"cbox\" style=\"width:100%;margin-bottom:20px;border:2px dashed var(--border)\">"+
-        "<div class=\"stitle mb10\">upload a new CSV</div>"+
+        "<div class=\"stitle mb10\">choose a CSV</div>"+
         "<div style=\"font-size:.78rem;color:var(--muted);margin-bottom:12px\">"+
-          (S.sid?"Restored session — upload a file to replace it, or ":"")+
-          "<button class=\"btn btn-ghost btn-sm\" onclick=\"goNewUpload()\">reset & start over</button>"+
+          (S.sid?"Restored session — pick a CSV to replace it, or ":"")+
+          "<button class=\"btn btn-ghost btn-sm\" onclick=\"goNewUpload()\">reset &amp; start over</button>"+
         "</div>"+
-        uploadDropzoneHtml()+
+        csvPathPickerHtml()+
       "</div>";
-  } else if(!S.file && S.restoredSession){
+  } else if(!S.file && !S.sampleRef && S.restoredSession){
     uploadBlock=
       "<div class=\"cbox\" style=\"width:100%;margin-bottom:20px;border:2px solid var(--amber,#f59e0b)\">"+
         "<div class=\"stitle mb10\">restored session loaded</div>"+
@@ -2696,7 +2753,7 @@ function vReady(){
   }
 
   return "<main class=\"page\"><div class=\"widget-wrap\">"+
-    (S.file?"<div class=\"file-info\">"+E(S.fname)+" <span>· "+S.cols+" cols · "+((S.rows||0).toLocaleString())+" rows</span></div>":"")+
+    (S.file||S.sampleRef?"<div class=\"file-info\">"+E(S.fname)+" <span>· "+S.cols+" cols · "+((S.rows||0).toLocaleString())+" rows</span></div>":"")+
     uploadBlock+
     "<div class=\"chips\">"+
       "<div class=\"wchip\" data-chip=\"pii\"><div class=\"cn\">PII</div><div class=\"cs\">privacy</div></div>"+

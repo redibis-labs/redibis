@@ -445,6 +445,22 @@ class EvidenceReviewService:
                     decision_version=entry.decision_version,
                 )
                 applied.append(entry.column)
+                try:
+                    from redibis.store.generation_ledger import Generation
+                    self.store.generation_ledger.append(table, entry.column, [
+                        Generation(
+                            field="pii",
+                            source="supplied",
+                            value={"is_pii": entry.status == "pii", "entity_type": entry.entity_type},
+                            confidence=None,
+                            run_id=entry.source_run_id or "supplied",
+                            ts=_utc_now_iso(),
+                            detail={"actor": actor, "reason": reason},
+                            fingerprint_key=entry.fingerprint_key,
+                        ),
+                    ])
+                except Exception:
+                    pass
             except Exception as exc:
                 skipped.append({"column": entry.column, "error": str(exc)})
 

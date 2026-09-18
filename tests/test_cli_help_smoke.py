@@ -111,8 +111,32 @@ _HELP_PATHS: list[list[str]] = [
     ["pii", "text", "--help"],
     ["pii", "text-llm-check", "--help"],
     ["pii", "text-batch", "--help"],
+    ["pii", "llm-verdict", "--help"],
+    ["pii", "recommend", "--help"],
+    ["pii", "sessions", "list", "--help"],
+    ["pii", "sessions", "export", "--help"],
+    ["verdict", "export", "--help"],
+    ["steward", "overview", "--help"],
+    ["steward", "column", "--help"],
+    ["steward", "verdict", "--help"],
+    ["steward", "finalize", "--help"],
+    ["steward", "export", "--help"],
+    ["steward", "import-verdicts", "--help"],
+    ["workspace", "--help"],
+    ["workspace", "list", "--help"],
+    ["workspace", "add", "--help"],
+    ["workspace", "remove", "--help"],
+    ["workspace", "reindex", "--help"],
+    ["workspace", "contracts", "--help"],
+    ["workspace", "enrich", "--help"],
+    ["workspace", "synthesize", "--help"],
+    ["workspace", "export", "--help"],
+    ["workspace", "batch-status", "--help"],
+    ["workspace", "promote", "--help"],
+    ["scan-batch", "--help"],
+    ["dataset", "export", "--help"],
+    ["training", "export", "--help"],
 ]
-
 
 @pytest.mark.parametrize("argv_tail", _HELP_PATHS, ids=lambda p: " ".join(p))
 def test_cli_help_exits_zero(argv_tail: list[str]):

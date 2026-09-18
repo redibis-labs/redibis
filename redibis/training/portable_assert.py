@@ -52,6 +52,7 @@ _SAFE_PATH_SUFFIXES = (
     ".run_id",
     ".checksum",
     ".version",
+    ".review_digest",
 )
 
 

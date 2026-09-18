@@ -22,7 +22,14 @@ from typing import Any, Iterator, Optional
 
 from redibis.contracts.privacy import column_is_pii, col_entity_type
 from redibis.store.contract_store import ContractStore
-from redibis.store.review_store import ColumnReview, ReviewStore
+from redibis.store.review_store import (
+    BLOCKING_STATUSES,
+    ColumnReview,
+    FieldVerdict,
+    REVIEWED_STATUSES,
+    ReviewStore,
+    STATUS_TO_DECISION,
+)
 
 
 class ReviewInputError(ValueError):
@@ -159,8 +166,10 @@ class ReviewService:
             "contract_uuid": str(active.get("contract_uuid") or ""),
             "columns": items,
             "approved_count": state.approved_count,
+            "reviewed_count": state.reviewed_count,
             "total_columns": len(props),
             "fully_approved": state.fully_approved,
+            "guaranteed": state.guaranteed,
             "updated_at": state.updated_at,
             "updated_by": state.updated_by,
         }
@@ -172,8 +181,10 @@ class ReviewService:
         return {
             "table": table,
             "approved_count": state.approved_count,
+            "reviewed_count": state.reviewed_count,
             "total_columns": total,
-            "fully_approved": state.fully_approved and total > 0 and state.approved_count >= total,
+            "fully_approved": state.fully_approved and total > 0 and state.reviewed_count >= total,
+            "guaranteed": bool(state.guaranteed),
             "updated_at": state.updated_at,
         }
 
@@ -200,7 +211,8 @@ class ReviewService:
             "glossary": glossary,
             "tags": list(tags),
             "classification": classification,
-            "profiling": cm.get("profiling") or cm.get("profiling_features") or [],
+            "profiling": [],
+            "profile_ref": (cm.get("profile_ref") if isinstance(cm, dict) else None) or {},
             "review": review.to_dict() if review else _pending_review(),
         }
 
@@ -301,6 +313,16 @@ class ReviewService:
         self._checkpoint(table, column, status="rejected", reviewer=who, note=note)
         return self.get_review(table)
 
+    def needs_review_column(self, table: str, column: str, *, reviewer: str = "", note: str = "") -> dict:
+        who = _require_reviewer(reviewer)
+        self._checkpoint(table, column, status="needs_review", reviewer=who, note=note)
+        return self.get_review(table)
+
+    def no_action_column(self, table: str, column: str, *, reviewer: str = "", note: str = "") -> dict:
+        who = _require_reviewer(reviewer)
+        self._checkpoint(table, column, status="no_action", reviewer=who, note=note)
+        return self.get_review(table)
+
     def reset_column(self, table: str, column: str) -> dict:
         self.reviews.reset_column(table, column)
         try:
@@ -346,12 +368,16 @@ class ReviewService:
             "glossary": prop.get("authoritativeDefinitions") or prop.get("glossary") or [],
         }
 
-    def _checkpoint(self, table, column, *, status, reviewer, approved=None, note=""):
+    def _checkpoint(self, table, column, *, status, reviewer, approved=None, note="", verdicts=None):
         active = self.store.get_active(table)
         total = len(list(_iter_props(active))) if active else 0
+        existing = self.reviews.get(table).columns.get(column)
+        merged_verdicts = dict(existing.verdicts) if existing else {}
+        if verdicts:
+            merged_verdicts.update(verdicts)
         cr = ColumnReview(
             column=column, status=status, approved=approved or {},
-            reviewed_by=reviewer, note=note,
+            reviewed_by=reviewer, note=note, verdicts=merged_verdicts,
         )
         state = self.reviews.set_column(
             table, cr, total_columns=total,

@@ -337,6 +337,8 @@ class TextScanner:
     @staticmethod
     def _engine_set(engines: str) -> set[str]:
         e = (engines or "both").lower().strip()
+        if e in ("none", "off"):
+            return set()
         if e in ("both", "all"):
             return {"regex", "phone", "ner"}
         if e == "regex":

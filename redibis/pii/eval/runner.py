@@ -47,6 +47,9 @@ def _scan_case(svc: Any, case: Mapping[str, Any], options: Mapping[str, Any]) ->
         "preprocess_obfuscation": bool(options.get("preprocess_obfuscation", True)),
         "preprocess_expanders": list(options.get("preprocess_expanders") or []),
         "equation": str(options.get("equation") or options.get("arbitration") or "independent"),
+        "llm_verdict": str(options.get("llm_verdict") or "off"),
+        "recommend": bool(options.get("recommend")),
+        "trim": bool(options.get("trim")),
     }
     text = case["text"]
     if options.get("max_chars") is not None:
@@ -109,6 +112,8 @@ def evaluate_with_service(
         require_redibis_version=require_redibis_version,
     )
     predictions: dict[str, Any] = {}
+    case_verdicts: dict[str, Any] = {}
+    case_recs: dict[str, Any] = {}
     engines_ran: set[str] = set()
     engines_unavailable: dict[str, str] = {}
     truncated_cases: list[str] = []
@@ -138,6 +143,12 @@ def evaluate_with_service(
                 f"LLM refiner unavailable: {unavailable['llm']}"
             )
         predictions[case["id"]] = result.detections
+        verdict = getattr(result, "llm_verdict", None)
+        if verdict:
+            case_verdicts[case["id"]] = dict(verdict)
+        recs = getattr(result, "recommendations", None)
+        if recs:
+            case_recs[case["id"]] = dict(recs)
         engines_ran.update(getattr(result, "engines_ran", ()) or ())
         ruleset_id = getattr(result, "ruleset_id", "") or ruleset_id
         ruleset_version = getattr(result, "ruleset_version", "") or ruleset_version
@@ -285,6 +296,12 @@ def evaluate_with_service(
         )
     except Exception:
         pass
+    for case in report.get("cases") or []:
+        cid = case.get("id")
+        if cid in case_verdicts:
+            case["llm_verdict"] = case_verdicts[cid]
+        if cid in case_recs:
+            case["recommendations"] = case_recs[cid]
     return report
 
 

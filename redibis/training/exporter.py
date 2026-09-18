@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence, Union
 
-from redibis.contracts.privacy import col_entity_type, col_privacy_classification, iter_columns
+from redibis.contracts.privacy import col_entity_type, col_privacy_classification, column_is_pii, iter_columns
 from redibis.store.contract_store import ContractStore
 from redibis.store.pii_decisions import infer_engine_baseline_from_telemetry
 from redibis.store.review_store import ReviewStore
@@ -23,7 +23,7 @@ class ExportOptions:
 
     tables: Optional[Sequence[str]] = None
     database: Optional[str] = None
-    label_sources: Optional[Sequence[str]] = None  # human_decision | review | contract_confirmed
+    label_sources: Optional[Sequence[str]] = None  # human_decision | review | contract_confirmed | steward_review
     min_confidence: Optional[float] = None
     include_samples: bool = False
     samples_by_column: Mapping[str, Sequence[str]] = field(default_factory=dict)
@@ -147,7 +147,7 @@ class TrainingDatasetExporter:
             # Also include approved/edited reviews without an overlay (contract_confirmed path).
             for col, rev in reviews.items():
                 status = getattr(rev, "status", None) or (rev.get("status") if isinstance(rev, dict) else "")
-                if status in ("approved", "edited"):
+                if status in ("approved", "edited", "no_action"):
                     columns.add(col)
 
             for column in sorted(columns):
@@ -357,3 +357,139 @@ class TrainingDatasetExporter:
                     raise
         ds.write_jsonl(path)
         return ds
+
+    def export_steward_bundle(
+        self,
+        table: str,
+        *,
+        digest: str = "",
+        profiles=None,
+        consent=None,
+        include_spans: bool = True,
+    ) -> dict[str, Any]:
+        """A4 — columns.jsonl + optional spans.jsonl + taxonomy/glossary + manifest."""
+        import json as _json
+
+        from redibis.training.portable_assert import PortableLeakError, assert_portable_row
+
+        active = self.store.get_active(table) or {}
+        props = _props_by_name(active)
+        state = self.review_store.get(table)
+        decisions = self.store.get_pii_decisions(table) or {}
+        column_rows: list[dict] = []
+        span_rows: list[dict] = []
+        spans_skipped = 0
+        by_source: dict[str, int] = {}
+        by_entity: dict[str, int] = {}
+
+        for column, cr in (state.columns or {}).items():
+            prop = props.get(column) or {"name": column}
+            pii_d = decisions.get(column) or {}
+            is_pii = pii_d.get("status") == "pii" or (
+                pii_d.get("status") != "not_pii" and column_is_pii(prop)
+            )
+            entity = str(pii_d.get("entity_type") or col_entity_type(prop) or "")
+            verdicts = cr.verdicts if hasattr(cr, "verdicts") else {}
+            first = None
+            if isinstance(verdicts, dict) and verdicts:
+                first = next(iter(verdicts.values()))
+            rationale = getattr(first, "rationale_code", "") if first else ""
+            chosen = getattr(first, "chosen_source", "") if first else ""
+            row = {
+                "residency": "portable",
+                "features": build_column_features(
+                    table=table, column=column, prop=prop, telemetry={}, table_domain="",
+                ),
+                "label": {
+                    "is_pii": bool(is_pii),
+                    "entity_type": entity or None,
+                    "source": "steward_review",
+                    "rationale_code": rationale,
+                    "chosen_source": chosen,
+                    "decision": getattr(first, "decision", None) if first else cr.status,
+                },
+                "provenance": {
+                    "table": table,
+                    "column": column,
+                    "review_digest": digest,
+                    "reviewed_by": cr.reviewed_by,
+                },
+            }
+            assert_portable_row(row, path=f"{table}.{column}")
+            column_rows.append(row)
+            by_source["steward_review"] = by_source.get("steward_review", 0) + 1
+            if entity:
+                by_entity[entity] = by_entity.get(entity, 0) + 1
+
+            if include_spans and entity and is_pii:
+                approved = False
+                if consent is not None and hasattr(consent, "is_approved"):
+                    try:
+                        approved = bool(consent.is_approved(table, column))
+                    except Exception:
+                        approved = False
+                if not approved:
+                    spans_skipped += 1
+                    continue
+                run_id = None
+                samples: list[str] = []
+                if profiles is not None:
+                    try:
+                        run_id = profiles.latest_run_id(table)
+                        if run_id:
+                            payload = profiles.read(
+                                table, run_id, column,
+                                include_samples=True, allow_samples=True, actor="training-export",
+                            )
+                            samples = list(payload.get("samples") or [])
+                    except Exception:
+                        samples = []
+                if not samples:
+                    spans_skipped += 1
+                    continue
+                for text in samples:
+                    span_row = {
+                        "residency": "local",
+                        "text": str(text),
+                        "spans": [{"start": 0, "end": len(str(text)), "label": entity}],
+                        "column": column,
+                        "table": table,
+                        "review_digest": digest,
+                    }
+                    span_rows.append(span_row)
+
+        taxonomy = {
+            "entity_types": sorted(by_entity),
+            "review_digest": digest,
+        }
+        glossary_rows = []
+        for name, prop in props.items():
+            desc = str(prop.get("description") or "")
+            if desc:
+                glossary_rows.append({
+                    "term": name,
+                    "definition": desc,
+                    "residency": "portable_names",
+                    "review_digest": digest,
+                })
+
+        manifest = {
+            "review_digest": digest,
+            "table": table,
+            "counts": {
+                "columns": len(column_rows),
+                "spans": len(span_rows),
+                "spans_skipped_no_consent": spans_skipped,
+                "glossary": len(glossary_rows),
+                "by_label_source": by_source,
+                "by_entity": by_entity,
+            },
+            "residency": "portable" if not span_rows else "mixed",
+        }
+        return {
+            "columns.jsonl": "\n".join(_json.dumps(r, ensure_ascii=False) for r in column_rows) + ("\n" if column_rows else ""),
+            "spans.jsonl": "\n".join(_json.dumps(r, ensure_ascii=False) for r in span_rows) + ("\n" if span_rows else ""),
+            "taxonomy.json": taxonomy,
+            "glossary.jsonl": "\n".join(_json.dumps(r, ensure_ascii=False) for r in glossary_rows) + ("\n" if glossary_rows else ""),
+            "manifest.json": manifest,
+        }

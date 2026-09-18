@@ -26,6 +26,7 @@ OPERATIONAL_CONTRACT_FIELDS: frozenset[str] = frozenset({
     "last_updated_by_workflow",
     "_scan_metadata",       # transient scan hints from writers; never persisted in spec
     "_column_telemetry",    # per-column discovery evidence; lives in metadata sidecar
+    "_generations",         # append-only ledger payload; lives in GenerationLedger
 })
 
 
@@ -153,11 +154,20 @@ class ContractMetadataStore:
     # ── Per-column discovery telemetry ───────────────────────────────────
 
     def merge_column_telemetry(self, table: str, columns: dict) -> None:
-        """Upsert per-column discovery evidence (confidence, engines, …)."""
+        """Upsert per-column discovery evidence (confidence, engines, …).
+
+        Profiling payloads and sample values are stripped — they live in ProfileStore.
+        """
         if not columns:
             return
+        drop = frozenset({"profiling", "profiling_features", "samples", "sample_values", "histogram"})
+        cleaned = {}
+        for name, entry in columns.items():
+            if not isinstance(entry, dict):
+                continue
+            cleaned[name] = {k: v for k, v in entry.items() if k not in drop}
         current = self.get_column_telemetry(table)
-        current.update(copy.deepcopy(columns))
+        current.update(copy.deepcopy(cleaned))
         self.backend.put_json(self.bucket, self._columns_key(table), current)
 
     def get_column_telemetry(self, table: str) -> dict:

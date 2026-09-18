@@ -59,6 +59,20 @@ class TextPIIService:
         )
         self._provenance_cache: dict[str, Any] = {}
 
+    def reload_text_rules(self) -> None:
+        """Re-read persisted ``pii_text_rules`` so Save as default takes effect without restart."""
+        self._ruleset = self._compile_ruleset()
+        self._scanner = TextScanner(
+            ruleset=self._ruleset,
+            ner_backend=self._ner,
+            llm_refiner=self._llm,
+        )
+        self._facade = TextPIIScan(
+            ruleset=self._ruleset,
+            ner_backend=self._ner,
+            llm_refiner=self._llm,
+        )
+
     @property
     def config(self) -> Any:
         """The ``RedibisConfig`` this service was built from (may be ``None``)."""
@@ -346,6 +360,9 @@ class TextPIIService:
         include_provenance: bool = False,
         equation: str = "independent",
         include_arbitration: bool = False,
+        llm_verdict: str = "off",
+        trim: bool = False,
+        recommend: bool = False,
     ) -> DetectionResult:
         if text is None:
             raise TextPIIServiceError("text is required")
@@ -358,6 +375,11 @@ class TextPIIService:
         # Default preprocess off for library/admin API; Gateway opts in explicitly.
         if preprocess_obfuscation is None:
             preprocess_obfuscation = False
+        verdict_mode = str(llm_verdict or "off").strip().lower()
+        if verdict_mode not in ("off", "independent", "both"):
+            verdict_mode = "off"
+        if verdict_mode == "both":
+            use_llm = True
         gw = getattr(self._cfg, "text_gateway", None) if self._cfg is not None else None
         cfg = TextScanConfig(
             engines=engines,
@@ -380,6 +402,7 @@ class TextPIIService:
             llm_max_windows=int(getattr(gw, "max_llm_windows", 8) or 8) if gw is not None else 8,
             equation=str(equation or "independent"),
             include_arbitration=bool(include_arbitration),
+            llm_verdict=verdict_mode,
         )
         llm_override = None
         key = (llm_api_key or "").strip() or None
@@ -401,6 +424,67 @@ class TextPIIService:
             kind="api_scan",
             include_full=bool(include_provenance),
         )
+        active_llm = llm_override if llm_override is not None else self._llm
+        need_llm_tool = verdict_mode in ("independent", "both") or recommend
+        if need_llm_tool and active_llm is None and (llm_provider or "").strip():
+            active_llm = self._build_llm_override(
+                llm_provider.strip(), (llm_model or "").strip(), api_key=key,
+                endpoint_url=endpoint or None,
+            )
+        elif need_llm_tool and active_llm is None and key:
+            from redibis.pii.text_llm import LlmTextRefiner
+
+            active_llm = LlmTextRefiner(redibis_config=self._cfg, api_key=key)
+        from dataclasses import replace as _replace
+
+        if trim:
+            from redibis.pii.trim import trim_span
+
+            overlay = getattr(self._ruleset, "text_rules", None)
+            trimmed = []
+            for det in result.detections:
+                if det.start is None or det.end is None:
+                    trimmed.append(det)
+                    continue
+                ns, ne, _rules = trim_span(
+                    text, int(det.start), int(det.end),
+                    entity_type=str(det.entity_type or ""), overlay=overlay,
+                )
+                if (ns, ne) != (det.start, det.end) and 0 <= ns < ne <= len(text):
+                    trimmed.append(_replace(det, start=ns, end=ne, text=text[ns:ne]))
+                else:
+                    trimmed.append(det)
+            counts: dict[str, int] = {}
+            for det in trimmed:
+                counts[str(det.entity_type or "")] = counts.get(str(det.entity_type or ""), 0) + 1
+            result = _replace(result, detections=tuple(trimmed), entity_counts=counts)
+        if verdict_mode in ("independent", "both"):
+            from redibis.pii.llm_verdict import run_llm_verdict
+
+            verdict = run_llm_verdict(
+                text, config=cfg, refiner=active_llm, run_uuid=result.run_uuid,
+            )
+            coverage = dict(result.coverage or {})
+            refiner_ran = bool(use_llm)
+            coverage["llm_calls"] = (1 if refiner_ran else 0) + 1
+            result = _replace(
+                result,
+                llm_verdict=verdict.to_dict(return_text=return_text),
+                coverage=coverage,
+            )
+        if recommend:
+            from redibis.pii.tuning_advisor import recommend as _recommend
+
+            recs = _recommend(
+                text,
+                engine_result=result,
+                llm_verdict=result.llm_verdict,
+                overlay=getattr(self._ruleset, "text_rules", None),
+                config=cfg,
+                refiner=active_llm,
+                run_uuid=result.run_uuid,
+            )
+            result = _replace(result, recommendations=recs.to_dict())
         # Metadata-only logging — never log raw body
         logger.info(
             "text_pii_scan chars=%s entities=%s engines=%s language=%s latency_ms=%.1f "

@@ -87,6 +87,7 @@ def _load_hmac_key(root: Path) -> bytes:
         except ValueError:
             return hashlib.sha256(text.encode("utf-8")).digest()
     key = os.urandom(32)
+    root.mkdir(parents=True, exist_ok=True)
     key_path.write_text(key.hex() + "\n", encoding="utf-8")
     try:
         os.chmod(key_path, 0o600)

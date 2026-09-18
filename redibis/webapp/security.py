@@ -51,7 +51,13 @@ READ_ONLY_POST_PREFIXES = ("/api/gateway/",)
 
 
 def is_read_only_post(path: str) -> bool:
-    if path.startswith("/api/gateway/rules") and not path.startswith("/api/gateway/rules/dry-run"):
+    if path.startswith("/api/gateway/rules/dry-run") or path.startswith("/api/gateway/rules/advise"):
+        return True
+    if path.startswith("/api/gateway/rules"):
+        return False
+    if path.startswith("/api/gateway/sessions"):
+        return False
+    if path.startswith("/api/gateway/curation"):
         return False
     return any(path.startswith(p) for p in READ_ONLY_POST_PREFIXES)
 
@@ -60,7 +66,7 @@ def is_read_only_post(path: str) -> bool:
 # middleware keeps calling ``role_can`` and does not grow new ``if role ==`` branches.
 ROLE_CAPABILITIES: dict[str, frozenset[str]] = {
     "explorer": frozenset({"view", "export"}),
-    "admin": frozenset({"view", "export", "mutate", "manage_users"}),
+    "admin": frozenset({"view", "export", "mutate", "manage_users", "view_samples"}),
 }
 
 

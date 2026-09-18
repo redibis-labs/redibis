@@ -202,6 +202,9 @@ class BatchRunConfig:
     policy_id: str = ""
     quiet: bool = False
     llm_circuit_threshold: int = LLM_CIRCUIT_THRESHOLD
+    llm_verdict: str = "off"
+    trim: bool = False
+    recommend: bool = False
 
 
 @dataclass
@@ -242,6 +245,9 @@ def _scan_one(svc, doc: BatchDocument, cfg: BatchRunConfig, *, use_llm: bool):
         llm_endpoint=cfg.llm_endpoint,
         equation=cfg.equation,
         include_arbitration=cfg.include_arbitration,
+        llm_verdict=getattr(cfg, "llm_verdict", None) or "off",
+        trim=bool(getattr(cfg, "trim", False)),
+        recommend=bool(getattr(cfg, "recommend", False)),
     )
     last_exc: Optional[BaseException] = None
     for attempt in range(LLM_RETRY_ATTEMPTS if use_llm else 1):
@@ -378,6 +384,52 @@ def run_text_batch(
                 json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
                 encoding="utf-8",
             )
+            verdict = payload.get("llm_verdict")
+            if verdict:
+                llm_path = out_dir / "documents" / f"{doc.sanitized_id}.llm.json"
+                llm_doc = dict(verdict)
+                if not cfg.return_text:
+                    for span in llm_doc.get("spans") or []:
+                        if isinstance(span, dict):
+                            span["text"] = ""
+                    for row in llm_doc.get("not_pii") or []:
+                        if isinstance(row, dict):
+                            row["text"] = ""
+                llm_path.write_text(
+                    json.dumps(llm_doc, indent=2, ensure_ascii=False) + "\n",
+                    encoding="utf-8",
+                )
+                jsonl = out_dir / "llm-verdicts.jsonl"
+                with jsonl.open("a", encoding="utf-8") as fh:
+                    fh.write(json.dumps({"id": doc.doc_id, **llm_doc}, ensure_ascii=False) + "\n")
+                try:
+                    from redibis.pii.llm_verdict import diff_against_engine
+
+                    diff = diff_against_engine(verdict, payload.get("spans") or [])
+                except Exception:
+                    diff = {}
+                csv_path = out_dir / "verdict-diff.csv"
+                new_csv = not csv_path.exists()
+                with csv_path.open("a", encoding="utf-8", newline="") as fh:
+                    writer = csv.writer(fh)
+                    if new_csv:
+                        writer.writerow(["id", "agree", "llm_only", "engine_only", "type_conflict", "boundary_conflict"])
+                    writer.writerow([
+                        doc.doc_id,
+                        diff.get("agree", 0),
+                        diff.get("llm_only", 0),
+                        diff.get("engine_only", 0),
+                        diff.get("type_conflict", 0),
+                        diff.get("boundary_conflict", 0),
+                    ])
+            recs = payload.get("recommendations")
+            if recs:
+                rec_dir = out_dir / "recommendations"
+                rec_dir.mkdir(parents=True, exist_ok=True)
+                (rec_dir / f"{doc.sanitized_id}.json").write_text(
+                    json.dumps(recs, indent=2, ensure_ascii=False) + "\n",
+                    encoding="utf-8",
+                )
             if cfg.deidentify:
                 _write_redacted(svc, doc, scan, cfg, out_dir)
         result.documents.append({
@@ -503,7 +555,36 @@ def run_text_batch(
         "coverage": coverage_block,
         "llm_circuit_open": circuit_open,
     }
-    if cfg.require_llm and cfg.use_llm and (
+    rec_dir = (out_dir / "recommendations") if out_dir is not None else None
+    if rec_dir is not None and rec_dir.is_dir():
+        from redibis.pii.tuning_advisor import RecommendationSet, aggregate as agg_recs
+
+        sets = []
+        for path in sorted(rec_dir.glob("*.json")):
+            if path.name.endswith(".aggregate.json"):
+                continue
+            try:
+                raw = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if isinstance(raw, dict):
+                sets.append(RecommendationSet.from_dict(raw))
+        if sets:
+            combined = agg_recs(sets)
+            (out_dir / "recommendations.aggregate.json").write_text(
+                json.dumps(combined.to_dict(), indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+            result.aggregates["recommendations"] = {
+                "documents": len(sets),
+                "unique": len(combined.items),
+            }
+    if cfg.require_llm and (cfg.use_llm or (cfg.llm_verdict or "off") != "off" or cfg.recommend) and (
+        llm_unavailable_run or circuit_open or "llm" in engines_unavailable
+        or (scanned and "llm" not in engines_ran and (cfg.llm_verdict or "off") == "off")
+    ):
+        result.exit_code = 3
+    elif cfg.require_llm and cfg.use_llm and (
         llm_unavailable_run or circuit_open or "llm" in engines_unavailable
         or (scanned and "llm" not in engines_ran)
     ):

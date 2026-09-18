@@ -203,6 +203,50 @@ def test_eval_limiter_weight_and_cancel():
         )
 
 
+def test_evaluate_attaches_llm_verdict_and_recommendations():
+    from redibis.pii.eval.runner import evaluate_with_service
+
+    seen = {}
+
+    class _Result:
+        detections = [{"start": 0, "end": 17, "entity_type": "EMAIL_ADDRESS"}]
+        engines_ran = ("regex",)
+        engines_unavailable = {}
+        ruleset_id = "builtin"
+        ruleset_version = "1"
+        llm_verdict = {"kind": "redibis.llm_verdict", "spans": [{"start": 0, "end": 17, "entity_type": "EMAIL_ADDRESS"}]}
+        recommendations = {
+            "kind": "redibis.tuning_recommendations",
+            "items": [{"target": "noise_terms", "value": "x"}],
+        }
+
+    class _Svc:
+        def entities(self):
+            return {"entities": [{"entity_type": "EMAIL_ADDRESS"}]}
+
+        def scan(self, *_args, **kwargs):
+            seen.update(kwargs)
+            return _Result()
+
+    report = evaluate_with_service(
+        _Svc(),
+        _dataset([{
+            "id": "c1",
+            "text": "alice@example.com",
+            "expected_spans": [{"start": 0, "end": 17, "entity_type": "EMAIL_ADDRESS"}],
+        }]),
+        options={"llm_verdict": "independent", "recommend": True, "trim": True},
+    )
+    assert seen.get("llm_verdict") == "independent"
+    assert seen.get("recommend") is True
+    assert seen.get("trim") is True
+    case = report["cases"][0]
+    assert case["id"] == "c1"
+    assert case["llm_verdict"]["kind"] == "redibis.llm_verdict"
+    assert case["recommendations"]["items"][0]["target"] == "noise_terms"
+    assert (report.get("exact") or report.get("strict") or {}).get("micro", {}).get("tp") == 1
+
+
 def test_requested_llm_unavailable_fails_closed():
     from redibis.pii.eval.runner import evaluate_with_service
 
@@ -226,3 +270,26 @@ def test_requested_llm_unavailable_fails_closed():
             _dataset([{"id": "a", "text": "x", "expected_spans": []}]),
             options={"use_llm": True},
         )
+
+
+@pytest.mark.parametrize("version", ["1.0", "1.2"])
+def test_optional_case_name_round_trips(version):
+    raw = _dataset([
+        {
+            "id": "c1",
+            "name": "Invoice email",
+            "text": "alice@example.com",
+            "expected_spans": [{"start": 0, "end": 17, "entity_type": "EMAIL_ADDRESS"}],
+        }
+    ])
+    raw["schema_version"] = version
+    out = validate_dataset(raw)
+    assert out["schema_version"] == version
+    assert out["cases"][0]["name"] == "Invoice email"
+
+
+def test_case_without_name_still_loads():
+    out = validate_dataset(_dataset([
+        {"id": "c1", "text": "ab", "expected_spans": []},
+    ]))
+    assert "name" not in out["cases"][0]

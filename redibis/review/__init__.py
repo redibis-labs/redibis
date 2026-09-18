@@ -7,6 +7,7 @@ from redibis.review.fingerprint import (
     fingerprint_from_contract_prop,
     fingerprint_from_evidence_column,
 )
+from redibis.review.rationale import RATIONALE_CODES, validate_rationale
 from redibis.review.verdict_package import (
     VERDICT_PACKAGE_KIND,
     VERDICT_PACKAGE_VERSION,
@@ -20,6 +21,7 @@ __all__ = [
     "ColumnFingerprintSnapshot",
     "DriftResult",
     "EffectiveVerdict",
+    "RATIONALE_CODES",
     "VERDICT_PACKAGE_KIND",
     "VERDICT_PACKAGE_VERSION",
     "VerdictPackage",
@@ -29,5 +31,6 @@ __all__ = [
     "fingerprint_from_evidence_column",
     "load_verdict_package",
     "resolve_effective_verdict",
+    "validate_rationale",
     "verdict_package_digest",
 ]

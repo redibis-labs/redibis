@@ -22,6 +22,7 @@ MODEL_ROLES: tuple[str, ...] = (
     "contract.enrichment_repair",
     "pii.refiner",
     "pii.text_refiner",
+    "pii.tuning_advisor",
     "gateway.toxicity",
     "gateway.prompt_injection",
     "codegen.generator",
@@ -41,6 +42,7 @@ _DEFAULT_INHERIT: dict[str, str] = {
     "agent.planner_repair": "agent.planner",
     "agent.copilot": "agent.planner",
     "contract.enrichment_repair": "contract.enrichment",
+    "pii.tuning_advisor": "pii.text_refiner",
 }
 
 

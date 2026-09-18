@@ -593,6 +593,12 @@ def _run_pii(args) -> int:
         return _run_pii_text_llm_check(args)
     if args.pii_action == "text-batch":
         return _run_pii_text_batch(args)
+    if args.pii_action == "llm-verdict":
+        return _run_pii_llm_verdict(args)
+    if args.pii_action == "recommend":
+        return _run_pii_recommend(args)
+    if args.pii_action == "sessions":
+        return _run_pii_sessions(args)
     if args.pii_action == "eval":
         return _run_pii_eval(args)
     if args.pii_action == "eval-build":
@@ -970,6 +976,15 @@ def _text_scan_flags(p) -> None:
         action="store_true",
         help="exit 3 if NER was requested but did not run",
     )
+    p.add_argument(
+        "--llm-verdict",
+        choices=["off", "independent", "both"],
+        default="off",
+        help="independent LLM verdict alongside the engine (or both = refiner + verdict)",
+    )
+    p.add_argument("--llm-verdict-out", help="write the independent verdict JSON to FILE")
+    p.add_argument("--trim", action="store_true", help="trim span edges after scan")
+    p.add_argument("--recommend", action="store_true", help="request LLM tuning recommendations")
 
 
 def _cli_use_llm(args) -> bool:
@@ -994,11 +1009,18 @@ def _missing_engine_exit(result, args) -> int:
     """Return 3 when a required engine was requested but did not run, else 0."""
     unavailable = dict(getattr(result, "engines_unavailable", None) or {})
     ran = set(getattr(result, "engines_ran", ()) or ())
-    if _cli_use_llm(args) and getattr(args, "require_llm", False):
+    if getattr(args, "require_llm", False) and (
+        _cli_use_llm(args) or str(getattr(args, "llm_verdict", "off") or "off") != "off"
+        or getattr(args, "recommend", False)
+    ):
         if "llm" not in ran or "llm" in unavailable:
-            reason = unavailable.get("llm") or "llm did not run"
-            print(f"pii text: LLM requested but did not run — {reason}", file=sys.stderr)
-            return 3
+            # Independent verdict is not recorded as engines_ran "llm".
+            verdict = getattr(result, "llm_verdict", None) or {}
+            if not (isinstance(verdict, dict) and (verdict.get("spans") or verdict.get("error") == "")):
+                if not (isinstance(verdict, dict) and verdict.get("model")):
+                    reason = unavailable.get("llm") or "llm did not run"
+                    print(f"pii text: LLM requested but did not run — {reason}", file=sys.stderr)
+                    return 3
     engines = (getattr(args, "engines", "both") or "both").lower()
     ner_requested = engines in ("both", "all", "ner") or "ner" in engines.split(",")
     if getattr(args, "require_ner", False) and ner_requested:
@@ -1049,12 +1071,22 @@ def _run_pii_text(args) -> int:
             llm_endpoint=getattr(args, "llm_endpoint", "") or "",
             equation=getattr(args, "equation", "independent") or "independent",
             include_arbitration=explain is not None,
+            llm_verdict=getattr(args, "llm_verdict", None) or "off",
+            trim=bool(getattr(args, "trim", False)),
+            recommend=bool(getattr(args, "recommend", False)),
         )
     except TextPIIServiceError as exc:
         print(str(exc), file=sys.stderr)
         return 1 if int(getattr(exc, "status_code", 400) or 400) >= 400 else 2
     _warn_engines_unavailable(result)
     missing = _missing_engine_exit(result, args)
+    out_path = getattr(args, "llm_verdict_out", None)
+    if out_path and getattr(result, "llm_verdict", None):
+        from pathlib import Path as _Path
+        _Path(out_path).write_text(
+            json.dumps(result.llm_verdict, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
     if getattr(args, "redact", False):
         print(svc.redact(text, result))
         _record_cli_run(result, text=text, kind="cli_scan")
@@ -1194,6 +1226,111 @@ def _run_pii_text_llm_check(args) -> int:
     return 0
 
 
+def _run_pii_llm_verdict(args) -> int:
+    """``redibis pii llm-verdict`` — independent verdict JSON only."""
+    import json
+    from redibis.config import RedibisConfig
+    from redibis.pii.llm_verdict import run_llm_verdict
+    from redibis.pii.scan.result import TextScanConfig
+    from redibis.services.text_pii_service import TextPIIService, TextPIIServiceError
+
+    cfg = RedibisConfig.from_yaml(args.config) if getattr(args, "config", None) else RedibisConfig()
+    svc = TextPIIService(redibis_config=cfg)
+    text = _pii_text_input(args)
+    scan_cfg = TextScanConfig(
+        language=getattr(args, "language", "en") or "en",
+        arabic=str(getattr(args, "language", "en") or "en").startswith("ar"),
+        engines=getattr(args, "engines", "none") or "none",
+        use_llm=False,
+        llm_verdict="independent",
+    )
+    refiner = getattr(svc, "_llm", None)
+    provider = getattr(args, "llm_provider", "") or ""
+    try:
+        if provider:
+            refiner = svc._build_llm_override(
+                provider,
+                getattr(args, "llm_model", "") or "",
+                api_key=getattr(args, "llm_api_key", "") or None,
+                endpoint_url=getattr(args, "llm_endpoint", "") or None,
+            )
+        verdict = run_llm_verdict(text, config=scan_cfg, refiner=refiner)
+    except TextPIIServiceError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    print(json.dumps(verdict.to_dict(), indent=2, ensure_ascii=False))
+    if getattr(args, "require_llm", False) and (verdict.error or not verdict.model):
+        print("pii llm-verdict: LLM requested but did not run", file=sys.stderr)
+        return 3
+    return 0
+
+
+def _run_pii_recommend(args) -> int:
+    """``redibis pii recommend`` — advisory overlay suggestions for one document."""
+    import json
+    from redibis.config import RedibisConfig
+    from redibis.pii.tuning_advisor import recommend
+    from redibis.services.text_pii_service import TextPIIService, TextPIIServiceError
+
+    cfg = RedibisConfig.from_yaml(args.config) if getattr(args, "config", None) else RedibisConfig()
+    svc = TextPIIService(redibis_config=cfg)
+    text = _pii_text_input(args)
+    try:
+        result = None
+        verdict = None
+        if getattr(args, "with_verdict", False):
+            result = svc.scan(
+                text,
+                language=getattr(args, "language", "en") or "en",
+                engines="regex",
+                llm_verdict="independent",
+                llm_provider=getattr(args, "llm_provider", "") or "",
+                llm_model=getattr(args, "llm_model", "") or "",
+                llm_api_key=getattr(args, "llm_api_key", "") or "",
+                llm_endpoint=getattr(args, "llm_endpoint", "") or "",
+            )
+            verdict = result.llm_verdict
+        recs = recommend(
+            text,
+            engine_result=result,
+            llm_verdict=verdict,
+            overlay=getattr(getattr(svc, "_ruleset", None), "text_rules", None),
+            refiner=getattr(svc, "_llm", None),
+        )
+    except TextPIIServiceError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    print(json.dumps(recs.to_dict(), indent=2, ensure_ascii=False))
+    if getattr(args, "require_llm", False) and recs.error:
+        print(f"pii recommend: {recs.error}", file=sys.stderr)
+        return 3
+    return 0
+
+
+def _run_pii_sessions(args) -> int:
+    """``redibis pii sessions list | export``."""
+    import json
+    from pathlib import Path
+    from redibis.pii.session_store import SessionError, SessionStore
+
+    store = SessionStore()
+    action = getattr(args, "sessions_action", "")
+    if action == "list":
+        print(json.dumps([m.to_dict() for m in store.list()], indent=2, ensure_ascii=False))
+        return 0
+    if action == "export":
+        try:
+            blob = store.export(args.slug, date=getattr(args, "date", None) or None)
+        except SessionError as exc:
+            print(f"pii sessions: {exc}", file=sys.stderr)
+            return 1
+        Path(args.out).write_bytes(blob)
+        print(args.out)
+        return 0
+    print("unknown sessions subcommand", file=sys.stderr)
+    return 2
+
+
 def _run_pii_text_batch(args) -> int:
     """``redibis pii text-batch`` — scan a directory / JSONL / CSV of documents."""
     import json
@@ -1309,6 +1446,9 @@ def _run_pii_text_batch(args) -> int:
         deidentify=bool(getattr(args, "deidentify", False)),
         policy_id=getattr(args, "policy_id", "") or "default",
         quiet=bool(getattr(args, "quiet", False)),
+        llm_verdict=getattr(args, "llm_verdict", None) or "off",
+        trim=bool(getattr(args, "trim", False)),
+        recommend=bool(getattr(args, "recommend", False)),
     )
     try:
         run = run_text_batch(svc, docs, run_cfg, out_dir=out_dir)
@@ -2198,6 +2338,19 @@ def _run_enrich(args, store: ContractStore):
             if Path(args.instructions).is_file()
             else args.instructions
         )
+    steward_context = None
+    context_pack = getattr(args, "context_pack", None)
+    if context_pack:
+        pack_dir = Path(context_pack)
+        parts = []
+        if pack_dir.is_dir():
+            for name in ("00_taxonomy.md", "10_glossary.md", "20_decisions.md", "30_rules.md"):
+                p = pack_dir / name
+                if p.is_file():
+                    parts.append(p.read_text(encoding="utf-8"))
+        elif pack_dir.is_file():
+            parts.append(pack_dir.read_text(encoding="utf-8"))
+        steward_context = "\n\n".join(parts) if parts else None
     provider = get_provider(
         args.provider,
         model=args.model,
@@ -2218,6 +2371,7 @@ def _run_enrich(args, store: ContractStore):
                 provider,
                 system_prompt=system_prompt,
                 extra_instructions=extra_instructions,
+                steward_context=steward_context,
                 example_contracts=args.examples or None,
                 external_masked_acknowledged=getattr(args, "external_masked_ack", False),
                 redibis_config=redibis_cfg,
@@ -2272,6 +2426,7 @@ def _run_enrich(args, store: ContractStore):
                 provider,
                 system_prompt=system_prompt,
                 extra_instructions=extra_instructions,
+                steward_context=steward_context,
                 example_contracts=args.examples or None,
                 external_masked_acknowledged=getattr(args, "external_masked_ack", False),
                 redibis_config=redibis_cfg,
@@ -2331,6 +2486,7 @@ def _run_enrich(args, store: ContractStore):
                 provider,
                 system_prompt=system_prompt,
                 extra_instructions=extra_instructions,
+                steward_context=steward_context,
                 example_contracts=args.examples or None,
                 enriched_by="cli",
                 external_masked_acknowledged=getattr(args, "external_masked_ack", False),
@@ -2873,6 +3029,10 @@ def main(argv: Optional[list[str]] = None):
         help="enrichment pack folder or .zip (declarative prompts/context/examples)",
     )
     p_enrich.add_argument(
+        "--context-pack",
+        help="steward A3 llm_context/ directory (markdown+json) appended to pack context",
+    )
+    p_enrich.add_argument(
         "--dry-run",
         action="store_true",
         help="build prompts (and any reduction plan) without calling the LLM or writing",
@@ -3173,6 +3333,37 @@ def main(argv: Optional[list[str]] = None):
     p_pii_text_batch.add_argument("--deidentify", action="store_true")
     p_pii_text_batch.add_argument("--policy-id", default="default")
     p_pii_text_batch.add_argument("--config", help="redibis.yaml")
+
+    p_pii_llm_verdict = pii_sub.add_parser(
+        "llm-verdict",
+        help="independent LLM verdict only (no deterministic engines unless --engines is set)",
+    )
+    p_pii_llm_verdict.add_argument("text", nargs="?", help="text to judge (or '-' for stdin)")
+    p_pii_llm_verdict.add_argument("--file", help="read text from file ('-' = stdin)")
+    p_pii_llm_verdict.add_argument("--language", default="en")
+    p_pii_llm_verdict.add_argument("--engines", default="none", help="none (default) or comma list")
+    _llm_flags(p_pii_llm_verdict)
+    p_pii_llm_verdict.add_argument("--config", help="redibis.yaml")
+    p_pii_llm_verdict.add_argument("--json", action="store_true", default=True)
+
+    p_pii_recommend = pii_sub.add_parser(
+        "recommend",
+        help="LLM tuning recommendations for one document (never applied automatically)",
+    )
+    p_pii_recommend.add_argument("text", nargs="?", help="text (or '-' for stdin)")
+    p_pii_recommend.add_argument("--file", help="read text from file")
+    p_pii_recommend.add_argument("--language", default="en")
+    p_pii_recommend.add_argument("--with-verdict", action="store_true")
+    _llm_flags(p_pii_recommend)
+    p_pii_recommend.add_argument("--config", help="redibis.yaml")
+
+    p_pii_sessions = pii_sub.add_parser("sessions", help="list or export Text Gateway sessions")
+    sess_sub = p_pii_sessions.add_subparsers(dest="sessions_action", required=True)
+    sess_sub.add_parser("list", help="list sessions under REDIBIS_CONFIGS_DIR/pii_sessions")
+    p_sess_export = sess_sub.add_parser("export", help="export a session date folder as a zip")
+    p_sess_export.add_argument("slug")
+    p_sess_export.add_argument("--date", default="", help="YYYY-MM-DD (default: today UTC)")
+    p_sess_export.add_argument("-o", "--out", required=True, help="output zip path")
 
     p_pii_eval = pii_sub.add_parser(
         "eval", help="batch scan and score a portable text-span evaluation dataset"
@@ -3669,6 +3860,13 @@ def main(argv: Optional[list[str]] = None):
     from redibis.cli.verdict_cmd import register_verdict_commands
     register_verdict_commands(sub)
 
+    from redibis.cli.steward_cmd import register_steward_commands
+    register_steward_commands(sub)
+
+    from redibis.cli.workspace_cmd import register_scan_batch_command, register_workspace_commands
+    register_workspace_commands(sub)
+    register_scan_batch_command(sub, common=_common, scan_flags=_scan_flags)
+
     from redibis.cli.rdbpack_cmd import register_rdbpack_commands
     register_rdbpack_commands(sub)
 
@@ -3872,13 +4070,22 @@ def main(argv: Optional[list[str]] = None):
             return run_verdict_import(args)
         print(f"unknown verdict action: {args.verdict_action}", file=sys.stderr)
         return 2
+    if args.cmd == "steward":
+        from redibis.cli.steward_cmd import run_steward
+        return run_steward(args)
+    if args.cmd == "workspace":
+        from redibis.cli.workspace_cmd import run_workspace
+        return run_workspace(args)
+    if args.cmd == "scan-batch":
+        from redibis.cli.workspace_cmd import run_scan_batch
+        return run_scan_batch(args)
     if args.cmd == "rdbpack":
         from redibis.cli.rdbpack_cmd import run_rdbpack
         return run_rdbpack(args)
     if args.cmd == "eval":
         from redibis.cli.eval_cmd import run_eval
         return run_eval(args)
-    if args.cmd == "dataset":
+    if args.cmd in ("dataset", "training"):
         from redibis.cli.dataset_cmd import run_dataset
         return run_dataset(args)
     if args.cmd == "models":

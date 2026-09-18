@@ -371,7 +371,7 @@ class LlmTextRefiner:
         provider, model_id, _path = self.resolve_with_path()
         return provider, model_id
 
-    def _call_model(self, prompt: str, *, system: str = "") -> str:
+    def _call_model(self, prompt: str, *, system: str = "", model_role: str = "pii.text_refiner") -> str:
         from redibis.telemetry.model_gateway import guarded_model_call
 
         provider, model_id = self._resolve_provider()
@@ -392,7 +392,7 @@ class LlmTextRefiner:
             user_prompt=prompt,
             system_prompt=system_prompt,
             attested_masked_external=False,
-            model_role="pii.text_refiner",
+            model_role=model_role or "pii.text_refiner",
         )
         if isinstance(result, dict):
             return str(result.get("content") or result.get("text") or "")

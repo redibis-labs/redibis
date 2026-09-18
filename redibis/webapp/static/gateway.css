@@ -187,4 +187,9 @@
 .gw-diff-remove { background: #fee2e2; color: #991b1b; }
 .gw-diff-change { background: #fef3c7; color: #92400e; }
 .gw-inline-form { margin-top: 8px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; }
-.gw-noise-btn { margin-left: 6px; font-size: 11px; padding: 0 6px; }
+.gw-rejected { text-decoration: line-through; opacity: .65; }
+mark.gw-hl.gw-rejected { text-decoration: line-through; }
+.gw-curate { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 8px; }
+.gw-verdict { background: rgba(47,111,237,.10); border-color: #2F6FED; }
+#gwVerdict { margin-top: 12px; min-height: 180px; }
+.gw-result-split { display: grid; grid-template-columns: 1fr; gap: 12px; }

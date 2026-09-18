@@ -18,6 +18,7 @@ from redibis.training.residency import ArtifactResidencyError, ArtifactResidency
 def register_dataset_commands(sub) -> None:
     p = sub.add_parser(
         "dataset",
+        aliases=["training"],
         help="export / inspect steward-reviewed training datasets",
     )
     dsub = p.add_subparsers(dest="dataset_action", required=True)
@@ -37,7 +38,7 @@ def register_dataset_commands(sub) -> None:
         "--label-source",
         action="append",
         dest="label_sources",
-        choices=("human_decision", "review", "contract_confirmed"),
+        choices=("human_decision", "review", "contract_confirmed", "steward_review"),
         help="filter by label source (repeatable)",
     )
     p_export.add_argument("--min-confidence", type=float, help="min engine confidence from telemetry")
@@ -57,6 +58,11 @@ def register_dataset_commands(sub) -> None:
     )
     p_export.add_argument("--max-samples", type=int, default=5, help="samples per column (default 5)")
     p_export.add_argument("--table-domain", default="", help="coarse non-identifying domain tag")
+    p_export.add_argument(
+        "--spans",
+        action="store_true",
+        help="with --label-source steward_review, write A4 bundle (columns/spans/taxonomy) into --out dir",
+    )
     p_export.add_argument("--json", action="store_true", help="JSON summary")
     p_export.add_argument("--config", help="redibis.yaml; or set REDIBIS_CONFIG")
     p_export.add_argument("--s3-endpoint", help="S3/MinIO endpoint URL")
@@ -140,6 +146,32 @@ def _cmd_export(args) -> int:
     backend = _build_backend(args)
     store = _contract_store(args, backend)
     exporter = TrainingDatasetExporter(store)
+    sources = [str(s).lower() for s in (getattr(args, "label_sources", None) or [])]
+    if getattr(args, "spans", False) or "steward_review" in sources:
+        tables = list(getattr(args, "tables", None) or [])
+        if len(tables) != 1:
+            print("dataset export --spans / steward_review requires exactly one --table", file=sys.stderr)
+            return 2
+        out_dir = Path(getattr(args, "out", "finetune"))
+        out_dir.mkdir(parents=True, exist_ok=True)
+        bundle = exporter.export_steward_bundle(
+            tables[0],
+            include_spans=True,
+            consent=store.sampling_consent,
+            profiles=getattr(store, "profiles", None),
+        )
+        import json as _json
+        for name, payload in bundle.items():
+            dest = out_dir / name
+            if name.endswith(".jsonl"):
+                dest.write_text(payload if isinstance(payload, str) else "", encoding="utf-8")
+            else:
+                dest.write_text(
+                    _json.dumps(payload, indent=2, ensure_ascii=False) if not isinstance(payload, str) else payload,
+                    encoding="utf-8",
+                )
+        print(f"wrote {out_dir}  spans={bundle.get('manifest.json', {}).get('counts', {}).get('spans', 0)}")
+        return 0
     opts = ExportOptions(
         tables=getattr(args, "tables", None),
         database=getattr(args, "database", None),

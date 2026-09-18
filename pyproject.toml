@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "redibis"
-version = "0.6.15"
+version = "0.6.16"
 description = "Data contract pipeline — ODCS v3 with GE quality, Presidio + GLiNER PII detection, and Arabic + English support."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -101,6 +101,7 @@ dev = [
     "litellm>=1.55,<1.75",
     # Regex/Presidio path used by deep_scan + PII suite
     "presidio-analyzer>=2.2,<3",
+    "open-data-contract-standard>=3.1.2,<4",
 ]
 # Slim “full local” extra — same intent as docker/local/environment.yml pip section.
 # Avoid datacontract-cli[all] (soda-core, every cloud connector, pyspark sdist).

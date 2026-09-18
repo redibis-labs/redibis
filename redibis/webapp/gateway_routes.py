@@ -78,6 +78,9 @@ class GatewayScanBody(BaseModel):
     check_toxicity: bool = False
     check_prompt_injection: bool = False
     draft_rules: Optional[dict] = None
+    llm_verdict: str = "off"
+    trim: bool = False
+    recommend: bool = False
 
 
 class GatewaySuggestBody(GatewayScanBody):
@@ -112,6 +115,9 @@ class GatewayEvaluationBody(BaseModel):
     persist: bool = True
     label: str = ""
     run_uuid: str = ""
+    llm_verdict: str = "off"
+    recommend: bool = False
+    trim: bool = False
 
 
 class CorpusPatchBody(BaseModel):
@@ -164,6 +170,15 @@ def _actor(request: Request) -> str:
     return getattr(user, "username", "") or "anonymous"
 
 
+def _require_mutate(request: Request) -> None:
+    from redibis.webapp.security import auth_enabled, role_can
+
+    user = getattr(request.state, "user", None)
+    role = getattr(user, "role", "") or ""
+    if auth_enabled() and not role_can(role, "mutate"):
+        raise HTTPException(status_code=403, detail="admin only")
+
+
 def _ui_max_chars() -> int:
     gw = getattr(_redibis_config(), "text_gateway", None)
     return int(getattr(gw, "ui_max_chars", UI_MAX_CHARS) or UI_MAX_CHARS)
@@ -200,6 +215,19 @@ def _no_store(response) -> None:
 def _json_no_store(payload: dict, *, status_code: int = 200) -> JSONResponse:
     resp = JSONResponse(payload, status_code=status_code)
     _no_store(resp)
+    return resp
+
+
+def _llm_artifact_response(payload: dict) -> JSONResponse:
+    """HTTP 200 with the LLM artifact; ``error`` stays in the body.
+
+    Chosen over 424 Failed Dependency so standalone ``/llm-verdict`` and
+    ``/recommend`` share the scan/batch contract (the artifact is the
+    record; CLI ``--require-llm`` already gates on ``error``). Status-only
+    clients read ``X-Redibis-LLM``.
+    """
+    resp = _json_no_store(payload)
+    resp.headers["X-Redibis-LLM"] = "unavailable" if payload.get("error") else "ok"
     return resp
 
 
@@ -342,6 +370,16 @@ def envelope(
     if d.get("arbitration"):
         analysers["pii"]["arbitration"] = dict(d["arbitration"])
         out["arbitration"] = dict(d["arbitration"])
+    if d.get("llm_verdict"):
+        analysers["llm_verdict"] = dict(d["llm_verdict"])
+        try:
+            from redibis.pii.llm_verdict import diff_against_engine
+
+            analysers["verdict_diff"] = diff_against_engine(d["llm_verdict"], spans)
+        except Exception:
+            analysers["verdict_diff"] = {}
+    if d.get("recommendations"):
+        analysers["recommendations"] = dict(d["recommendations"])
     if d.get("provenance"):
         out["provenance"] = d["provenance"]
     return out
@@ -591,6 +629,9 @@ def _scan_kwargs(body: GatewayScanBody, max_chars: int) -> dict:
         "equation": getattr(body, "equation", None) or "independent",
         "preprocess_obfuscation": preprocess,
         "preprocess_expanders": expanders,
+        "llm_verdict": getattr(body, "llm_verdict", None) or "off",
+        "trim": bool(getattr(body, "trim", False)),
+        "recommend": bool(getattr(body, "recommend", False)),
     }
     return kwargs
 
@@ -776,6 +817,9 @@ def _prepare_evaluation(body: GatewayEvaluationBody, actor: str) -> tuple[dict, 
         "draft_rules": body.draft_rules,
         "pack": body.pack or "",
         "persist": bool(body.persist),
+        "llm_verdict": getattr(body, "llm_verdict", None) or "off",
+        "recommend": bool(getattr(body, "recommend", False)),
+        "trim": bool(getattr(body, "trim", False)),
     }
     return dataset, options, total_chars
 
@@ -859,6 +903,7 @@ def register_gateway_routes(
                 css_v=asset_v_fn("gateway.css"),
                 render_v=asset_v_fn("gateway_render.mjs"),
                 rules_v=asset_v_fn("gateway_rules.mjs"),
+                curation_v=asset_v_fn("gateway_curation.mjs"),
                 ui_max_chars=_ui_max_chars(),
             ),
         )
@@ -876,6 +921,7 @@ def register_gateway_routes(
                 css_v=asset_v_fn("gateway.css"),
                 render_v=asset_v_fn("gateway_render.mjs"),
                 rules_v=asset_v_fn("gateway_rules.mjs"),
+                curation_v=asset_v_fn("gateway_curation.mjs"),
                 ui_max_chars=_ui_max_chars(),
                 eval_max_cases=EVAL_MAX_CASES,
                 redibis_version=REDIBIS_VERSION,
@@ -1024,17 +1070,18 @@ def register_gateway_routes(
 
     @app.put("/api/gateway/rules")
     async def gateway_put_rules(request: Request, body: dict) -> Any:
-        from redibis.webapp.security import auth_enabled, role_can
-
-        user = getattr(request.state, "user", None)
-        role = getattr(user, "role", "") or ""
-        if auth_enabled() and not role_can(role, "mutate"):
-            raise HTTPException(status_code=403, detail="admin only")
+        _require_mutate(request)
         from redibis.pii.text_rules import TextRuleOverlay, compile_text_rules
         from redibis.webapp.pii_text_routes import _save_stored_text_rules
 
         overlay = TextRuleOverlay.from_dict(body.get("rules") if "rules" in (body or {}) else body)
         loc = _save_stored_text_rules(overlay.to_dict())
+        reload = getattr(_svc(), "reload_text_rules", None)
+        if callable(reload):
+            try:
+                reload()
+            except Exception:
+                logger.info("text-rules reload after save failed; next _svc() rebuild will pick them up")
         return _json_no_store({
             "status": "saved",
             "location": str(loc) if loc else "",
@@ -1089,14 +1136,256 @@ def register_gateway_routes(
             preprocess_expanders=expanders,
             max_chars=_scan_max_chars(),
         )
+        before_dict = before.to_dict(return_text=True)
+        after_dict = after.to_dict(return_text=True)
+        from redibis.pii.rules.term_target import ineffective_terms
+
+        base_overlay = getattr(getattr(_svc(), "_ruleset", None), "text_rules", None)
         return _json_no_store({
-            "before": before.to_dict(return_text=True),
-            "after": after.to_dict(return_text=True),
+            "before": before_dict,
+            "after": after_dict,
             "diff": _span_diff(
-                list(before.to_dict(return_text=True).get("spans") or []),
-                list(after.to_dict(return_text=True).get("spans") or []),
+                list(before_dict.get("spans") or []),
+                list(after_dict.get("spans") or []),
+            ),
+            "ineffective_terms": ineffective_terms(
+                draft,
+                text=text,
+                spans=list(before_dict.get("spans") or []),
+                overlay=base_overlay,
             ),
         })
+
+    @app.post("/api/gateway/rules/advise")
+    async def gateway_rules_advise(body: dict) -> Any:
+        from redibis.pii.rules.term_target import advise, summarize_advice
+
+        payload = body or {}
+        text = str(payload.get("text") or "")
+        term = str(payload.get("term") or "")
+        spans = payload.get("spans") or []
+        draft = payload.get("draft_rules") or {}
+        from redibis.pii.text_rules import TextRuleOverlay, merge_text_rules
+
+        overlay = merge_text_rules(
+            getattr(getattr(_svc(), "_ruleset", None), "text_rules", None),
+            TextRuleOverlay.from_dict(draft) if draft else None,
+        )
+        rows = advise(
+            term,
+            text=text,
+            spans=spans,
+            overlay=overlay,
+            requested=str(payload.get("requested") or ""),
+        )
+        return _json_no_store(summarize_advice(rows))
+
+    @app.post("/api/gateway/curation")
+    async def gateway_put_curation(request: Request, body: dict) -> Any:
+        _require_mutate(request)
+        from redibis.pii.curation import Curation, CurationError, assert_no_surfaces
+        from redibis.pii.curation_store import CurationStore
+
+        payload = (body or {}).get("curation") or body or {}
+        try:
+            assert_no_surfaces(payload if isinstance(payload, dict) else {})
+            rec = Curation.from_dict(payload)
+            if (body or {}).get("run_uuid") and not rec.run_uuid:
+                rec = Curation.from_dict({**rec.to_dict(), "run_uuid": str(body["run_uuid"])})
+            assert_no_surfaces(rec.to_dict())
+            CurationStore().put(rec)
+        except CurationError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return _json_no_store({"status": "saved", "run_uuid": rec.run_uuid, "curation": rec.to_dict()})
+
+    @app.get("/api/gateway/curation/{run_uuid}")
+    async def gateway_get_curation(run_uuid: str) -> Any:
+        from redibis.pii.curation_store import CurationStore
+
+        rec = CurationStore().get(run_uuid)
+        if rec is None:
+            raise HTTPException(status_code=404, detail="unknown curation")
+        return _json_no_store(rec.to_dict())
+
+    @app.post("/api/gateway/trim")
+    async def gateway_trim(body: dict) -> Any:
+        from redibis.pii.trim import trim_spans
+
+        payload = body or {}
+        text = str(payload.get("text") or "")
+        spans = list(payload.get("spans") or [])
+        overlay = getattr(getattr(_svc(), "_ruleset", None), "text_rules", None)
+        return _json_no_store({"spans": trim_spans(text, spans, overlay=overlay)})
+
+    @app.post("/api/gateway/llm-verdict")
+    async def gateway_llm_verdict(request: Request, body: dict) -> Any:
+        """Independent LLM verdict (text + entity vocabulary only).
+
+        Always HTTP 200. The artifact is the contract: when no refiner is
+        bound, ``error`` is set and spans are empty — never a silent omit.
+        Status-only clients should read ``X-Redibis-LLM: unavailable``.
+        424 is not used; ``scan`` with ``llm_verdict`` also stays 200 because
+        the engine result is still valid, and CLI ``--require-llm`` already
+        gates on the ``error`` field.
+        """
+        from redibis.pii.llm_verdict import run_llm_verdict
+        from redibis.pii.scan.result import TextScanConfig
+
+        payload = body or {}
+        text = str(payload.get("text") or "")
+        if not text.strip():
+            raise HTTPException(status_code=400, detail="text is required")
+        cfg = TextScanConfig(
+            language=str(payload.get("language") or "en"),
+            arabic=str(payload.get("language") or "en").startswith("ar"),
+            engines="none",
+            use_llm=False,
+            llm_verdict="independent",
+        )
+        svc = _svc()
+        refiner = getattr(svc, "_llm", None)
+        provider = str(payload.get("llm_provider") or "")
+        if provider:
+            refiner = svc._build_llm_override(
+                provider,
+                str(payload.get("llm_model") or ""),
+                api_key=str(payload.get("llm_api_key") or "") or None,
+            )
+        verdict = run_llm_verdict(text, config=cfg, refiner=refiner, run_uuid=str(payload.get("run_uuid") or ""))
+        return _llm_artifact_response(verdict.to_dict())
+
+    @app.post("/api/gateway/recommend")
+    async def gateway_recommend(request: Request, body: dict) -> Any:
+        """Advisory tuning recommendations. Never applied automatically.
+
+        Always HTTP 200 with the recommendation artifact. Missing LLM is
+        recorded as ``error`` plus ``X-Redibis-LLM: unavailable`` — same
+        contract as ``/llm-verdict``. CLI ``--require-llm`` gates on ``error``.
+        """
+        from redibis.pii.tuning_advisor import recommend as run_recommend
+
+        payload = body or {}
+        text = str(payload.get("text") or "")
+        if not text.strip():
+            raise HTTPException(status_code=400, detail="text is required")
+        svc = _svc()
+        overlay = getattr(getattr(svc, "_ruleset", None), "text_rules", None)
+        recs = run_recommend(
+            text,
+            engine_result=payload.get("engine_result"),
+            llm_verdict=payload.get("llm_verdict") if payload.get("include_verdict", True) else None,
+            curation=payload.get("curation"),
+            overlay=overlay,
+            refiner=getattr(svc, "_llm", None),
+            run_uuid=str(payload.get("run_uuid") or ""),
+        )
+        return _llm_artifact_response(recs.to_dict())
+
+    def _session_store():
+        from redibis.pii.session_store import SessionStore
+
+        return SessionStore()
+
+    @app.get("/api/gateway/sessions")
+    async def gateway_sessions_list() -> Any:
+        rows = [m.to_dict() for m in _session_store().list()]
+        return _json_no_store({"sessions": rows})
+
+    @app.post("/api/gateway/sessions")
+    async def gateway_sessions_create(request: Request, body: dict) -> Any:
+        _require_mutate(request)
+        from redibis.pii.session_store import SessionError
+
+        payload = body or {}
+        try:
+            meta = _session_store().create(
+                str(payload.get("name") or ""),
+                owner=_actor(request),
+                notes=str(payload.get("notes") or ""),
+                defaults=dict(payload.get("defaults") or {}),
+            )
+        except SessionError as exc:
+            raise HTTPException(status_code=409 if "already exists" in str(exc) else 400, detail=str(exc)) from exc
+        return _json_no_store(meta.to_dict(), status_code=201)
+
+    @app.get("/api/gateway/sessions/{slug}")
+    async def gateway_sessions_get(slug: str) -> Any:
+        from redibis.pii.session_store import SessionError
+
+        try:
+            return _json_no_store(_session_store().describe(slug))
+        except SessionError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.get("/api/gateway/sessions/{slug}/{date}/usecases")
+    async def gateway_sessions_usecases(slug: str, date: str, full: bool = False) -> Any:
+        from redibis.pii.session_store import SessionError
+
+        try:
+            store = _session_store().usecases(slug, date=date)
+        except SessionError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        rows = store.list(limit=1000)
+        if full:
+            packed = []
+            for row in rows:
+                uc = store.get(str(row.get("id") or ""))
+                if uc is not None:
+                    packed.append(uc.to_dict())
+            return _json_no_store({"date": date, "usecases": packed})
+        return _json_no_store({"date": date, "usecases": rows})
+
+    @app.get("/api/gateway/sessions/{slug}/{date}/usecases/{uc_id}")
+    async def gateway_sessions_usecase_get(
+        slug: str, date: str, uc_id: str, version: Optional[int] = None,
+    ) -> Any:
+        from redibis.pii.session_store import SessionError
+
+        try:
+            store = _session_store().usecases(slug, date=date)
+        except SessionError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        uc = store.get(uc_id, version=version)
+        if uc is None:
+            raise HTTPException(status_code=404, detail="unknown use case")
+        return _json_no_store(uc.to_dict())
+
+    @app.post("/api/gateway/sessions/{slug}/usecases")
+    async def gateway_sessions_save_usecase(request: Request, slug: str, body: dict) -> Any:
+        _require_mutate(request)
+        from redibis.pii.session_store import SessionError
+        from redibis.pii.usecase_store import usecase_from_payload
+
+        payload = body or {}
+        raw = payload.get("usecase") or payload
+        try:
+            uc, _reloc = usecase_from_payload(raw, author=_actor(request))
+            saved = _session_store().save_usecase(
+                slug,
+                uc,
+                curation=payload.get("curation"),
+                llm_verdict=payload.get("llm_verdict"),
+                recommendations=payload.get("recommendations"),
+            )
+        except SessionError as exc:
+            code = 404 if "unknown session" in str(exc) else 409 if "already exists" in str(exc) else 400
+            raise HTTPException(status_code=code, detail=str(exc)) from exc
+        except Exception as exc:
+            raise _usecase_http_error(exc) from exc
+        return _json_no_store(saved.to_dict(), status_code=201)
+
+    @app.get("/api/gateway/sessions/{slug}/{date}/export")
+    async def gateway_sessions_export(slug: str, date: str) -> Any:
+        from redibis.pii.session_store import SessionError
+
+        try:
+            blob = _session_store().export(slug, date=date)
+        except SessionError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        resp = Response(content=blob, media_type="application/zip")
+        resp.headers["Content-Disposition"] = f'attachment; filename="{slug}-{date}.zip"'
+        _no_store(resp)
+        return resp
 
     @app.get("/api/gateway/llm-log/{run_uuid}")
     async def gateway_llm_log(request: Request, run_uuid: str) -> Any:

@@ -609,9 +609,8 @@ class SampleDataConfig:
 
     Lets an operator start a scan from a file that already sits on the machine
     hosting redibis, instead of uploading one. When ``roots`` is empty and
-    ``REDIBIS_SAMPLE_DATA_DIR`` is unset, the process working directory (the
-    folder the server was started from) is used. Every configured root is
-    readable to every signed-in user of the web app.
+    ``REDIBIS_SAMPLE_DATA_DIR`` is unset, ``redibis/webapp/samples`` is used.
+    Every configured root is readable to every signed-in user of the web app.
 
     ``roots`` entries are either a plain path string or a mapping
     ``{name, label, path}``. Paths are resolved once at startup; nothing
@@ -627,6 +626,17 @@ class SampleDataConfig:
     max_entries: int = 2000
     # Allow the picker to start a scan. False = listing and preview only.
     allow_scan: bool = True
+
+
+@dataclass
+class WorkspacesConfig:
+    """Local folder workspaces the web app may attach.
+
+    Empty ``allowed_roots`` disables adding local workspaces (same pattern as
+    ``sample_data.roots``). MinIO/S3 workspaces are not gated by this list.
+    """
+
+    allowed_roots: list = field(default_factory=list)
 
 
 @dataclass
@@ -658,6 +668,7 @@ class RedibisConfig:
     packs: list = field(default_factory=list)  # list[PackSourceConfig | dict]
     text_gateway: TextGatewayConfig = field(default_factory=TextGatewayConfig)
     sample_data: SampleDataConfig = field(default_factory=SampleDataConfig)
+    workspaces: WorkspacesConfig = field(default_factory=WorkspacesConfig)
 
     @classmethod
     def default(cls) -> "RedibisConfig":

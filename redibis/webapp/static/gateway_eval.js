@@ -8,6 +8,7 @@ const {
   toChars,
 } = await import(`./gateway_render.mjs?v=${window.GW_RENDER_V || ""}`);
 const { askInline, createRulesEditor } = await import(`./gateway_rules.mjs?v=${window.GW_RULES_V || window.GW_RENDER_V || ""}`);
+const { applyCuration, emptyCuration, entityCounts, isRejected, persistable, spanKey, upsertEntry } = await import(`./gateway_curation.mjs?v=${window.GW_CURATION_V || window.GW_RENDER_V || ""}`);
 
 const MAX = Number(window.GW_MAX_CHARS || 200000);
 const MAX_CASES = Number(window.GW_EVAL_MAX_CASES || 100);
@@ -46,9 +47,15 @@ let selectedMatch = null;
 let selectedSpan = null;
 let lastEvalRunUuid = "";
 let lastLlmLog = null;
+let dirty = false;
+const caseCuration = {};
 const rulesEditor = $("evRules")
   ? createRulesEditor($("evRules"), {
     getText: () => (currentCase() && currentCase().text) || (textEl && textEl.value) || "",
+    getSpans: () => {
+      const reportCase = lastReport && currentCase() && (lastReport.cases || []).find((row) => row.id === currentCase().id);
+      return (reportCase && reportCase.predicted_spans) || [];
+    },
     getLanguage: () => langEl.value,
     getEngines: () => ($("evEngines") && $("evEngines").value) || "regex",
     getMinScore: () => Number(($("evMinScore") && $("evMinScore").value) || 0.35),
@@ -75,7 +82,7 @@ function emptyDataset() {
 }
 
 function emptyCase(n) {
-  return { id: "case-" + n, text: "", language: "en", tags: [], expected_spans: [], forbidden_spans: [] };
+  return { id: "case-" + n, name: "", text: "", language: "en", tags: [], expected_spans: [], forbidden_spans: [] };
 }
 
 function currentCase() {
@@ -184,9 +191,28 @@ function renderCases() {
     btn.type = "button";
     btn.className = "gw-eval-case" + (i === selectedIndex ? " active" : "");
     const label = document.createElement("span");
-    label.appendChild(document.createTextNode(c.id + " · " + (c.expected_spans || []).length + " spans"));
+    label.appendChild(document.createTextNode((c.name || c.id) + " · " + (c.expected_spans || []).length + " spans"));
     btn.appendChild(label);
     btn.addEventListener("click", () => selectCase(i));
+    if (i === selectedIndex) {
+      const rename = document.createElement("button");
+      rename.type = "button";
+      rename.className = "btn btn-ghost btn-sm";
+      rename.appendChild(document.createTextNode("✎"));
+      rename.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        askInline($("evRenameHost") || $("evInlineForm"), {
+          label: "Case name",
+          value: c.name || c.id,
+          onOk: (name) => {
+            c.name = (name || "").trim();
+            dirty = true;
+            renderCases();
+          },
+        });
+      });
+      btn.appendChild(rename);
+    }
     casesEl.appendChild(btn);
   });
 }
@@ -221,7 +247,7 @@ function renderSpans() {
     row.addEventListener("click", (ev) => {
       if (ev.target === del) return;
       selectedSpan = {
-        text: sliceCodepoints(c.text || "", span.start, span.end),
+        text: sliceCodepoints(toChars(c.text || ""), span.start, span.end),
         entity_type: span.entity_type,
         span,
       };
@@ -316,6 +342,20 @@ function renderMetrics() {
     ["Type acc.", typeBlock.accuracy != null ? typeBlock.accuracy : typeBlock.f1, deltas.type_f1],
     ["Proposals excluded", lastReport.proposal_count, null],
   ];
+  const c = currentCase();
+  const reportCase = lastReport && c && (lastReport.cases || []).find((row) => row.id === c.id);
+  if (reportCase && caseCuration[c.id]) {
+    const predicted = applyCuration(reportCase.predicted_spans || [], caseCuration[c.id], c.text || "");
+    const gold = reportCase.expected_spans || [];
+    let tp = 0;
+    predicted.forEach((p) => {
+      if (gold.some((g) => g.start === p.start && g.end === p.end && g.entity_type === p.entity_type)) tp += 1;
+    });
+    const prec = predicted.length ? tp / predicted.length : 1;
+    const rec = gold.length ? tp / gold.length : 1;
+    const f1 = (prec + rec) ? (2 * prec * rec / (prec + rec)) : 0;
+    rows.push(["Curated F1", f1.toFixed(3), null]);
+  }
   for (const [k, v, delta] of rows) {
     const dt = document.createElement("dt");
     dt.appendChild(document.createTextNode(k));
@@ -385,6 +425,38 @@ function reportCaseForCurrent() {
   return (lastReport.cases || []).find((row) => row.id === c.id) || null;
 }
 
+async function curatePredicted(span, decision, extra) {
+  const c = currentCase();
+  if (!c || !span) return;
+  extra = extra || {};
+  if (decision === "accept" && $("evAutoTrim") && $("evAutoTrim").checked && !extra.trimmed) {
+    const res = await fetch("/api/gateway/trim", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: c.text || "", spans: [span] }),
+    });
+    if (res.ok) {
+      const body = await res.json();
+      const next = (body.spans || [])[0];
+      if (next && (next.start !== span.start || next.end !== span.end)) {
+        extra = Object.assign({}, extra, {
+          new_start: next.start,
+          new_end: next.end,
+          trimmed: true,
+          reason: extra.reason || (next.trim_rules || []).join(", "),
+        });
+      }
+    }
+  }
+  const cur = caseCuration[c.id] || emptyCuration(lastEvalRunUuid);
+  caseCuration[c.id] = upsertEntry(cur, Object.assign({
+    key: spanKey(span, span.source || "engine"),
+    decision,
+  }, extra));
+  dirty = true;
+  renderAll();
+}
+
 function renderSpanTable() {
   const card = $("evSpanTableCard");
   const el = $("evSpanTable");
@@ -404,7 +476,7 @@ function renderSpanTable() {
   const table = document.createElement("table");
   table.className = "gw-eval-table";
   const head = document.createElement("tr");
-  ["Expected", "Predicted", "Class", "Coverage", "Char prec.", "Δ", "Type", "Engine"].forEach((label) => {
+  ["Expected", "Predicted", "Class", "Coverage", "Char prec.", "Δ", "Type", "Engine", "Curate"].forEach((label) => {
     const th = document.createElement("th");
     th.appendChild(document.createTextNode(label));
     head.appendChild(th);
@@ -449,6 +521,60 @@ function renderSpanTable() {
       tr.appendChild(td);
     });
     tr.addEventListener("click", () => selectMatchRow(row, reportCase));
+    const td = document.createElement("td");
+    if (pred) {
+      const c = currentCase();
+      if (c && isRejected(pred, caseCuration[c.id])) tr.classList.add("gw-rejected");
+      [["✓ keep", "accept"], ["✗ reject", "reject"]].forEach(([label, dec]) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn btn-ghost btn-sm";
+        btn.appendChild(document.createTextNode(label));
+        btn.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          curatePredicted(pred, dec);
+        });
+        td.appendChild(btn);
+      });
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "btn btn-ghost btn-sm";
+      edit.appendChild(document.createTextNode("✎ edit"));
+      edit.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const sel = selectionOffsets(resultEl);
+        if (sel && sel.end > sel.start) {
+          curatePredicted(pred, "modify", { new_start: sel.start, new_end: sel.end });
+        }
+      });
+      td.appendChild(edit);
+      const trimBtn = document.createElement("button");
+      trimBtn.type = "button";
+      trimBtn.className = "btn btn-ghost btn-sm";
+      trimBtn.appendChild(document.createTextNode("⟲ trim"));
+      trimBtn.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
+        const c2 = currentCase();
+        if (!c2) return;
+        const res = await fetch("/api/gateway/trim", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: c2.text || "", spans: [pred] }),
+        });
+        if (!res.ok) return;
+        const body = await res.json();
+        const next = (body.spans || [])[0];
+        if (!next) return;
+        curatePredicted(pred, "modify", {
+          new_start: next.start,
+          new_end: next.end,
+          trimmed: true,
+          reason: (next.trim_rules || []).join(", "),
+        });
+      });
+      td.appendChild(trimBtn);
+    }
+    tr.appendChild(td);
     table.appendChild(tr);
   });
   el.appendChild(table);
@@ -533,7 +659,7 @@ function selectedSurface() {
     const gold = (reportCase.expected_spans || [])[row.expected_index] || {};
     const span = pred.start != null ? pred : gold;
     return {
-      text: span.text || sliceCodepoints((reportCase.text || currentCase().text || ""), span.start, span.end),
+      text: span.text || sliceCodepoints(toChars(reportCase.text || currentCase().text || ""), span.start, span.end),
       entity_type: row.got_type || row.expected_type || entityEl.value,
       span,
       row,
@@ -612,6 +738,7 @@ function renderAll() {
   renderSpans();
   paintCase();
   renderMetrics();
+  renderEvalVerdict();
   updateCount();
 }
 
@@ -630,8 +757,17 @@ function addCase() {
     paintBanners(bannerEl, [{ kind: "warn", text: "Case limit reached (" + MAX_CASES + ")." }]);
     return;
   }
-  dataset.cases.push(emptyCase(dataset.cases.length + 1));
-  selectCase(dataset.cases.length - 1);
+  askInline($("evRenameHost") || $("evInlineForm"), {
+    label: "New case name",
+    value: "",
+    onOk: (name) => {
+      const c = emptyCase(dataset.cases.length + 1);
+      c.name = (name || "").trim();
+      dataset.cases.push(c);
+      dirty = true;
+      selectCase(dataset.cases.length - 1);
+    },
+  });
 }
 
 function classifySelection() {
@@ -738,6 +874,11 @@ async function runEvaluation() {
       normalization: "v1",
       tier: ["strict", "value", "overlap", "type"],
       draft_rules: rulesEditor && rulesEditor.getDraft() || undefined,
+      llm_verdict: ($("evLlmVerdict") && $("evLlmVerdict").checked)
+        ? (($("evUseLlm") && $("evUseLlm").checked) ? "both" : "independent")
+        : "off",
+      recommend: !!($("evRecommend") && $("evRecommend").checked),
+      trim: !!($("evAutoTrim") && $("evAutoTrim").checked),
     }, { signal: evalAbort.signal });
     if (!lastReport) return;
     lastEvalRunUuid = (lastReport.provenance && lastReport.provenance.run_uuid) || lastReport.run_uuid || "";
@@ -785,6 +926,7 @@ function importDataset(raw) {
     id: String(raw.id || ""),
     cases: cases.map((c, i) => ({
       id: String(c.id || ("case-" + (i + 1))),
+      name: String(c.name || ""),
       text: String(c.text || ""),
       language: String(c.language || "en"),
       tags: Array.isArray(c.tags) ? c.tags : [],
@@ -812,6 +954,7 @@ function importReport(raw) {
     id: String(raw.dataset_id || ""),
     cases: cases.map((c, i) => ({
       id: String(c.id || ("case-" + (i + 1))),
+      name: String(c.name || ""),
       text: String(c.text || ""),
       language: String(c.language || "en"),
       expected_spans: Array.isArray(c.expected_spans) ? c.expected_spans : [],
@@ -830,10 +973,15 @@ function importReport(raw) {
 }
 
 function resetAll() {
+  if (dirty || Object.keys(caseCuration).length) {
+    if (!window.confirm("Clear unsaved cases and curation?")) return;
+  }
   dataset = emptyDataset();
   lastReport = null;
   downloadReportBtn.disabled = true;
   selectedIndex = 0;
+  dirty = false;
+  Object.keys(caseCuration).forEach((k) => { delete caseCuration[k]; });
   textEl.value = "";
   resultEl.textContent = "";
   paintBanners(bannerEl, []);
@@ -902,7 +1050,20 @@ $("evFile").addEventListener("change", async (ev) => {
   }
 });
 $("evDownload").addEventListener("click", () => {
-  downloadJson("gateway-eval-dataset.json", stampedDataset());
+  downloadJson("gateway-eval-all-cases.eval.json", stampedDataset());
+});
+if ($("evDownloadCase")) $("evDownloadCase").addEventListener("click", () => {
+  persistCurrentText();
+  const c = currentCase();
+  if (!c) return;
+  const payload = {
+    kind: DATASET_KIND,
+    schema_version: dataset.schema_version || "1.2",
+    offset_unit: "unicode_codepoint",
+    cases: [c],
+  };
+  const stem = (c.name || c.id || "case").replace(/[^\w.-]+/g, "_");
+  downloadJson(stem + ".eval.json", payload);
 });
 downloadReportBtn.addEventListener("click", () => {
   if (lastReport) downloadJson("gateway-eval-report.json", lastReport);
@@ -936,15 +1097,24 @@ function alsoQueue() {
 
 function applyDraftAndPreview(field, value, extra) {
   if (!rulesEditor) return;
-  if (field === "context_cues") {
-    rulesEditor.addTerm("context_cues", value, extra && extra.entity_type);
-  } else {
-    rulesEditor.addTerm(field, value);
-  }
-  rulesEditor.preview();
-  if (alsoQueue() && selectedMatch) {
-    queueAction(extra && extra.queueAction || field, { term: value, trigger: value, pattern: value, ...extra });
-  }
+  const go = async () => {
+    if (field === "context_cues") {
+      rulesEditor.addTerm("context_cues", value, extra && extra.entity_type);
+    } else if (rulesEditor.addTermChecked) {
+      const result = await rulesEditor.addTermChecked(value, { preferred: field });
+      if (result && result.refused) {
+        paintBanners(bannerEl, [{ kind: "warn", text: result.reason }]);
+        return;
+      }
+    } else {
+      rulesEditor.addTerm(field, value);
+    }
+    rulesEditor.preview();
+    if (alsoQueue() && selectedMatch) {
+      queueAction(extra && extra.queueAction || field, { term: value, trigger: value, pattern: value, ...extra });
+    }
+  };
+  go();
 }
 
 if ($("evActExclude")) $("evActExclude").addEventListener("click", () => {
@@ -1001,8 +1171,23 @@ if ($("evActNumber")) $("evActNumber").addEventListener("click", () => {
   });
 });
 if ($("evActAccept")) $("evActAccept").addEventListener("click", () => {
-  if (selectedMatch) queueAction("accept_as_expected");
-  else paintBanners(bannerEl, [{ kind: "info", text: "Accept as expected needs a scored span-table row." }]);
+  if (selectedMatch) {
+    const row = selectedMatch.row;
+    const reportCase = selectedMatch.reportCase;
+    const pred = (reportCase.predicted_spans || [])[row.predicted_index] || {};
+    const c = currentCase();
+    if (c && pred.start != null) {
+      c.expected_spans = c.expected_spans || [];
+      c.expected_spans.push({
+        start: pred.start,
+        end: pred.end,
+        entity_type: pred.entity_type,
+      });
+      dirty = true;
+      renderAll();
+    }
+    queueAction("accept_as_expected");
+  } else paintBanners(bannerEl, [{ kind: "info", text: "Accept as expected needs a scored span-table row." }]);
 });
 if ($("evActAdvisory")) $("evActAdvisory").addEventListener("click", () => {
   if (selectedMatch) queueAction("mark_advisory");
@@ -1119,6 +1304,299 @@ async function toggleEvalLlm() {
   body.hidden = false;
   if (btn) btn.textContent = "Hide";
 }
+
+function evalVerdictSpans() {
+  const c = currentCase();
+  if (lastReport && lastReport.llm_verdict && Array.isArray(lastReport.llm_verdict.spans)) {
+    return lastReport.llm_verdict.spans;
+  }
+  const reportCase = lastReport && c && (lastReport.cases || []).find((row) => row.id === c.id);
+  return (reportCase && reportCase.llm_verdict && reportCase.llm_verdict.spans) || [];
+}
+
+function renderEvalVerdict() {
+  const card = $("evVerdictCard");
+  const pane = $("evVerdict");
+  const meta = $("evVerdictMeta");
+  const list = $("evVerdictList");
+  if (!card) return;
+  const spans = evalVerdictSpans();
+  if (!spans.length) {
+    card.hidden = true;
+    if (pane) pane.hidden = true;
+    if (list) list.textContent = "";
+    return;
+  }
+  const c = currentCase();
+  card.hidden = false;
+  if (pane) {
+    pane.hidden = false;
+    pane.dir = ((c && c.language) || "").startsWith("ar") ? "rtl" : "ltr";
+    renderHighlights(pane, (c && c.text) || "", spans);
+  }
+  if (meta) meta.textContent = spans.length + " spans";
+  if (list) {
+    list.textContent = "";
+    spans.forEach((span) => {
+      const row = document.createElement("div");
+      row.className = "gw-sum-row";
+      const label = document.createElement("span");
+      label.dir = "auto";
+      label.style.unicodeBidi = "isolate";
+      label.appendChild(document.createTextNode((span.entity_type || "") + " · " + (span.text || "")));
+      row.appendChild(label);
+      const acc = document.createElement("button");
+      acc.type = "button";
+      acc.className = "btn btn-ghost btn-sm";
+      acc.appendChild(document.createTextNode("✓ accept"));
+      acc.addEventListener("click", () => {
+        curatePredicted(Object.assign({}, span, { source: "llm_verdict" }), "accept");
+      });
+      const ed = document.createElement("button");
+      ed.type = "button";
+      ed.className = "btn btn-ghost btn-sm";
+      ed.appendChild(document.createTextNode("✎ accept with edit"));
+      ed.addEventListener("click", () => {
+        const extra = {};
+        const sel = pane && selectionOffsets(pane);
+        if (sel && sel.end > sel.start) {
+          extra.new_start = sel.start;
+          extra.new_end = sel.end;
+        }
+        curatePredicted(Object.assign({}, span, { source: "llm_verdict" }), "accept", extra);
+      });
+      const ign = document.createElement("button");
+      ign.type = "button";
+      ign.className = "btn btn-ghost btn-sm";
+      ign.appendChild(document.createTextNode("✗ ignore"));
+      ign.addEventListener("click", () => {
+        curatePredicted(Object.assign({}, span, { source: "llm_verdict" }), "reject");
+      });
+      row.appendChild(acc);
+      row.appendChild(ed);
+      row.appendChild(ign);
+      list.appendChild(row);
+    });
+  }
+  renderEvalRecommendations();
+}
+
+function renderEvalRecommendations() {
+  const card = $("evRecommendCard");
+  const list = $("evRecommendList");
+  if (!card || !list) return;
+  const c = currentCase();
+  const reportCase = lastReport && c && (lastReport.cases || []).find((row) => row.id === c.id);
+  const recs = (reportCase && reportCase.recommendations)
+    || (lastReport && lastReport.recommendations);
+  if (!recs || !(recs.items || []).length) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  list.textContent = "";
+  (recs.items || []).forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "gw-sum-row";
+    const badge = (item.validation && item.validation.ok === false) ? " refused" : " ok";
+    row.appendChild(document.createTextNode(
+      item.target + " · " + JSON.stringify(item.value) + " · " + (item.reason || "") + badge
+    ));
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "btn btn-ghost btn-sm";
+    add.appendChild(document.createTextNode("+ add to draft"));
+    add.addEventListener("click", async () => {
+      if (!rulesEditor) return;
+      const term = typeof item.value === "string" ? item.value : (item.value && item.value.value) || "";
+      await rulesEditor.addTermChecked(term || JSON.stringify(item.value), { preferred: item.target });
+    });
+    row.appendChild(add);
+    list.appendChild(row);
+  });
+}
+
+function caseToUsecase(c) {
+  return {
+    name: (c && (c.name || c.id)) || "case",
+    text: (c && c.text) || "",
+    language: (c && c.language) || "en",
+    tags: (c && c.tags) || [],
+    expected_spans: ((c && c.expected_spans) || []).map((s) => ({
+      start: s.start, end: s.end, entity_type: s.entity_type,
+      value: sliceCodepoints(toChars((c && c.text) || ""), s.start, s.end),
+    })),
+    forbidden_spans: (c && c.forbidden_spans) || [],
+  };
+}
+
+async function ensureSession(name) {
+  const created = await fetch("/api/gateway/sessions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name,
+      defaults: { auto_trim: !!($("evAutoTrim") && $("evAutoTrim").checked) },
+    }),
+  });
+  if (created.status === 201) {
+    const meta = await created.json();
+    return meta.slug || name;
+  }
+  if (created.status === 409) return name.replace(/\s+/g, "-");
+  throw new Error("Could not create session (" + created.status + ")");
+}
+
+async function saveCasesToSession(cases) {
+  persistCurrentText();
+  const name = (($("evSessionName") && $("evSessionName").value) || "").trim();
+  if (!name) {
+    paintBanners(bannerEl, [{ kind: "warn", text: "Enter a session name first." }]);
+    return;
+  }
+  const slug = await ensureSession(name);
+  let ok = 0;
+  for (const c of cases) {
+    const res = await fetch("/api/gateway/sessions/" + encodeURIComponent(slug) + "/usecases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        usecase: caseToUsecase(c),
+        curation: persistable(caseCuration[c.id] || emptyCuration(lastEvalRunUuid)),
+      }),
+    });
+    if (res.ok) ok += 1;
+  }
+  paintBanners(bannerEl, [{
+    kind: ok ? "ok" : "warn",
+    text: ok ? ("Saved " + ok + " case(s) to session " + slug) : "Save to session failed.",
+  }]);
+}
+
+async function openSession() {
+  const host = $("evSessionList");
+  const res = await fetch("/api/gateway/sessions");
+  if (!res.ok) {
+    paintBanners(bannerEl, [{ kind: "warn", text: "Could not list sessions." }]);
+    return;
+  }
+  const body = await res.json();
+  const rows = body.sessions || [];
+  if (!host) return;
+  host.textContent = "";
+  if (!rows.length) {
+    host.appendChild(document.createTextNode("No sessions yet."));
+    return;
+  }
+  rows.forEach((meta) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-ghost btn-sm";
+    btn.appendChild(document.createTextNode(meta.name || meta.slug));
+    btn.addEventListener("click", async () => {
+      const detail = await fetch("/api/gateway/sessions/" + encodeURIComponent(meta.slug));
+      if (!detail.ok) return;
+      const info = await detail.json();
+      const dates = info.dates || [];
+      const day = dates.length ? dates[dates.length - 1].date : "";
+      if (!day) {
+        paintBanners(bannerEl, [{ kind: "warn", text: "Session has no saved dates." }]);
+        return;
+      }
+      const ucs = await fetch(
+        "/api/gateway/sessions/" + encodeURIComponent(meta.slug) + "/" + encodeURIComponent(day) + "/usecases?full=1"
+      );
+      if (!ucs.ok) return;
+      const pack = await ucs.json();
+      const loaded = (pack.usecases || []).map((uc, i) => ({
+        id: String(uc.id || ("case-" + (i + 1))),
+        name: String(uc.name || ""),
+        text: String(uc.text || ""),
+        language: String(uc.language || "en"),
+        tags: Array.isArray(uc.tags) ? uc.tags : [],
+        expected_spans: Array.isArray(uc.expected_spans) ? uc.expected_spans : [],
+        forbidden_spans: Array.isArray(uc.forbidden_spans) ? uc.forbidden_spans : [],
+      }));
+      if (!loaded.length) {
+        paintBanners(bannerEl, [{ kind: "warn", text: "No use cases in that session date." }]);
+        return;
+      }
+      dataset = { ...emptyDataset(), cases: loaded };
+      Object.keys(caseCuration).forEach((k) => { delete caseCuration[k]; });
+      (pack.usecases || []).forEach((uc) => {
+        const cur = uc.context && uc.context.curation;
+        if (cur && uc.id) caseCuration[uc.id] = cur;
+      });
+      dirty = false;
+      if ($("evSessionName")) $("evSessionName").value = meta.name || meta.slug;
+      selectCase(0);
+      paintBanners(bannerEl, [{ kind: "ok", text: "Opened session " + (meta.name || meta.slug) + " (" + loaded.length + ")." }]);
+    });
+    host.appendChild(btn);
+  });
+}
+
+if ($("evSessionSave")) $("evSessionSave").addEventListener("click", () => {
+  const c = currentCase();
+  if (c) saveCasesToSession([c]).catch((err) => paintBanners(bannerEl, [{ kind: "warn", text: err.message }]));
+});
+if ($("evSessionSaveAll")) $("evSessionSaveAll").addEventListener("click", () => {
+  persistCurrentText();
+  saveCasesToSession(dataset.cases || []).catch((err) => paintBanners(bannerEl, [{ kind: "warn", text: err.message }]));
+});
+if ($("evSessionOpen")) $("evSessionOpen").addEventListener("click", () => {
+  openSession().catch((err) => paintBanners(bannerEl, [{ kind: "warn", text: err.message }]));
+});
+async function acceptEvalVerdictFilter(pred) {
+  const c = currentCase();
+  if (!c) return;
+  let cur = caseCuration[c.id] || emptyCuration(lastEvalRunUuid);
+  let spans = evalVerdictSpans().filter((span) => !pred || pred(span));
+  if ($("evAutoTrim") && $("evAutoTrim").checked && spans.length) {
+    const res = await fetch("/api/gateway/trim", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: c.text || "", spans }),
+    });
+    if (res.ok) {
+      const body = await res.json();
+      spans = body.spans || spans;
+    }
+  }
+  spans.forEach((span) => {
+    cur = upsertEntry(cur, {
+      key: spanKey(span, "llm_verdict"),
+      decision: "accept",
+      new_start: span.start,
+      new_end: span.end,
+      trimmed: !!span.trimmed,
+    });
+  });
+  caseCuration[c.id] = cur;
+  dirty = true;
+  renderAll();
+}
+
+function evalVerdictAgrees(span) {
+  const reportCase = reportCaseForCurrent();
+  const preds = (reportCase && reportCase.predicted_spans) || [];
+  return preds.some((p) => p.start === span.start && p.end === span.end && p.entity_type === span.entity_type);
+}
+
+if ($("evVerdictAcceptAll")) $("evVerdictAcceptAll").addEventListener("click", () => acceptEvalVerdictFilter(null));
+if ($("evVerdictAcceptAgree")) $("evVerdictAcceptAgree").addEventListener("click", () => {
+  acceptEvalVerdictFilter((span) => evalVerdictAgrees(span));
+});
+if ($("evVerdictAcceptLlmOnly")) $("evVerdictAcceptLlmOnly").addEventListener("click", () => {
+  acceptEvalVerdictFilter((span) => !evalVerdictAgrees(span));
+});
+if ($("evRecommendDownload")) $("evRecommendDownload").addEventListener("click", () => {
+  const c = currentCase();
+  const reportCase = lastReport && c && (lastReport.cases || []).find((row) => row.id === c.id);
+  const recs = (reportCase && reportCase.recommendations) || (lastReport && lastReport.recommendations);
+  if (!recs) return;
+  downloadJson("recommendations.json", recs);
+});
 
 if ($("evLlmShow")) $("evLlmShow").addEventListener("click", toggleEvalLlm);
 if ($("evLlmDownload")) $("evLlmDownload").addEventListener("click", async () => {

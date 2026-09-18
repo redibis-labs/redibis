@@ -42,7 +42,12 @@ class SampleRoot:
     path: Path
 
     def to_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "label": self.label, "exists": self.path.is_dir()}
+        return {
+            "name": self.name,
+            "label": self.label,
+            "path": str(self.path),
+            "exists": self.path.is_dir(),
+        }
 
 
 def _slug(value: str) -> str:
@@ -75,20 +80,32 @@ def _config() -> Any:
     return RedibisConfig().sample_data
 
 
-def _cwd_root() -> str | None:
-    """Process working directory — used when nothing is configured."""
+def default_root_path() -> Path | None:
+    """Static library: ``redibis/webapp/samples`` next to the web app."""
     try:
-        cwd = Path.cwd().resolve()
+        return (Path(__file__).resolve().parents[1] / "webapp" / "samples").expanduser().resolve()
     except (OSError, RuntimeError):
         return None
-    return str(cwd) if cwd.is_dir() else None
+
+
+def _default_root() -> str | None:
+    """``webapp/samples`` — used when nothing is configured."""
+    path = default_root_path()
+    return str(path) if path is not None else None
+
+
+def _is_absolute_user_path(raw: str) -> bool:
+    if raw.startswith("/") or raw.startswith("\\"):
+        return True
+    # Windows drive letter: C:/... or C:\...
+    return len(raw) >= 3 and raw[0].isalpha() and raw[1] == ":"
 
 
 def list_roots(cfg: Any = None) -> list[SampleRoot]:
     """Configured roots, resolved. Env entries come first and are named env1…N.
 
     When neither ``REDIBIS_SAMPLE_DATA_DIR`` nor ``sample_data.roots`` is set,
-    the process working directory (where the server was started) is the root.
+    the web app ``samples/`` folder is the root.
     """
     cfg = cfg if cfg is not None else _config()
     entries: list[tuple[str, str, str]] = []
@@ -102,9 +119,9 @@ def list_roots(cfg: Any = None) -> list[SampleRoot]:
             name = _slug(str(raw.get("name") or Path(path).name or f"root{index}"))
             entries.append((name, str(raw.get("label") or Path(path).name or name), path))
     if not entries:
-        cwd = _cwd_root()
-        if cwd:
-            entries.append(("cwd", Path(cwd).name or "working directory", cwd))
+        samples = _default_root()
+        if samples:
+            entries.append(("samples", "samples", samples))
 
     out: list[SampleRoot] = []
     seen: set[str] = set()
@@ -134,8 +151,9 @@ def get_root(name: str = "", cfg: Any = None) -> SampleRoot:
     roots = list_roots(cfg)
     if not roots:
         raise SampleDataDisabled(
-            "no sample data root is configured — set sample_data.roots in "
-            f"REDIBIS_CONFIG or the {ENV_ROOT} environment variable"
+            "no sample data root is configured — place CSV files in "
+            "redibis/webapp/samples, set sample_data.roots in REDIBIS_CONFIG, "
+            f"or the {ENV_ROOT} environment variable"
         )
     if not name:
         return roots[0]
@@ -216,6 +234,7 @@ def list_files(root_name: str = "", cfg: Any = None) -> dict[str, Any]:
     return {
         "root": root.name,
         "label": root.label,
+        "root_path": str(root.path),
         "roots": [r.to_dict() for r in list_roots(cfg)],
         "files": files,
         "truncated": truncated,
@@ -225,30 +244,15 @@ def list_files(root_name: str = "", cfg: Any = None) -> dict[str, Any]:
     }
 
 
-def resolve(root_name: str, rel_path: str, cfg: Any = None) -> Path:
-    """Resolve ``rel_path`` inside a configured root, or raise.
-
-    This is the security gate. Callers must never build a path themselves.
-    """
-    cfg = cfg if cfg is not None else _config()
-    root = get_root(root_name, cfg)
-    raw = (rel_path or "").strip().replace("\\", "/").lstrip("/")
-    if not raw:
-        raise SampleDataError("path is required")
-    parts = [p for p in raw.split("/") if p not in ("", ".")]
-    if not parts:
-        raise SampleDataError("path is required")
-    if any(p.startswith(".") for p in parts):
-        raise SampleDataError("path may not contain dot entries")
-
-    candidate = (root.path / Path(*parts)).resolve()
-    # Containment after resolution — this is what defeats symlink escape.
+def _resolve_inside_root(root: SampleRoot, rel_parts: Sequence[str], cfg: Any) -> Path:
+    """Containment + suffix + size checks for a path already known to be under ``root``."""
+    candidate = (root.path / Path(*rel_parts)).resolve()
     try:
         candidate.relative_to(root.path)
     except ValueError:
         raise SampleDataError("path escapes the sample data root") from None
     if not candidate.is_file():
-        raise SampleDataError(f"not a file: {raw}")
+        raise SampleDataError(f"not a file: {'/'.join(rel_parts)}")
     if candidate.suffix.lower() not in _allowed_suffixes(cfg):
         raise SampleDataError(f"unsupported file type: {candidate.suffix or '(none)'}")
     max_bytes = int(getattr(cfg, "max_file_mb", 512)) * 1024 * 1024
@@ -264,9 +268,61 @@ def resolve(root_name: str, rel_path: str, cfg: Any = None) -> Path:
     return candidate
 
 
+def resolve(root_name: str, rel_path: str, cfg: Any = None) -> Path:
+    """Resolve a sample path inside a configured root, or raise.
+
+    Accepts a name relative to the root (``customers.csv``) or an absolute
+    path that still resolves inside a configured root. This is the security
+    gate. Callers must never build a path themselves.
+    """
+    cfg = cfg if cfg is not None else _config()
+    raw = (rel_path or "").strip().replace("\\", "/")
+    if not raw:
+        raise SampleDataError("path is required")
+
+    if _is_absolute_user_path(raw):
+        try:
+            absolute = Path(raw).expanduser().resolve()
+        except (OSError, RuntimeError) as exc:
+            raise SampleDataError(f"cannot resolve path: {exc}") from exc
+        roots = [get_root(root_name, cfg)] if root_name else list_roots(cfg)
+        for root in roots:
+            try:
+                relative = absolute.relative_to(root.path)
+            except ValueError:
+                continue
+            parts = [p for p in relative.as_posix().split("/") if p not in ("", ".")]
+            if not parts:
+                raise SampleDataError("path is required")
+            if any(p.startswith(".") for p in parts):
+                raise SampleDataError("path may not contain dot entries")
+            return _resolve_inside_root(root, parts, cfg)
+        raise SampleDataError("path is outside the sample data root")
+
+    root = get_root(root_name, cfg)
+    parts = [p for p in raw.lstrip("/").split("/") if p not in ("", ".")]
+    if not parts:
+        raise SampleDataError("path is required")
+    if any(p.startswith(".") for p in parts):
+        raise SampleDataError("path may not contain dot entries")
+    return _resolve_inside_root(root, parts, cfg)
+
+
 def read_bytes(root_name: str, rel_path: str, cfg: Any = None) -> tuple[str, bytes]:
     path = resolve(root_name, rel_path, cfg)
     return path.name, path.read_bytes()
+
+
+def _containing_root(path: Path, cfg: Any, root_name: str = "") -> SampleRoot:
+    if root_name:
+        return get_root(root_name, cfg)
+    for root in list_roots(cfg):
+        try:
+            path.relative_to(root.path)
+            return root
+        except ValueError:
+            continue
+    raise SampleDataError("path is outside the sample data root")
 
 
 def preview(
@@ -278,11 +334,13 @@ def preview(
 ) -> dict[str, Any]:
     """Column names, dtypes and a few rows — enough to populate the scan form."""
     path = resolve(root_name, rel_path, cfg)
+    root = _containing_root(path, cfg, root_name)
+    relative = path.relative_to(root.path).as_posix()
     frame, total = _read_head(path, rows)
     columns = [str(c) for c in frame.columns]
     return {
-        "root": get_root(root_name, cfg).name,
-        "path": rel_path,
+        "root": root.name,
+        "path": relative,
         "name": path.name,
         "table": path.stem,
         "columns": columns,

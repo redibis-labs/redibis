@@ -21,10 +21,11 @@ REDIBIS_ONLY_TOP_LEVEL: frozenset[str] = frozenset({
     "last_updated_by_workflow",
     "provenance",
     "_scan_metadata",
+    "x-redibis-review",
 })
 
 # Column-level extensions not in ODCS (canonical ``privacy`` + legacy keys).
-REDIBIS_COLUMN_EXTENSIONS: tuple[str, ...] = ("privacy", "pii", "maskingPolicy")
+REDIBIS_COLUMN_EXTENSIONS: tuple[str, ...] = ("privacy", "pii", "maskingPolicy", "entity_type")
 
 
 def prepare_for_odcs_pydantic(contract: dict) -> dict:

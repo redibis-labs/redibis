@@ -71,6 +71,19 @@ if TYPE_CHECKING:
     from redibis.agents.tool_runner import ToolContext
 
 
+def _cs():
+    """Workspace-scoped ContractStore. Default slug is the global singleton."""
+    from redibis.workspace.model import WorkspaceDenied, WorkspaceNotFound
+    from redibis.workspace.stores import current_stores
+
+    try:
+        return current_stores().contract
+    except WorkspaceNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except WorkspaceDenied as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
 def _redibis_config():
     """Root config spine for RAI, classification, agents, etc."""
     from redibis.config import RedibisConfig
@@ -148,8 +161,10 @@ app.add_middleware(
 async def _request_id(request: Request, call_next):
     cid = request.headers.get("x-request-id") or uuid4().hex[:12]
     from redibis.obs import bind_context
+    from redibis.workspace.stores import bind_workspace, slug_from_request
 
-    with bind_context(run_id=cid, fn=request.url.path):
+    slug = slug_from_request(request)
+    with bind_workspace(slug), bind_context(run_id=cid, fn=request.url.path):
         resp = await call_next(request)
     resp.headers["x-request-id"] = cid
     return resp
@@ -714,7 +729,7 @@ async def run_scan(session_id: str) -> dict:
         execute_unified_scan,
         session,
         get_backend_store(),
-        get_contract_store(),
+        _cs(),
     )
     return {"status": "started", "session_id": session_id,
             "scan_mode": session.common_config.scan_mode}
@@ -755,7 +770,7 @@ async def run_profile_step(
         execute_profile_step,
         session,
         session.config,
-        get_contract_store(),
+        _cs(),
     )
     return {"status": "started", "step": "profile", "session_id": session_id}
 
@@ -770,7 +785,7 @@ async def run_quality_step(session_id: str) -> dict:
         execute_quality_step,
         session,
         get_backend_store(),
-        get_contract_store(),
+        _cs(),
     )
     return {"status": "started", "step": "quality", "session_id": session_id}
 
@@ -792,7 +807,7 @@ async def run_pii_step(
         execute_pii_step,
         session,
         get_backend_store(),
-        get_contract_store(),
+        _cs(),
     )
     return {"status": "started", "step": "pii", "session_id": session_id}
 
@@ -1019,7 +1034,7 @@ def _run_session_table_eval(session_id: str, body: TableEvalBody, *, progress_cb
     contract = None
     if body.target == "contract":
         try:
-            contract = get_contract_store().get_active(session.table_name)
+            contract = _cs().get_active(session.table_name)
         except Exception:
             contract = None
         if contract is None:
@@ -1282,7 +1297,7 @@ async def merge_sub_contracts(session_id: str, body: SubContractMerge) -> dict:
     session = _require_session(session_id)
     try:
         merged = merge_session_sub_contracts(
-            session, get_contract_store(), ids=body.ids, validate=body.validate_contract)
+            session, _cs(), ids=body.ids, validate=body.validate_contract)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Merge failed: {e}")
     return {"status": "merged", "count": len(merged), "results": merged}
@@ -1392,7 +1407,7 @@ async def merge_approved_route(session_id: str, body: ApprovedMergeBody) -> dict
     session = _require_session(session_id)
     from redibis.services.session_service import merge_approved
     try:
-        result = merge_approved(session, get_contract_store(), validate=body.validate_contract)
+        result = merge_approved(session, _cs(), validate=body.validate_contract)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Merge failed: {e}")
     session.persist_to_disk()
@@ -1765,7 +1780,7 @@ def _resolve_quality_rules(session, table: str, body):
         pasted_code=getattr(body, "code", None),
         explicit_rules=getattr(body, "rules", None),
         dropped_indices=getattr(body, "dropped_indices", None),
-        store=get_contract_store(),
+        store=_cs(),
     )
 
 
@@ -2600,29 +2615,34 @@ async def import_configs(bundle: ConfigBundle) -> dict:
 # ═══════════════════════════════════════════════════════════════════════════
 
 @app.get("/api/contracts")
-async def list_contracts() -> list:
-    """List every table that has an active contract, with a small summary."""
-    out = []
-    for table in store_op(get_contract_store().list_tables):
-        active = store_op(get_contract_store().get_active, table) or {}
-        history = store_op(get_contract_store().get_history, table, limit=1)
-        meta = store_op(get_contract_store().get_metadata, table)
-        out.append({
-            "table": table,
-            "version": active.get("version"),
-            "contract_uuid": active.get("contract_uuid"),
-            "workflows": sorted({p.get("workflow") for p in meta.get("provenance", [])
-                                 if p.get("workflow")}),
-            "last_updated": (meta.get("telemetry") or {}).get("last_updated")
-                            or (history[0].timestamp if history else None),
-        })
-    return out
+async def list_contracts(
+    q: str = "",
+    status: str = "",
+    review: str = "",
+    sort: str = "updated",
+    desc: bool = True,
+    limit: int = 50,
+    offset: int = 0,
+    all_rows: bool = Query(False, alias="all"),
+) -> JSONResponse:
+    """Paged contract list (default 50). Pass ``?all=1`` for up to 2000 rows.
+
+    Response is still a JSON array for existing callers (app.js / v2). Totals
+    land in ``X-Redibis-Total`` / ``X-Redibis-Truncated``.
+    """
+    from redibis.webapp.workspace_routes import list_contracts_page
+
+    rows, headers = list_contracts_page(
+        q=q, status=status, review=review, sort=sort, desc=desc,
+        limit=limit, offset=offset, all_rows=all_rows,
+    )
+    return JSONResponse(rows, headers=headers)
 
 
 @app.get("/api/contracts/{table}")
 async def get_contract(table: str) -> dict:
     """Slim contract spec only (no operational telemetry)."""
-    active = store_op(get_contract_store().get_active, table)
+    active = store_op(_cs().get_active, table)
     if active is None:
         raise HTTPException(status_code=404, detail=f"No active contract for '{table}'")
     return active
@@ -2631,16 +2651,16 @@ async def get_contract(table: str) -> dict:
 @app.get("/api/contracts/{table}/metadata")
 async def get_contract_metadata(table: str) -> dict:
     """Operational telemetry: provenance, pii_summary, last_updated, pii_decisions."""
-    if store_op(get_contract_store().get_active, table) is None:
+    if store_op(_cs().get_active, table) is None:
         raise HTTPException(status_code=404, detail=f"No active contract for '{table}'")
-    return store_op(get_contract_store().get_metadata, table)
+    return store_op(_cs().get_metadata, table)
 
 
 @app.get("/api/contracts/{table}/export-package")
 async def export_contract_package(table: str) -> dict:
     """Full JSON bundle for catalog integration (OpenMetadata, Elasticsearch, etc.)."""
     try:
-        return store_op(get_contract_store().export_integration_package, table)
+        return store_op(_cs().export_integration_package, table)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -2651,7 +2671,7 @@ def _catalog_service():
 
     cfg_path = os.environ.get("REDIBIS_CONFIG")
     cfg = RedibisConfig.from_yaml(cfg_path) if cfg_path else RedibisConfig.default()
-    return CatalogService.from_redibis_config(get_contract_store(), cfg)
+    return CatalogService.from_redibis_config(_cs(), cfg)
 
 
 @app.get("/api/catalog/backends")
@@ -2709,13 +2729,13 @@ async def get_contract_history(table: str, limit: int = 50) -> list:
             "timestamp": e.timestamp, "version": e.version,
             "contributed_fields": e.contributed_fields,
         }
-        for e in get_contract_store().get_history(table, limit=limit)
+        for e in _cs().get_history(table, limit=limit)
     ]
 
 
 @app.get("/api/contracts/{table}/audit/{run_uuid}")
 async def get_contract_audit(table: str, run_uuid: str) -> dict:
-    snap = get_contract_store().get_audit_snapshot(table, run_uuid)
+    snap = _cs().get_audit_snapshot(table, run_uuid)
     if snap is None:
         raise HTTPException(status_code=404, detail="Audit snapshot not found")
     return snap
@@ -2752,13 +2772,13 @@ def _column_is_pii(prop: dict) -> bool:
 @app.get("/api/contracts/{table}/sampling-consent")
 async def get_sampling_consent(table: str) -> dict:
     """Return steward sampling-consent flags for memory redaction (optional)."""
-    return {"table": table, "columns": get_contract_store().get_sampling_consent(table)}
+    return {"table": table, "columns": _cs().get_sampling_consent(table)}
 
 
 @app.post("/api/contracts/{table}/columns/{column}/sampling-consent")
 async def set_sampling_consent(table: str, column: str, body: SamplingConsentBody) -> dict:
     """Approve or revoke consent to persist masked/hashed samples in column memory."""
-    entry = get_contract_store().set_sampling_consent(
+    entry = _cs().set_sampling_consent(
         table,
         column,
         approved=body.approved,
@@ -2771,10 +2791,10 @@ def _memory_hints_for_contract(table: str, active: dict) -> list[dict]:
     from redibis.memory.retriever import get_context_retriever, hint_to_dict
     from redibis.memory.writer import fingerprint_from_column_prop
 
-    mc = get_contract_store().memory_config
+    mc = _cs().memory_config
     retriever = get_context_retriever(
         mc,
-        memory_store=getattr(get_contract_store(), "_memory_store", None),
+        memory_store=getattr(_cs(), "_memory_store", None),
     )
     if retriever is None:
         return []
@@ -2802,7 +2822,7 @@ def _memory_hints_for_contract(table: str, active: dict) -> list[dict]:
 @app.get("/api/memory/status")
 async def memory_status() -> dict:
     """Read-only memory feature flag + store health (additive; off when memory disabled)."""
-    mc = get_contract_store().memory_config
+    mc = _cs().memory_config
     out = {
         "enabled": mc.enabled,
         "store": mc.store,
@@ -2812,7 +2832,7 @@ async def memory_status() -> dict:
         "min_similarity": mc.min_similarity,
     }
     if mc.enabled:
-        out["store_ready"] = getattr(get_contract_store(), "_memory_store", None) is not None
+        out["store_ready"] = getattr(_cs(), "_memory_store", None) is not None
         from redibis.memory.async_writer import memory_write_stats
 
         out["async_writes"] = mc.async_writes
@@ -2838,7 +2858,7 @@ async def column_similar(table: str, column: str, k: int = 5) -> dict:
     from redibis.profiling.inference import infer_column_governance
     from redibis.store.fingerprint_store import FingerprintStore
 
-    fp_store = FingerprintStore.from_env(get_contract_store().backend, get_contract_store().bucket)
+    fp_store = FingerprintStore.from_env(_cs().backend, _cs().bucket)
     raw = fp_store.get_column(table, column)
     if not raw:
         raise HTTPException(status_code=404, detail=f"No fingerprint for {table}.{column}")
@@ -2856,7 +2876,7 @@ async def list_golden(q: Optional[str] = None) -> dict:
     """Browse the golden reference set."""
     from redibis.store.golden_store import GoldenStore
 
-    gs = GoldenStore.from_env(get_contract_store().backend, get_contract_store().bucket)
+    gs = GoldenStore.from_env(_cs().backend, _cs().bucket)
     cols = gs.list_all()
     if q:
         ql = q.lower()
@@ -2882,10 +2902,10 @@ async def vector_reload() -> dict:
 @app.get("/api/contracts/{table}/memory/hints")
 async def memory_hints(table: str) -> dict:
     """Read-only similar past steward reviews for enrichment UI hints."""
-    mc = get_contract_store().memory_config
+    mc = _cs().memory_config
     if not mc.enabled:
         return {"enabled": False, "table": table, "columns": []}
-    active = get_contract_store().get_active(table)
+    active = _cs().get_active(table)
     if active is None:
         raise HTTPException(status_code=404, detail=f"No active contract for '{table}'")
     return {
@@ -2902,10 +2922,10 @@ async def get_pii_decisions(table: str) -> dict:
     `columns` lists every schema column with whether it currently reads as PII,
     so the UI can offer strip (for PII columns) and add (for non-PII columns).
     """
-    active = get_contract_store().get_active(table)
+    active = _cs().get_active(table)
     if active is None:
         raise HTTPException(status_code=404, detail=f"No active contract for '{table}'")
-    decisions = get_contract_store().get_pii_decisions(table)
+    decisions = _cs().get_pii_decisions(table)
     columns = []
     for schema_obj in active.get("schema", []) or []:
         for prop in schema_obj.get("properties", []) or []:
@@ -2920,14 +2940,14 @@ async def get_pii_decisions(table: str) -> dict:
                 "decision": decisions.get(name),
             })
     return {"table": table, "columns": columns,
-            "decisions": get_contract_store().pii_decisions.list(table)}
+            "decisions": _cs().pii_decisions.list(table)}
 
 
 @app.post("/api/contracts/{table}/columns/{column}/strip-pii")
 async def strip_pii_column(table: str, column: str, body: StripPiiBody) -> dict:
     """Remove all PII metadata from a column → a normal business column."""
     try:
-        res = get_contract_store().set_pii_decision(
+        res = _cs().set_pii_decision(
             table, column, "not_pii",
             decided_by=body.decided_by, run_id=body.run_id)
     except ValueError as e:
@@ -2945,7 +2965,7 @@ async def add_pii_column(table: str, column: str, body: AddPiiColumnBody) -> dic
         "confidence": body.confidence, "arabic_aware": body.arabic_aware,
     })
     try:
-        res = get_contract_store().set_pii_decision(
+        res = _cs().set_pii_decision(
             table, column, "pii", entity_type=body.entity_type, payload=frag,
             decided_by=body.decided_by, run_id=body.run_id)
     except ValueError as e:
@@ -2957,7 +2977,7 @@ async def add_pii_column(table: str, column: str, body: AddPiiColumnBody) -> dic
 @app.delete("/api/contracts/{table}/columns/{column}/pii-decision")
 async def clear_pii_decision(table: str, column: str) -> dict:
     """Stop enforcing a column's PII decision (existing metadata is unchanged)."""
-    removed = get_contract_store().clear_pii_decision(table, column)
+    removed = _cs().clear_pii_decision(table, column)
     return {"status": "cleared" if removed else "noop", "table": table, "column": column}
 
 
@@ -2999,7 +3019,7 @@ class DefinitionsPatchBody(BaseModel):
 @app.get("/api/contracts/{table}/pii-view")
 async def get_pii_view(table: str) -> dict:
     try:
-        return get_contract_store().get_pii_view(table)
+        return _cs().get_pii_view(table)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -3007,7 +3027,7 @@ async def get_pii_view(table: str) -> dict:
 @app.patch("/api/contracts/{table}/columns/{column}/privacy")
 async def patch_column_privacy(table: str, column: str, body: PatchPrivacyBody) -> dict:
     try:
-        res = get_contract_store().patch_column_privacy(
+        res = _cs().patch_column_privacy(
             table, column,
             entity_type=body.entity_type,
             classification=body.classification,
@@ -3026,7 +3046,7 @@ async def patch_column_privacy(table: str, column: str, body: PatchPrivacyBody) 
 @app.get("/api/contracts/{table}/quality-view")
 async def get_quality_view(table: str) -> dict:
     try:
-        return get_contract_store().get_quality_view(table)
+        return _cs().get_quality_view(table)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -3034,7 +3054,7 @@ async def get_quality_view(table: str) -> dict:
 @app.post("/api/contracts/{table}/quality-decisions/{rule_id}/suppress")
 async def suppress_quality_rule(table: str, rule_id: str, body: QualitySuppressBody) -> dict:
     try:
-        res = get_contract_store().suppress_quality_rule(
+        res = _cs().suppress_quality_rule(
             table, rule_id, column=body.column,
             decided_by=body.decided_by, run_id=body.run_id,
         )
@@ -3046,7 +3066,7 @@ async def suppress_quality_rule(table: str, rule_id: str, body: QualitySuppressB
 @app.post("/api/contracts/{table}/quality-decisions/suppress-all")
 async def suppress_all_quality_rules(table: str, body: QualitySuppressBody) -> dict:
     try:
-        res = get_contract_store().suppress_all_quality_rules(
+        res = _cs().suppress_all_quality_rules(
             table, decided_by=body.decided_by, run_id=body.run_id,
         )
     except ValueError as e:
@@ -3057,7 +3077,7 @@ async def suppress_all_quality_rules(table: str, body: QualitySuppressBody) -> d
 @app.post("/api/contracts/{table}/quality-decisions/{rule_id}/restore")
 async def restore_quality_rule(table: str, rule_id: str) -> dict:
     try:
-        res = get_contract_store().restore_quality_rule(table, rule_id)
+        res = _cs().restore_quality_rule(table, rule_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"status": "restored", "rule_id": rule_id, "version_after": res.version_after}
@@ -3068,7 +3088,7 @@ async def add_manual_quality_rule(table: str, body: QualityManualBody) -> dict:
     from redibis.services.session_service import quality_row_to_fragment
     payload = quality_row_to_fragment({**body.rule, "column": body.column})
     try:
-        res = get_contract_store().add_manual_quality_rule(
+        res = _cs().add_manual_quality_rule(
             table, payload,
             rule_id=body.rule_id,
             column=body.column,
@@ -3085,7 +3105,7 @@ async def add_manual_quality_rule(table: str, body: QualityManualBody) -> dict:
 @app.get("/api/contracts/{table}/definitions-view")
 async def get_definitions_view(table: str) -> dict:
     try:
-        return get_contract_store().get_definitions_view(table)
+        return _cs().get_definitions_view(table)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -3093,7 +3113,7 @@ async def get_definitions_view(table: str) -> dict:
 @app.patch("/api/contracts/{table}/definitions")
 async def patch_definitions(table: str, body: DefinitionsPatchBody) -> dict:
     try:
-        res = get_contract_store().patch_definitions(
+        res = _cs().patch_definitions(
             table,
             table_patch=body.table,
             column_patches=body.columns,
@@ -3178,7 +3198,7 @@ async def discard_run(kind: str, table: str, run_id: str) -> dict:
 @app.delete("/api/contracts/{table}")
 async def purge_contract(table: str, keep_runs: bool = True) -> dict:
     """Purge the active contract + all audits/business/enrichment → fresh UUID."""
-    result = get_contract_store().purge(table)
+    result = _cs().purge(table)
     if not keep_runs:
         result["deleted_runs"] = get_subcontract_store().delete_table_runs(table)
     return {"status": "purged", **result}
@@ -3189,7 +3209,7 @@ async def purge_contract(table: str, keep_runs: bool = True) -> dict:
 @app.get("/api/contracts/{table}/rules")
 async def get_contract_rules(table: str) -> dict:
     from redibis.contracts.rules import extract_rules
-    active = get_contract_store().get_active(table)
+    active = _cs().get_active(table)
     if active is None:
         raise HTTPException(status_code=404, detail=f"No active contract for '{table}'")
     return {"table": table, "rules": [r.to_dict() for r in extract_rules(active)]}
@@ -3198,7 +3218,7 @@ async def get_contract_rules(table: str) -> dict:
 @app.get("/api/contracts/{table}/rules/export")
 async def export_contract_rules(table: str, target: str = "ge"):
     from redibis.contracts.rules import regenerate
-    active = get_contract_store().get_active(table)
+    active = _cs().get_active(table)
     if active is None:
         raise HTTPException(status_code=404, detail=f"No active contract for '{table}'")
     try:
@@ -3260,7 +3280,7 @@ class EnrichContextPromoteBody(BaseModel):
 def _enrichment_service():
     from redibis.enrich.service import enrichment_service_for_store
 
-    return enrichment_service_for_store(get_contract_store())
+    return enrichment_service_for_store(_cs())
 
 
 @app.get("/api/llm-providers")
@@ -3802,7 +3822,7 @@ async def run_enrichment_with_context(table: str, body: EnrichContextRunBody) ->
     from redibis.store.run_output_writer import RunOutputWriter
 
     svc = _enrichment_service()
-    store = get_contract_store()
+    store = _cs()
     bundle = body.context or load_context_draft(store, table)
     run_id = body.run_id or (bundle or {}).get("run_id") or datetime.now(timezone.utc).strftime(
         "%Y-%m-%d_%H-%M-%S",
@@ -4085,7 +4105,7 @@ async def enrich_preflight(
     from redibis.enrich.providers import get_provider
     from redibis.enrich.rai_gate import compute_enrich_rai_preflight
 
-    active = get_contract_store().get_active(table)
+    active = _cs().get_active(table)
     if active is None:
         raise HTTPException(status_code=404, detail=f"No active contract for '{table}'")
     svc = _enrichment_service()
@@ -4109,7 +4129,7 @@ async def enrich_contract(table: str, body: EnrichBody) -> dict:
     from redibis.store.run_output_writer import RunOutputWriter
 
     svc = _enrichment_service()
-    store = get_contract_store()
+    store = _cs()
     run_id = body.run_id or datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
     cfg = _redibis_config()
     run_writer = RunOutputWriter(
@@ -4139,7 +4159,7 @@ async def enrich_contract(table: str, body: EnrichBody) -> dict:
     except PermissionError as e:
         from redibis.enrich.rai_gate import compute_enrich_rai_preflight
         try:
-            active = get_contract_store().get_active(table)
+            active = _cs().get_active(table)
             prov = get_provider(body.provider, model=body.model, api_key=body.api_key,
                                 endpoint_url=body.endpoint_url)
             sample_count = len(svc.list_sample_data(table))
@@ -4269,7 +4289,7 @@ async def merge_enrichment(table: str) -> dict:
 @app.get("/api/contracts/{table}/triage")
 async def get_contract_triage(table: str) -> dict:
     """Triage report — API/CLI only (decoupled from the PII verdict, not in UI)."""
-    active = get_contract_store().get_active(table)
+    active = _cs().get_active(table)
     if active is None:
         raise HTTPException(status_code=404, detail=f"No active contract for '{table}'")
     triage = []
@@ -4287,7 +4307,7 @@ async def get_contract_triage(table: str) -> dict:
 
 @app.get("/api/contracts/{table}/html", response_class=HTMLResponse)
 async def get_contract_html(table: str) -> HTMLResponse:
-    active = get_contract_store().get_active(table)
+    active = _cs().get_active(table)
     if active is None:
         raise HTTPException(status_code=404, detail=f"No active contract for '{table}'")
     import yaml as _yaml
@@ -4509,7 +4529,7 @@ async def delete_user_route(username: str) -> dict:
 
 @app.post("/api/contracts/{table}/share")
 async def create_share(table: str, body: ShareBody) -> dict:
-    active = get_contract_store().get_active(table)
+    active = _cs().get_active(table)
     if active is None:
         raise HTTPException(status_code=404, detail=f"No active contract for '{table}'")
     try:
@@ -4535,7 +4555,7 @@ async def get_share_view(token: str) -> dict:
         raise HTTPException(status_code=404, detail="Share not found")
     if share.is_expired():
         raise HTTPException(status_code=410, detail="Share link expired")
-    active = get_contract_store().get_active(share.table)
+    active = _cs().get_active(share.table)
     if active is None:
         raise HTTPException(status_code=404, detail="Contract no longer exists")
     return {"share": share.to_dict(), "scope": share.scope,
@@ -4550,7 +4570,7 @@ async def edit_via_share(token: str, body: ShareEditBody) -> dict:
         raise HTTPException(status_code=404, detail="Share not found")
     if share.is_expired():
         raise HTTPException(status_code=410, detail="Share link expired")
-    active = get_contract_store().get_active(share.table)
+    active = _cs().get_active(share.table)
     if active is None:
         raise HTTPException(status_code=404, detail="Contract no longer exists")
 
@@ -4562,7 +4582,7 @@ async def edit_via_share(token: str, body: ShareEditBody) -> dict:
         for col, ce in (body.edits.get("columns") or {}).items():
             if isinstance(ce, dict) and ce.get("remove_pii"):
                 try:
-                    get_contract_store().set_pii_decision(
+                    _cs().set_pii_decision(
                         share.table, col, "not_pii",
                         decided_by=f"share:{token[:8]}", run_id=f"share_{token[:8]}")
                     applied_strip.append(f"{col}.strip_pii")
@@ -4570,7 +4590,7 @@ async def edit_via_share(token: str, body: ShareEditBody) -> dict:
                     pass  # column missing / no contract — skip silently
 
     # Re-fetch: a strip above may have produced a new active version.
-    active = store_op(get_contract_store().get_active, share.table) or active
+    active = store_op(_cs().get_active, share.table) or active
     modified, applied = apply_scoped_edits(active, body.edits, share.scope)
     applied = applied + applied_strip
     if not applied:
@@ -4578,10 +4598,10 @@ async def edit_via_share(token: str, body: ShareEditBody) -> dict:
     if not (set(applied) - set(applied_strip)):
         # Only strips happened — they're already persisted; report and return.
         return {"status": "applied", "applied_fields": applied, "scope": share.scope,
-                "version_after": (store_op(get_contract_store().get_active, share.table) or {}).get("version")}
+                "version_after": (store_op(_cs().get_active, share.table) or {}).get("version")}
     try:
         upsert = store_op(
-            get_contract_store().upsert,
+            _cs().upsert,
             partial=modified, table=share.table,
             workflow=f"share:{share.scope}",
             run_id=f"share_{token[:8]}", validate=body.validate_contract,
@@ -5372,7 +5392,7 @@ def agents_preview(body: AgentPreviewBody) -> dict:
     return estimate_pipeline_scope(
         spec,
         config=_redibis_config(),
-        contract_store=get_contract_store(),
+        contract_store=_cs(),
         tables=body.tables or None,
         database=body.database,
         try_on_n=body.try_on_n,
@@ -5698,10 +5718,10 @@ def _agent_tool_context(cfg, *, dry_run: bool = False, sample_paths: dict | None
     from redibis.agents.tool_runner import ToolContext
     from redibis.services.catalog_service import CatalogService
 
-    catalog = CatalogService.from_redibis_config(get_contract_store(), cfg)
+    catalog = CatalogService.from_redibis_config(_cs(), cfg)
     resolved_sample_dir = Path(sample_dir) if sample_dir else _agent_sample_dir()
     return ToolContext(
-        contract_store=get_contract_store(),
+        contract_store=_cs(),
         catalog_service=catalog,
         config=cfg,
         dry_run=dry_run,
@@ -5746,7 +5766,7 @@ def agents_run_artifacts(run_id: str) -> dict:
         storage_backend=get_backend_store(),
         runs_bucket=get_runs_bucket(),
         lineage_root=lineage.root,
-        contract_store=get_contract_store(),
+        contract_store=_cs(),
     )
 
 
@@ -5768,7 +5788,7 @@ def agents_run_artifact_download(run_id: str, artifact_id: str):
         storage_backend=get_backend_store(),
         runs_bucket=get_runs_bucket(),
         lineage_root=lineage.root,
-        contract_store=get_contract_store(),
+        contract_store=_cs(),
     )
     entry = index.get(artifact_id)
     if entry is None:
@@ -5808,8 +5828,8 @@ def agents_review_queue(run_id: str) -> dict:
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     retriever = get_context_retriever(
-        get_contract_store().memory_config,
-        memory_store=getattr(get_contract_store(), "_memory_store", None),
+        _cs().memory_config,
+        memory_store=getattr(_cs(), "_memory_store", None),
     )
     items = build_review_queue(run, memory_retriever=retriever)
     return {
@@ -5967,7 +5987,7 @@ def agents_codegen_request(body: CodegenRequestBody) -> dict:
     """Build egress-validated CodegenRequest (metadata only — nothing executes)."""
     from redibis.agents.codegen_egress import prepare_codegen_request
 
-    contract = get_contract_store().get_active(body.table)
+    contract = _cs().get_active(body.table)
     if contract is None:
         raise HTTPException(status_code=404, detail=f"no active contract for {body.table!r}")
 
@@ -6017,7 +6037,7 @@ def agents_codegen_submit(body: CodegenRequestBody) -> dict:
             "hint": "Toggle the matching step(s) in the composer and Send, or resubmit with force_external=true.",
         }
 
-    contract = get_contract_store().get_active(body.table)
+    contract = _cs().get_active(body.table)
     if contract is None:
         raise HTTPException(status_code=404, detail=f"no active contract for {body.table!r}")
 
@@ -6400,7 +6420,7 @@ def agents_batch_run(body: AgentBatchBody, background_tasks: BackgroundTasks) ->
     spec = PipelineSpec.from_dict(body.pipeline)
     cfg = _config_with_resolved_planner()
 
-    catalog = CatalogService.from_redibis_config(get_contract_store(), cfg)
+    catalog = CatalogService.from_redibis_config(_cs(), cfg)
     store = _agent_lineage_store()
     ctx = _agent_tool_context(
         cfg,
@@ -6414,7 +6434,7 @@ def agents_batch_run(body: AgentBatchBody, background_tasks: BackgroundTasks) ->
         spec,
         tables=body.tables or None,
         database=body.database,
-        contract_store=get_contract_store(),
+        contract_store=_cs(),
     )
     if not tables:
         raise HTTPException(status_code=400, detail="no tables to process")
@@ -6617,10 +6637,28 @@ def share_editor(request: Request, token: str) -> HTMLResponse:
 try:
     from redibis.webapp.review_routes import register_review_routes
 
-    register_review_routes(app, lambda: get_contract_store())
+    register_review_routes(app, lambda: _cs())
 except Exception:
     logger.exception(
         "review routes failed to register — /api/contracts/*/review unavailable"
+    )
+
+try:
+    from redibis.webapp.steward_routes import register_steward_routes
+
+    register_steward_routes(app, lambda: _cs())
+except Exception:
+    logger.exception(
+        "steward routes failed to register — /api/contracts/*/steward unavailable"
+    )
+
+try:
+    from redibis.webapp.workspace_routes import register_workspace_routes
+
+    register_workspace_routes(app)
+except Exception:
+    logger.exception(
+        "workspace routes failed to register — /api/workspaces unavailable"
     )
 
 # Behavior Policy Runtime — catalogue, CRUD, simulate, activate (Phase 5+)

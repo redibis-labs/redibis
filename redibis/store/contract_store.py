@@ -66,6 +66,7 @@ from redibis.store.quality_decisions import (
 )
 from redibis.store.definition_decisions import (
     DefinitionDecisionStore,
+    evaluate_and_mark_definition_drift,
     reconcile_definition_decisions,
 )
 from redibis.store.storage_backend import StorageBackend
@@ -175,11 +176,13 @@ class ContractStore:
         metadata_bucket: Optional[str] = None,
         *,
         memory_config: Optional["MemoryConfig"] = None,
+        on_upsert: Optional[Any] = None,
     ):
         from redibis.config import MemoryConfig
 
         self.backend = backend
         self.bucket  = bucket
+        self.on_upsert = on_upsert
         self.memory_config = memory_config or MemoryConfig()
         from redibis.memory.consent import SamplingConsentStore
         self.sampling_consent = SamplingConsentStore(backend, bucket)
@@ -207,6 +210,12 @@ class ContractStore:
         self.quality_decisions = QualityDecisionStore(backend, bucket)
         self.definition_decisions = DefinitionDecisionStore(backend, bucket)
         self.verdict_import_log = VerdictImportLog(backend, bucket)
+        from redibis.store.generation_ledger import GenerationLedger
+        from redibis.store.field_decisions import FieldDecisionStore
+        from redibis.store.profile_store import ProfileStore
+        self.generation_ledger = GenerationLedger(backend, bucket)
+        self.field_decisions = FieldDecisionStore(backend, bucket)
+        self.profiles = ProfileStore(backend, bucket, consent=self.sampling_consent)
 
     # ── Key path helpers ──────────────────────────────────────────────────
 
@@ -262,6 +271,100 @@ class ContractStore:
             return None
         return self._normalize_active_contract(table, raw)
 
+    def _column_metadata_pointers(self, table: str) -> dict:
+        """Stats digests + profile pointers — never the profiling payload."""
+        tel = self.metadata.get_column_telemetry(table) or {}
+        latest = None
+        try:
+            latest = self.profiles.latest_run_id(table)
+        except Exception:
+            latest = None
+        out: dict[str, dict] = {}
+        _PAYLOAD_KEYS = frozenset({
+            "profiling", "profiling_features", "samples", "sample_values", "histogram",
+        })
+        for name, entry in tel.items():
+            if not isinstance(entry, dict):
+                continue
+            slim = {k: v for k, v in entry.items() if k not in _PAYLOAD_KEYS}
+            if latest:
+                slim["profile_ref"] = {"run_id": latest}
+            out[str(name)] = slim
+        return out
+
+    def _append_generations_from_scan(
+        self,
+        table: str,
+        merged: dict,
+        run_id: str,
+        *,
+        generations: Any = None,
+        telemetry: Optional[dict] = None,
+    ) -> None:
+        from redibis.review.fingerprint import fingerprint_from_contract_prop
+        from redibis.store.generation_ledger import Generation, generations_from_telemetry
+
+        by_name = {}
+        for schema_obj in merged.get("schema", []) or []:
+            for prop in schema_obj.get("properties", []) or []:
+                if isinstance(prop, dict) and prop.get("name"):
+                    by_name[prop["name"]] = prop
+
+        if isinstance(generations, dict) and generations:
+            for column, gens in generations.items():
+                fp = fingerprint_from_contract_prop(column, by_name.get(column) or {})
+                stamped = []
+                for g in gens or []:
+                    d = dict(g)
+                    d.setdefault("fingerprint_key", fp.fingerprint_key)
+                    d.setdefault("run_id", run_id)
+                    stamped.append(Generation.from_dict(d))
+                if stamped:
+                    self.generation_ledger.append(table, str(column), stamped)
+            return
+
+        if isinstance(telemetry, dict) and telemetry:
+            for column, tel in telemetry.items():
+                if not isinstance(tel, dict):
+                    continue
+                existing = self.generation_ledger.get(table, str(column))
+                if existing:
+                    continue
+                fp = fingerprint_from_contract_prop(column, by_name.get(column) or {})
+                gens = generations_from_telemetry(
+                    str(column), tel,
+                    run_id=str(tel.get("run_id") or run_id),
+                    fingerprint_key=fp.fingerprint_key,
+                )
+                if gens:
+                    self.generation_ledger.append(table, str(column), gens)
+
+    def _mark_columns_needs_review(self, table: str, columns: list[str]) -> None:
+        if not columns:
+            return
+        try:
+            from redibis.store.review_store import ColumnReview, ReviewStore
+            reviews = ReviewStore(self.backend, self.bucket)
+            state = reviews.get(table)
+            for column in columns:
+                existing = state.columns.get(column)
+                reviews.set_column(
+                    table,
+                    ColumnReview(
+                        column=column,
+                        status="needs_review",
+                        approved=dict(existing.approved) if existing else {},
+                        reviewed_by=existing.reviewed_by if existing else "",
+                        note="fingerprint drift — re-review required",
+                        verdicts=dict(existing.verdicts) if existing else {},
+                    ),
+                    total_columns=state.total_columns,
+                    contract_uuid=state.contract_uuid,
+                    updated_by="drift",
+                )
+        except Exception:
+            log.warning("failed to mark columns needs_review after drift", exc_info=True)
+
     def _normalize_active_contract(self, table: str, contract: dict) -> dict:
         """Migrate embedded telemetry to metadata store; return slim spec."""
         if extract_operational_metadata(contract):
@@ -283,6 +386,7 @@ class ContractStore:
             "pii_decisions": {
                 k: v for k, v in (self.pii_decisions.get(table) or {}).items()
             },
+            "columns": self._column_metadata_pointers(table),
         }
 
     def export_integration_package(self, table: str) -> dict:
@@ -507,6 +611,12 @@ class ContractStore:
             # every scan and merge workflow passes through — so lifecycle state
             # changes at write time, never as a side effect of a reviewer GET.
             evaluate_and_mark_drift(table, merged, self.pii_decisions)
+            stale_pii = [
+                col for col, raw in (self.pii_decisions.get(table) or {}).items()
+                if str(raw.get("lifecycle_state") or "") == "stale"
+            ]
+            if stale_pii:
+                self._mark_columns_needs_review(table, stale_pii)
             decisions = self.pii_decisions.get(table)
             reconcile_pii_columns(merged, decisions)
 
@@ -516,7 +626,16 @@ class ContractStore:
 
         dd = self.definition_decisions.get(table)
         if dd.get("table") or dd.get("columns"):
+            stale_defs = evaluate_and_mark_definition_drift(table, merged, self.definition_decisions)
+            if stale_defs:
+                self._mark_columns_needs_review(table, stale_defs)
+            dd = self.definition_decisions.get(table)
             reconcile_definition_decisions(merged, dd)
+
+        from redibis.store.field_decisions import evaluate_and_mark_field_drift
+        stale_fields = evaluate_and_mark_field_drift(table, merged, self.field_decisions)
+        if stale_fields:
+            self._mark_columns_needs_review(table, [c for c, _f in stale_fields])
 
         # ── PII value-leak guard: strip quality rules from PII columns ────
         # min/max/quantile/validValues/length expectations embed REAL PII
@@ -556,6 +675,11 @@ class ContractStore:
         column_telemetry = partial.get("_column_telemetry")
         if isinstance(column_telemetry, dict) and column_telemetry:
             self.metadata.merge_column_telemetry(table, column_telemetry)
+            self._append_generations_from_scan(
+                table, merged, run_id or timestamp,
+                generations=partial.get("_generations"),
+                telemetry=column_telemetry,
+            )
 
         slim = slim_contract(merged)
 
@@ -593,7 +717,7 @@ class ContractStore:
             contributed_fields = provenance_entry.get("contributed_fields", []),
         )
 
-        return UpsertResult(
+        result = UpsertResult(
             table          = table,
             contract_uuid  = slim.get("contract_uuid", ""),
             run_uuid       = run_uuid,
@@ -605,6 +729,13 @@ class ContractStore:
             workflow       = workflow,
             timestamp      = timestamp,
         )
+        hook = getattr(self, "on_upsert", None)
+        if callable(hook):
+            try:
+                hook(result, slim)
+            except Exception:
+                log.warning("on_upsert hook failed for %s", table, exc_info=True)
+        return result
 
     def upsert_business(
         self,
@@ -995,12 +1126,23 @@ class ContractStore:
         decided_by: str = "",
         run_id: str = "",
     ) -> UpsertResult:
+        from redibis.store.field_decisions import fingerprint_kwargs_from_prop
+
+        active = self.get_active(table)
+        by_name = {}
+        if active:
+            for schema_obj in active.get("schema", []) or []:
+                for prop in schema_obj.get("properties", []) or []:
+                    if isinstance(prop, dict) and prop.get("name"):
+                        by_name[prop["name"]] = prop
         if table_patch:
             self.definition_decisions.patch_table(table, table_patch, decided_by=decided_by)
         for col, patch in (column_patches or {}).items():
             if col not in self.column_names(table):
                 raise ValueError(f"Column {col!r} is not in the {table!r} contract schema.")
-            self.definition_decisions.patch_column(table, col, patch, decided_by=decided_by)
+            stamped = dict(patch)
+            stamped.update(fingerprint_kwargs_from_prop(col, by_name.get(col)))
+            self.definition_decisions.patch_column(table, col, stamped, decided_by=decided_by)
         result = self._reapply_overlays(
             table, workflow="definitions-patch",
             run_id=run_id or "definitions-patch",

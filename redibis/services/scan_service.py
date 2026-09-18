@@ -274,6 +274,7 @@ class ScanService:
                         )
 
                 if run_result.status == "success":
+                    self._write_guarded_profiles(config, run_id, run_result, df)
                     if run_result.contract_draft is not None:
                         _add_step("Writing run subcontracts...")
                         persist = ScanContractWriter.persist(
@@ -402,6 +403,45 @@ class ScanService:
                 "Install with: pip install redibis[ner]"
             )
             return []
+
+    def _write_guarded_profiles(self, config, run_id, run_result, df) -> None:
+        """Best-effort write of the guarded profile store + profile generations."""
+        if self.store is None:
+            return
+        try:
+            samples: dict[str, list] = {}
+            if df is not None and hasattr(df, "columns"):
+                for col in list(df.columns)[:200]:
+                    try:
+                        samples[str(col)] = [str(v) for v in list(df[col].head(5))]
+                    except Exception:
+                        continue
+            engines = []
+            profile = getattr(run_result, "profile", None)
+            if profile is not None:
+                engines.append("profile")
+            self.store.profiles.write(
+                config.table,
+                run_id,
+                profile_result=profile,
+                quality_result=getattr(run_result, "quality_results", None),
+                samples=samples,
+                consent=self.store.sampling_consent,
+                engines=engines,
+                actor="scan",
+            )
+            from redibis.store.generation_ledger import generations_from_profile
+            from redibis.review.fingerprint import fingerprint_from_contract_prop
+            stats_map = {}
+            if profile is not None:
+                from redibis.store.profile_store import _stats_from_profile
+                stats_map = _stats_from_profile(profile)
+            for column, stats in stats_map.items():
+                gens = generations_from_profile(column, stats, run_id=run_id)
+                if gens:
+                    self.store.generation_ledger.append(config.table, column, gens)
+        except Exception:
+            log.warning("guarded profile write failed", exc_info=True)
 
     def _write_deterministic_lifecycle(
         self,

@@ -775,3 +775,113 @@ def test_missing_llm_log_returns_available_false(client):
     assert body["available"] is False
     assert "not retained" in (body.get("reason") or "")
 
+
+def test_explorer_cannot_create_session(client):
+    _explorer(client)
+    r = _post(client, "/api/gateway/sessions", {"name": "Lab"})
+    assert r.status_code == 403
+
+
+def test_explorer_cannot_write_curation(client, tmp_path, monkeypatch):
+    monkeypatch.setenv("REDIBIS_CONFIGS_DIR", str(tmp_path))
+    _explorer(client)
+    r = _post(
+        client,
+        "/api/gateway/curation",
+        {
+            "run_uuid": "run-nope",
+            "curation": {
+                "kind": "redibis.span_curation",
+                "schema_version": "1.0",
+                "run_uuid": "run-nope",
+                "entries": [
+                    {
+                        "key": {"start": 0, "end": 1, "entity_type": "PERSON", "source": "engine"},
+                        "decision": "reject",
+                    }
+                ],
+            },
+        },
+    )
+    assert r.status_code == 403
+
+
+def test_admin_session_collision_is_409(client, tmp_path, monkeypatch):
+    monkeypatch.setenv("REDIBIS_CONFIGS_DIR", str(tmp_path))
+    _admin(client)
+    first = _post(client, "/api/gateway/sessions", {"name": "Lab"})
+    assert first.status_code == 201, first.text
+    again = _post(client, "/api/gateway/sessions", {"name": "Lab"})
+    assert again.status_code == 409
+
+
+def test_llm_verdict_on_fresh_configs_dir_is_200_not_500(client, tmp_path, monkeypatch):
+    """D1: first /llm-verdict must mkdir the run dir before writing .hmac_key."""
+    monkeypatch.setenv("REDIBIS_CONFIGS_DIR", str(tmp_path / "fresh_configs"))
+    monkeypatch.delenv("REDIBIS_PII_RUN_HMAC_KEY", raising=False)
+    monkeypatch.delenv("REDIBIS_PII_RUN_DIR", raising=False)
+    _explorer(client)
+    text = "standalone verdict text that is long enough to digest"
+    r = _post(client, "/api/gateway/llm-verdict", {"text": text})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body.get("error") == "no LLM refiner attached"
+    assert r.headers.get("X-Redibis-LLM") == "unavailable"
+    assert (tmp_path / "fresh_configs" / "pii_runs" / ".hmac_key").is_file()
+
+
+def test_recommend_on_fresh_configs_dir_sets_llm_unavailable_header(client, tmp_path, monkeypatch):
+    monkeypatch.setenv("REDIBIS_CONFIGS_DIR", str(tmp_path / "fresh_configs_rec"))
+    monkeypatch.delenv("REDIBIS_PII_RUN_HMAC_KEY", raising=False)
+    monkeypatch.delenv("REDIBIS_PII_RUN_DIR", raising=False)
+    _explorer(client)
+    r = _post(
+        client,
+        "/api/gateway/recommend",
+        {"text": "standalone recommend text that is long enough"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json().get("error") == "no LLM refiner attached"
+    assert r.headers.get("X-Redibis-LLM") == "unavailable"
+
+
+def test_advise_reports_effective_false_for_word_inside_span(client):
+    _explorer(client)
+    text = "قابل محمد علي اليوم"
+    start = text.index("محمد علي")
+    r = _post(
+        client,
+        "/api/gateway/rules/advise",
+        {
+            "term": "محمد",
+            "text": text,
+            "spans": [{"start": start, "end": start + len("محمد علي"), "entity_type": "PERSON", "text": "محمد علي"}],
+        },
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["effective"] is False
+    assert body["reason"]
+    assert "sits inside" in body["reason"]
+    assert body["advice"]
+
+
+def test_advise_reports_effective_true_for_whole_surface(client):
+    _explorer(client)
+    text = "hello Alice"
+    start = text.index("Alice")
+    r = _post(
+        client,
+        "/api/gateway/rules/advise",
+        {
+            "term": "Alice",
+            "text": text,
+            "spans": [{"start": start, "end": start + 5, "entity_type": "PERSON", "text": "Alice"}],
+        },
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["effective"] is True
+    assert "advice" in body
+
+

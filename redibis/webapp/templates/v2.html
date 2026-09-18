@@ -63,6 +63,25 @@ small.hint{color:var(--muted);font-size:11px}
 .diff-after{color:#166534;font-weight:600}
 .diff-add{color:#166534}.diff-remove{color:#991b1b}
 tr.diff-row td{vertical-align:top}
+.wrap{grid-template-columns:340px 1fr}
+#workspaceBar{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+#workspaceBar .ws-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+#workspaceBar select,#workspaceBar input{width:100%}
+#workspaceBar .ws-pager{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.tbl-item{display:grid;grid-template-columns:18px 1fr auto auto auto;gap:6px;align-items:center}
+.ws-row-main{display:flex;flex-direction:column;min-width:0}
+.ws-row-meta{font-size:10px;color:var(--muted);font-weight:400;font-family:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ws-select-row{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);margin:6px 0}
+.ws-table-head{display:none}
+.art-dots{display:flex;gap:2px}
+.art-dot{width:7px;height:7px;border-radius:50%;background:#e2e8f0;font-size:0}
+.art-dot.on{background:#2563eb}
+.ws-batch-bar details{margin-top:10px;font-size:12px}
+.ws-batch-bar button{display:block;width:100%;text-align:left;margin-top:4px}
+#batchPanel{position:fixed;bottom:0;left:340px;right:0;background:#fff;border-top:1px solid var(--border);max-height:180px;overflow:auto;z-index:20;padding:8px 16px}
+.ws-batch-panel{font-size:12px}
+.ws-batch-item.error{color:#991b1b}
+.ws-uuid{cursor:copy}
 </style>
 </head>
 <body>
@@ -77,18 +96,20 @@ tr.diff-row td{vertical-align:top}
 </header>
 <div class="wrap">
   <aside class="side">
-    <h2>Active contracts</h2>
+    <div id="workspaceBar"></div>
+    <h2>Contracts</h2>
     <div id="tableList"></div>
     <h2 style="margin-top:18px">Run buckets</h2>
     <div id="runTableList"></div>
   </aside>
   <main id="main"><div class="empty">Select a table from the left.</div></main>
 </div>
+<div id="batchPanel"></div>
 <div class="toast" id="toast"></div>
 
 <script>
 const $ = (id) => document.getElementById(id);
-let STATE = { table: null, tab: "contract", memoryEnabled: false };
+let STATE = { table: null, tab: "contract", memoryEnabled: false, ws: "default" };
 
 function toast(msg, ok=true){
   const t = $("toast"); t.textContent = msg; t.style.background = ok ? "#0f172a" : "#991b1b";
@@ -96,6 +117,7 @@ function toast(msg, ok=true){
 }
 async function api(method, path, body, isForm){
   const opt = { method, headers:{} };
+  if(STATE.ws) opt.headers["X-Redibis-Workspace"] = STATE.ws;
   if(body && !isForm){ opt.headers["Content-Type"]="application/json"; opt.body=JSON.stringify(body); }
   else if(isForm){ opt.body = body; }
   let r;
@@ -133,7 +155,11 @@ async function api(method, path, body, isForm){
 const esc = (s)=> String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const jsArg = (s)=> esc(JSON.stringify(String(s==null?"":s)));
 function contractPath(table, suffix=""){
-  return `/api/contracts/${encodeURIComponent(table)}${suffix}`;
+  let path = `/api/contracts/${encodeURIComponent(table)}${suffix}`;
+  if(STATE.ws && STATE.ws !== "default"){
+    path += (path.includes("?") ? "&" : "?") + "ws=" + encodeURIComponent(STATE.ws);
+  }
+  return path;
 }
 function formatApiError(e){
   const msg = (e && e.message) ? e.message : String(e);
@@ -149,46 +175,55 @@ async function loadMemoryStatus(){
 }
 
 // ── Sidebar ──────────────────────────────────────────────────────────────
+let _wsRefresh = null;
 async function loadTables(){
+  if(typeof window.mountContractWorkspace === "function"){
+    if(!_wsRefresh){
+      _wsRefresh = await window.mountContractWorkspace({
+        bar: $("workspaceBar"),
+        list: $("tableList"),
+        batch: $("batchPanel"),
+        state: STATE,
+        api: api,
+        onSelect: (t)=>{ STATE.table = t; render(); },
+        toast: toast,
+      });
+    } else if(typeof _wsRefresh === "function"){
+      await _wsRefresh();
+    }
+    return;
+  }
   const contracts = await api("GET","/api/contracts");
-  $("tableList").innerHTML = contracts.length ? contracts.map(c =>
+  const rows = Array.isArray(contracts) ? contracts : (contracts.rows || []);
+  $("tableList").innerHTML = rows.length ? rows.map(c =>
     `<div class="tbl-item ${c.table===STATE.table?'active':''}" onclick="selectTable(${jsArg(c.table)})">
        ${esc(c.table)} <span class="chip chip-muted">v${esc(c.version||'∅')}</span></div>`).join("")
     : `<div class="empty" style="padding:8px">No active contracts yet.</div>`;
-  // tables that only have runs (not yet merged)
-  const seen = new Set(contracts.map(c=>c.table));
-  let runTables = new Set();
-  for(const k of ["pii","quality"]){
-    try{
-      // there's no list-all-run-tables endpoint; derive from contracts + show known
-    }catch(e){}
-  }
 }
 async function selectTable(t){ STATE.table = t; await loadTables(); render(); }
 
 // ── Main render ────────────────────────────────────────────────────────────
 function render(){
   if(!STATE.table){ $("main").innerHTML = `<div class="empty">Select a table.</div>`; return; }
-  const tabs = [["contract","Contract"],["review","Evidence Review"],["runs","Runs"],["enrich","Enrich"],["synthesize","Synthesis"],["share","Share"]];
+  const tabs = [["contract","Contract"],["review","Steward Review"],["runs","Runs"],["enrich","Enrich"],["synthesize","Synthesis"],["share","Share"]];
   $("main").innerHTML =
     `<div class="tabs">${tabs.map(([k,l])=>
         `<div class="tab ${STATE.tab===k?'active':''}" onclick="setTab(${jsArg(k)})">${l}</div>`).join("")}</div>
      <div id="tabBody"></div>`;
-  ({contract:renderContract, review:renderEvidenceReview, runs:renderRuns, enrich:renderEnrich, synthesize:renderSynthesis, share:renderShare}[STATE.tab])();
+  ({contract:renderContract, review:renderStewardReview, runs:renderRuns, enrich:renderEnrich, synthesize:renderSynthesis, share:renderShare}[STATE.tab])();
 }
 function setTab(k){ STATE.tab=k; render(); }
 
-async function renderEvidenceReview(){
-  const body = $("tabBody"); body.innerHTML = "Loading evidence review…";
-  if(typeof EvidenceReviewer === "undefined"){
-    body.innerHTML = `<div class="empty">Evidence reviewer script not loaded.</div>`; return;
+async function renderStewardReview(){
+  const body = $("tabBody"); body.innerHTML = "Loading steward review…";
+  if(typeof window.mountStewardReview !== "function"){
+    body.innerHTML = `<div class="empty">Steward review module not loaded.</div>`; return;
   }
-  body.innerHTML = `<div id="v2EvidenceReview"></div><p class="hint" style="margin-top:12px">
-    <a href="/review?table=${encodeURIComponent(STATE.table)}" target="_blank">Open full-page explorer</a></p>`;
+  body.innerHTML = `<div id="v2StewardReview"></div>`;
   try{
-    await EvidenceReviewer.mountRunExplorer($("v2EvidenceReview"), {table: STATE.table, readOnly: false});
+    await window.mountStewardReview($("v2StewardReview"), {table: STATE.table, api: api, ws: STATE.ws});
   }catch(e){
-    body.innerHTML = `<div class="empty">No run-scoped evidence for this table yet.</div>`;
+    body.innerHTML = `<div class="empty">No contract to review yet. ${esc(e && e.message || e)}</div>`;
   }
 }
 
@@ -196,7 +231,7 @@ async function renderEvidenceReview(){
 async function renderContract(){
   const body = $("tabBody"); body.innerHTML = "Loading…";
   let active;
-  try { active = await api("GET","/api/contracts/"+STATE.table); }
+  try { active = await api("GET", contractPath(STATE.table)); }
   catch(e){ body.innerHTML = `<div class="empty">No active contract. Merge a run first.</div>`; return; }
   const props = (active.schema||[]).flatMap(s=>s.properties||[]);
   const colEngine = (p)=> (p.privacy||{}).classification_engine || p.pii || {};
@@ -1488,7 +1523,9 @@ function openModal(text, onSave){
   const t = params.get("table");
   const sid = params.get("session");
   const tab = params.get("tab");
+  const ws = params.get("ws");
   if(tab) STATE.tab = tab;
+  if(ws) STATE.ws = ws;
   let backHref = "/";
   if(sid) backHref = "/?session="+encodeURIComponent(sid);
   else if(t) backHref = "/?table="+encodeURIComponent(t);
@@ -1500,10 +1537,14 @@ function openModal(text, onSave){
   }
   const backEl = $("backScan");
   if(backEl) backEl.href = backHref;
-  loadMemoryStatus().then(()=> loadTables().then(()=>{ if(t) selectTable(t); }));
+  const start = ()=> loadMemoryStatus().then(()=> loadTables().then(()=>{ if(t) selectTable(t); }));
+  if(document.readyState === "complete") start();
+  else window.addEventListener("load", start);
 })();
 </script>
 <script src="/static/auth.js"></script>
 <script src="/static/evidence_reviewer.js"></script>
+<script type="module" src="/static/steward_review.mjs"></script>
+<script type="module" src="/static/contract_workspace.mjs"></script>
 </body>
 </html>

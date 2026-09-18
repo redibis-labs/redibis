@@ -66,6 +66,11 @@ def clear_stores() -> None:
     global _last_ping
     _stores.clear()
     _last_ping = 0.0
+    try:
+        from redibis.workspace.stores import invalidate_stores
+        invalidate_stores()
+    except Exception:
+        pass
 
 
 def get_backend_store() -> StorageBackend:

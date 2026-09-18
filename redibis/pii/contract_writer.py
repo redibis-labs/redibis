@@ -112,16 +112,22 @@ class PIIContractWriter:
         telemetry = self.build_column_telemetry()
         if telemetry:
             result["_column_telemetry"] = telemetry
+        generations = self.build_generations()
+        if generations:
+            result["_generations"] = generations
         return result
 
     def build_column_telemetry(self) -> dict[str, dict]:
-        """Per-column discovery evidence for ``ContractMetadataStore``."""
+        """Per-column discovery evidence for ``ContractMetadataStore``.
+
+        Every scanned column is recorded — including engines that ran and said
+        "not PII". LLM score/verdict/reasoning are persisted (reasoning scrubbed).
+        """
+        from redibis.contracts.privacy import scrub_pii_text
         from redibis.pii.equations import build_column_report
 
         out: dict[str, dict] = {}
         for det in self._detections:
-            if not det.detected:
-                continue
             report = build_column_report(
                 det, thresholds=self.thresholds, equation=self.equation_used,
             )
@@ -129,6 +135,7 @@ class PIIContractWriter:
             entry: dict[str, Any] = {
                 "entity_type": det.entity_type,
                 "confidence": det.confidence,
+                "detected": bool(det.detected),
                 "discovery_engines": engines,
                 "run_id": self.run_id,
             }
@@ -146,9 +153,31 @@ class PIIContractWriter:
                 entry["gliner_score"] = det.gliner_score
             if det.phone_score is not None:
                 entry["phone_score"] = det.phone_score
+            if det.llm_score is not None:
+                entry["llm_score"] = det.llm_score
+            if det.llm_verdict is not None:
+                entry["llm_verdict"] = det.llm_verdict
+            if det.llm_reasoning:
+                entry["llm_reasoning"] = scrub_pii_text(str(det.llm_reasoning))
+            if det.edge_rule_ids:
+                entry["edge_rule_ids"] = list(det.edge_rule_ids)
             if det.arabic_aware:
                 entry["arabic_aware"] = True
             out[det.column] = entry
+        return out
+
+    def build_generations(self, *, fingerprint_by_column: Optional[dict[str, str]] = None) -> dict[str, list[dict]]:
+        """Per-column generation records for the append-only ledger."""
+        from redibis.store.generation_ledger import generations_from_detection
+
+        fps = fingerprint_by_column or {}
+        out: dict[str, list[dict]] = {}
+        for det in self._detections:
+            gens = generations_from_detection(
+                det, run_id=self.run_id, fingerprint_key=str(fps.get(det.column) or ""),
+            )
+            if gens:
+                out[det.column] = [g.to_dict() for g in gens]
         return out
 
     def _property_for_detection(self, det: PIIDetection) -> dict:

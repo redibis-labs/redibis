@@ -227,6 +227,36 @@ def _stage_schema_fields(candidate: dict, bundle: EvidenceBundle, ctx: dict) -> 
         prop.setdefault("relationships", [])
         if created:
             pass
+        # Record synthesis opinions for the steward ledger when a store is wired.
+        ledger = ctx.get("generation_ledger")
+        table = ctx.get("table")
+        if ledger and table and name:
+            try:
+                from redibis.store.generation_ledger import Generation
+                gens = []
+                if payload.get("classification"):
+                    gens.append(Generation(
+                        field="classification",
+                        source="llm_synthesis",
+                        value=str(payload["classification"]).lower(),
+                        confidence=rec.confidence,
+                        run_id=str(ctx.get("run_id") or "synthesis"),
+                        ts="",
+                        detail={"requirement_ids": list(rec.requirement_ids)},
+                    ))
+                if payload.get("logicalType"):
+                    gens.append(Generation(
+                        field="logical_type",
+                        source="llm_synthesis",
+                        value=lt,
+                        confidence=rec.confidence,
+                        run_id=str(ctx.get("run_id") or "synthesis"),
+                        ts="",
+                    ))
+                if gens:
+                    ledger.append(table, str(name), gens)
+            except Exception:
+                pass
     schema_obj["properties"] = props
     return StageResult(stage_id="schema_fields", findings=findings)
 

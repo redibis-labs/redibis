@@ -4,8 +4,18 @@ const {
   paintBanners,
   remapSpansAfterDeid,
   renderHighlights,
+  selectionOffsets,
 } = await import(`./gateway_render.mjs?v=${window.GW_RENDER_V || ""}`);
-const { createRulesEditor } = await import(`./gateway_rules.mjs?v=${window.GW_RULES_V || window.GW_RENDER_V || ""}`);
+const { createRulesEditor, askInline } = await import(`./gateway_rules.mjs?v=${window.GW_RULES_V || window.GW_RENDER_V || ""}`);
+const {
+  applyCuration,
+  emptyCuration,
+  entityCounts,
+  isRejected,
+  persistable,
+  spanKey,
+  upsertEntry,
+} = await import(`./gateway_curation.mjs?v=${window.GW_CURATION_V || window.GW_RENDER_V || ""}`);
 
 const MAX = Number(window.GW_MAX_CHARS || 200000);
 const STRATEGIES = ["redact", "mask", "hash", "fpe", "fake", "passthrough"];
@@ -82,9 +92,12 @@ let sourceText = "";
 let lastEnvelope = null;
 let lastLlmLog = null;
 let llmLogOpen = false;
+let curation = emptyCuration();
+let hideRejected = false;
 const rulesEditor = $("gwRules")
   ? createRulesEditor($("gwRules"), {
     getText: () => sourceText || (input && input.value) || "",
+    getSpans: () => (lastEnvelope && lastEnvelope.analysers && lastEnvelope.analysers.pii && lastEnvelope.analysers.pii.spans) || [],
     getLanguage: () => langEl.value,
     getEngines: () => enginesEl.value,
     getMinScore: () => Number(minScoreEl.value || 0.35),
@@ -142,6 +155,10 @@ function scanPayload() {
     check_toxicity: !!(checkToxicityEl && checkToxicityEl.checked),
     check_prompt_injection: !!(checkInjectionEl && checkInjectionEl.checked),
     draft_rules: rulesEditor && rulesEditor.getDraft() || undefined,
+    llm_verdict: ($("gwLlmVerdict") && $("gwLlmVerdict").checked)
+      ? ((useLlmEl && useLlmEl.checked) ? "both" : "independent")
+      : "off",
+    recommend: !!( $("gwRecommend") && $("gwRecommend").checked ),
   };
 }
 
@@ -316,54 +333,177 @@ function bindMarks(container) {
   });
 }
 
+function rawSpans() {
+  if (!lastEnvelope) return [];
+  const pii = lastEnvelope.analysers && lastEnvelope.analysers.pii;
+  return (pii && pii.spans) || [];
+}
+
+function curatedSpans() {
+  return applyCuration(rawSpans(), curation, sourceText);
+}
+
+function visibleSpans() {
+  return applyCuration(rawSpans(), curation, sourceText, { keepRejected: !hideRejected });
+}
+
+function persistCuration() {
+  if (!lastEnvelope || !lastEnvelope.run_uuid) return;
+  curation.run_uuid = lastEnvelope.run_uuid;
+  fetch("/api/gateway/curation", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ run_uuid: lastEnvelope.run_uuid, curation: persistable(curation) }),
+  }).catch(() => {});
+}
+
+function autoTrimEnabled() {
+  return !!($("gwAutoTrim") && $("gwAutoTrim").checked);
+}
+
+async function trimSpanBounds(span, text) {
+  const res = await fetch("/api/gateway/trim", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: text || "", spans: [span] }),
+  });
+  if (!res.ok) return null;
+  const body = await res.json();
+  return (body.spans || [])[0] || null;
+}
+
+async function decide(span, decision, extra) {
+  extra = extra || {};
+  if (decision === "accept" && autoTrimEnabled() && !extra.trimmed) {
+    const next = await trimSpanBounds(span, sourceText);
+    if (next && (next.start !== span.start || next.end !== span.end)) {
+      extra = Object.assign({}, extra, {
+        new_start: next.start,
+        new_end: next.end,
+        trimmed: true,
+        reason: extra.reason || (next.trim_rules || []).join(", "),
+      });
+    }
+  }
+  const key = spanKey(span, span.source || "engine");
+  const entry = Object.assign({
+    key,
+    decision,
+    by: (window.REDIBIS_USER && window.REDIBIS_USER.username) || "",
+    at: new Date().toISOString(),
+  }, extra);
+  curation = upsertEntry(curation, entry);
+  persistCuration();
+  paintResultPane();
+  if (lastEnvelope) renderSummary(lastEnvelope);
+}
+
+async function promoteToRule(span) {
+  if (!rulesEditor) return;
+  const term = span.text || sourceText.slice(span.start, span.end);
+  const result = await rulesEditor.addTermChecked(term, {
+    preferred: "exclude_terms",
+    spans: curatedSpans(),
+    onReject: () => decide(span, "reject", { reason: "rejected instead of a rule" }),
+  });
+  if (result && (result.action === "forbidden_span" || result.target === "forbidden_span")) {
+    decide(span, "reject", { reason: "forbidden_span" });
+  }
+}
+
+function curationButtons(span) {
+  const wrap = document.createElement("span");
+  wrap.className = "gw-curate";
+  const keep = document.createElement("button");
+  keep.type = "button";
+  keep.className = "btn btn-ghost btn-sm";
+  keep.appendChild(document.createTextNode("✓ keep"));
+  keep.addEventListener("click", () => decide(span, "accept"));
+  const reject = document.createElement("button");
+  reject.type = "button";
+  reject.className = "btn btn-ghost btn-sm";
+  reject.appendChild(document.createTextNode("✗ reject"));
+  reject.addEventListener("click", () => decide(span, "reject"));
+  const edit = document.createElement("button");
+  edit.type = "button";
+  edit.className = "btn btn-ghost btn-sm";
+  edit.appendChild(document.createTextNode("✎ edit"));
+  edit.addEventListener("click", () => {
+    const sel = selectionOffsets(resultEl);
+    if (sel && sel.end > sel.start) {
+      decide(span, "modify", { new_start: sel.start, new_end: sel.end });
+      return;
+    }
+    askInline($("gwInlineForm"), {
+      label: "New entity type (or leave blank) — select text in the pane then click edit to set bounds",
+      value: span.entity_type || "",
+      onOk: (et) => decide(span, "modify", { new_entity_type: (et || "").toUpperCase() }),
+    });
+  });
+  const trimBtn = document.createElement("button");
+  trimBtn.type = "button";
+  trimBtn.className = "btn btn-ghost btn-sm";
+  trimBtn.appendChild(document.createTextNode("⟲ trim"));
+  trimBtn.addEventListener("click", async () => {
+    const next = await trimSpanBounds(span, sourceText);
+    if (!next) return;
+    const before = sourceText.slice(span.start, span.end);
+    const after = sourceText.slice(next.start, next.end);
+    paintBanners(bannerEl, [{
+      kind: "info",
+      text: "Trim “" + before + "” → “" + after + "”",
+    }]);
+    decide(span, "modify", {
+      new_start: next.start, new_end: next.end, trimmed: true,
+      reason: (next.trim_rules || []).join(", "),
+    });
+  });
+  const rule = document.createElement("button");
+  rule.type = "button";
+  rule.className = "btn btn-ghost btn-sm";
+  rule.appendChild(document.createTextNode("→ make a rule…"));
+  rule.addEventListener("click", () => promoteToRule(span));
+  wrap.appendChild(keep);
+  wrap.appendChild(reject);
+  wrap.appendChild(edit);
+  wrap.appendChild(trimBtn);
+  wrap.appendChild(rule);
+  return wrap;
+}
+
 function renderSummary(env) {
   const pii = env.analysers.pii;
-  const counts = pii.entity_counts || {};
-  const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  summaryEl.textContent = "";
-  if (!rows.length) {
-    summaryEl.appendChild(document.createTextNode("No entity counts."));
-  } else {
-    for (const [type, n] of rows) {
-      const row = document.createElement("div");
-      row.className = "gw-sum-row";
-      const sw = document.createElement("span");
-      sw.className = "gw-swatch gw-" + classOf(type);
-      row.appendChild(sw);
-      row.appendChild(document.createTextNode(type + " · " + n + " · " + classOf(type)));
-      summaryEl.appendChild(row);
-    }
-    const spansForNoise = (pii.spans || []).filter((s) => s.text);
-    if (spansForNoise.length) {
-      const noiseHint = document.createElement("div");
-      noiseHint.className = "gw-hint";
-      noiseHint.appendChild(document.createTextNode("Add a finding to noise terms:"));
-      summaryEl.appendChild(noiseHint);
-      spansForNoise.slice(0, 12).forEach((span) => {
+    const view = curatedSpans();
+    const listed = visibleSpans();
+    const counts = entityCounts(view);
+    const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    summaryEl.textContent = "";
+    if (!rows.length) {
+      summaryEl.appendChild(document.createTextNode("No entity counts."));
+    } else {
+      for (const [type, n] of rows) {
+        const row = document.createElement("div");
+        row.className = "gw-sum-row";
+        const sw = document.createElement("span");
+        sw.className = "gw-swatch gw-" + classOf(type);
+        row.appendChild(sw);
+        row.appendChild(document.createTextNode(type + " · " + n + " · " + classOf(type)));
+        summaryEl.appendChild(row);
+      }
+      listed.slice(0, 24).forEach((span) => {
         const line = document.createElement("div");
-        line.className = "gw-sum-row";
+        line.className = "gw-sum-row" + (isRejected(span, curation) ? " gw-rejected" : "");
         line.appendChild(document.createTextNode((span.entity_type || "") + " · "));
         const surface = document.createElement("span");
         surface.dir = "auto";
         surface.style.unicodeBidi = "isolate";
-        surface.appendChild(document.createTextNode(span.text || ""));
+        surface.appendChild(document.createTextNode(span.text || sourceText.slice(span.start, span.end) || ""));
         line.appendChild(surface);
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "btn btn-ghost btn-sm gw-noise-btn";
-        btn.appendChild(document.createTextNode("⌦ noise"));
-        btn.addEventListener("click", async () => {
-          if (!rulesEditor) return;
-          rulesEditor.addTerm("noise_terms", span.text);
-          await rulesEditor.preview();
-          runScan();
-        });
-        line.appendChild(btn);
+        line.appendChild(curationButtons(span));
         summaryEl.appendChild(line);
       });
     }
-  }
-  const spans = pii.spans || [];
+    const spans = view;
   const proposals = spans.filter((s) => s.is_proposal).length;
   const foot = document.createElement("div");
   foot.className = "gw-hint";
@@ -690,10 +830,17 @@ function paintResultPane() {
   if (!lastEnvelope) return;
   const pii = lastEnvelope.analysers.pii;
   const text = maskPreviewOn ? maskedText : sourceText;
-  const spans = maskPreviewOn ? maskedSpans : (pii.spans || []);
+  let spans = maskPreviewOn ? maskedSpans : visibleSpans();
   resultEl.dir = (lastEnvelope.text_meta.language || "").startsWith("ar") ? "rtl" : "ltr";
   renderHighlights(resultEl, text, spans);
+  resultEl.querySelectorAll("mark.gw-hl").forEach((mark) => {
+    try {
+      const items = JSON.parse(mark.dataset.spans || "[]");
+      if (items.some((s) => isRejected(s, curation))) mark.classList.add("gw-rejected");
+    } catch { /* ignore */ }
+  });
   bindMarks(resultEl);
+  renderVerdictPane();
 }
 
 function showResultMode(on) {
@@ -717,10 +864,14 @@ function resetMaskPreview() {
 }
 
 function resetAll() {
+  if ((curation.entries || []).length) {
+    if (!window.confirm("Clear " + curation.entries.length + " curation decision(s) and the current result?")) return;
+  }
   cancelScan();
   sourceText = "";
   lastEnvelope = null;
   reviewedPolicy = null;
+  curation = emptyCuration();
   resetMaskPreview();
   input.value = "";
   resultEl.textContent = "";
@@ -821,6 +972,13 @@ async function runScan() {
     const env = await streamScan(scanPayload(), { signal: scanAbort.signal });
     if (!env) return;
     lastEnvelope = env;
+    curation = emptyCuration(env.run_uuid);
+    if (env.run_uuid) {
+      try {
+        const saved = await fetch("/api/gateway/curation/" + encodeURIComponent(env.run_uuid));
+        if (saved.ok) curation = Object.assign(emptyCuration(env.run_uuid), await saved.json());
+      } catch { /* none yet */ }
+    }
     const pii = env.analysers.pii;
     const banners = classifyBanners({
       truncated: env.text_meta.truncated,
@@ -847,6 +1005,7 @@ async function runScan() {
     paintResultPane();
     renderSummary(env);
     renderSafety(env);
+    renderRecommendations(env);
     showResultMode(true);
     resultEl.focus();
     reviewedPolicy = null;
@@ -923,11 +1082,14 @@ async function copyDeidentified() {
   if (!policy) return;
   deidBtn.disabled = true;
   try {
-    const body = scanPayload();
-    body.policy = policy;
-    const env = await api("/api/gateway/deidentify", body);
-    if (!env) return;
-    const text = (env.deidentified && env.deidentified.text) || "";
+    const spans = curatedSpans().slice().sort((a, b) => (b.start || 0) - (a.start || 0));
+    let text = sourceText;
+    spans.forEach((span) => {
+      const start = span.start || 0;
+      const end = span.end || 0;
+      if (end <= start) return;
+      text = text.slice(0, start) + "[" + (span.entity_type || "PII") + "]" + text.slice(end);
+    });
     if (navigator.clipboard && navigator.clipboard.writeText) {
       await navigator.clipboard.writeText(text);
     } else {
@@ -938,7 +1100,7 @@ async function copyDeidentified() {
       document.execCommand("copy");
       ta.remove();
     }
-    paintBanners(bannerEl, [{ kind: "ok", text: "De-identified text copied." }]);
+    paintBanners(bannerEl, [{ kind: "ok", text: "De-identified text copied (curated spans)." }]);
   } catch (err) {
     paintBanners(bannerEl, [{ kind: "warn", text: err.message }]);
   } finally {
@@ -948,7 +1110,16 @@ async function copyDeidentified() {
 
 function downloadJson() {
   if (!lastEnvelope) return;
-  const blob = new Blob([JSON.stringify(lastEnvelope, null, 2)], { type: "application/json" });
+  const payload = JSON.parse(JSON.stringify(lastEnvelope));
+  payload.curation = persistable(curation);
+  payload.analysers = payload.analysers || {};
+  payload.analysers.pii = payload.analysers.pii || {};
+  payload.analysers.pii.spans = curatedSpans();
+  payload.analysers.pii.entity_counts = entityCounts(payload.analysers.pii.spans);
+  if (lastEnvelope.analysers && lastEnvelope.analysers.llm_verdict) {
+    payload.llm_verdict = lastEnvelope.analysers.llm_verdict;
+  }
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   const stem = String((lastEnvelope.run_uuid || lastEnvelope.llm && lastEnvelope.llm.run_id) || "result").slice(0, 12);
@@ -970,6 +1141,124 @@ async function downloadLlmLog() {
   URL.revokeObjectURL(a.href);
 }
 
+function renderVerdictPane() {
+  const pane = $("gwVerdict");
+  const card = $("gwVerdictCard");
+  const list = $("gwVerdictList");
+  const meta = $("gwVerdictMeta");
+  if (!pane || !card) return;
+  const verdict = lastEnvelope && lastEnvelope.analysers && lastEnvelope.analysers.llm_verdict;
+  if (!verdict) {
+    pane.hidden = true;
+    card.hidden = true;
+    return;
+  }
+  const spans = verdict.spans || [];
+  const diff = (lastEnvelope.analysers && lastEnvelope.analysers.verdict_diff) || {};
+  pane.hidden = false;
+  card.hidden = false;
+  pane.dir = (lastEnvelope.text_meta.language || "").startsWith("ar") ? "rtl" : "ltr";
+  const showDiff = $("gwVerdictDiff") && $("gwVerdictDiff").checked;
+  const paint = showDiff
+    ? (verdict.spans || []).map((s) => Object.assign({}, s, { eval_kind: "llm_only" }))
+    : spans;
+  renderHighlights(pane, sourceText, paint);
+  if (meta) {
+    meta.textContent = [
+      verdict.model || "llm",
+      "coverage " + ((verdict.coverage_fraction || 0) * 100).toFixed(0) + "%",
+      spans.length + " spans",
+      (diff.agree || 0) + " agree",
+      (diff.llm_only || 0) + " llm-only",
+      verdict.error ? ("error: " + verdict.error) : "",
+    ].filter(Boolean).join(" · ");
+  }
+  if (list) {
+    list.textContent = "";
+    spans.forEach((span) => {
+      const row = document.createElement("div");
+      row.className = "gw-sum-row";
+      const label = document.createElement("span");
+      label.dir = "auto";
+      label.style.unicodeBidi = "isolate";
+      label.appendChild(document.createTextNode((span.entity_type || "") + " · " + (span.text || "")));
+      row.appendChild(label);
+      const acc = document.createElement("button");
+      acc.type = "button";
+      acc.className = "btn btn-ghost btn-sm";
+      acc.appendChild(document.createTextNode("✓ accept"));
+      acc.addEventListener("click", () => {
+        decide(Object.assign({}, span, { source: "llm_verdict" }), "accept");
+      });
+      const ed = document.createElement("button");
+      ed.type = "button";
+      ed.className = "btn btn-ghost btn-sm";
+      ed.appendChild(document.createTextNode("✎ accept with edit"));
+      ed.addEventListener("click", () => {
+        const sel = selectionOffsets(pane);
+        const extra = { };
+        if (sel && sel.end > sel.start) {
+          extra.new_start = sel.start;
+          extra.new_end = sel.end;
+        }
+        decide(Object.assign({}, span, { source: "llm_verdict" }), "accept", extra);
+      });
+      const ign = document.createElement("button");
+      ign.type = "button";
+      ign.className = "btn btn-ghost btn-sm";
+      ign.appendChild(document.createTextNode("✗ ignore"));
+      ign.addEventListener("click", () => {
+        decide(Object.assign({}, span, { source: "llm_verdict" }), "reject");
+      });
+      row.appendChild(acc);
+      row.appendChild(ed);
+      row.appendChild(ign);
+      list.appendChild(row);
+    });
+  }
+}
+
+function acceptVerdictFilter(pred) {
+  const verdict = lastEnvelope && lastEnvelope.analysers && lastEnvelope.analysers.llm_verdict;
+  const diff = (lastEnvelope && lastEnvelope.analysers && lastEnvelope.analysers.verdict_diff) || {};
+  (verdict && verdict.spans || []).forEach((span) => {
+    if (pred && !pred(span, diff)) return;
+    decide(Object.assign({}, span, { source: "llm_verdict" }), "accept");
+  });
+}
+
+function renderRecommendations(env) {
+  const card = $("gwRecommendCard");
+  const list = $("gwRecommendList");
+  if (!card || !list) return;
+  const recs = env && env.analysers && env.analysers.recommendations;
+  if (!recs || !(recs.items || []).length) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  list.textContent = "";
+  (recs.items || []).forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "gw-sum-row";
+    const badge = (item.validation && item.validation.ok === false) ? " refused" : " ok";
+    row.appendChild(document.createTextNode(
+      item.target + " · " + JSON.stringify(item.value) + " · " + (item.reason || "") + badge
+    ));
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "btn btn-ghost btn-sm";
+    add.appendChild(document.createTextNode("+ add to draft"));
+    add.addEventListener("click", async () => {
+      if (!rulesEditor) return;
+      const term = typeof item.value === "string" ? item.value : (item.value && item.value.value) || "";
+      await rulesEditor.addTermChecked(term || JSON.stringify(item.value), { preferred: item.target });
+    });
+    row.appendChild(add);
+    list.appendChild(row);
+  });
+}
+
 function syncLlmSelectors() {
   const on = !!(useLlmEl && useLlmEl.checked);
   llmProviderWrap.hidden = !on;
@@ -984,6 +1273,10 @@ useLlmEl.addEventListener("change", syncLlmSelectors);
 if (llmModelEl) llmModelEl.addEventListener("change", preferLocalProviderForHfModel);
 if (llmModelEl) llmModelEl.addEventListener("blur", preferLocalProviderForHfModel);
 editBtn.addEventListener("click", () => {
+  if ((curation.entries || []).length) {
+    if (!window.confirm("Editing the text invalidates " + curation.entries.length + " curation decision(s). Continue?")) return;
+    curation = emptyCuration(lastEnvelope && lastEnvelope.run_uuid);
+  }
   resetMaskPreview();
   input.value = sourceText;
   showResultMode(false);
@@ -997,6 +1290,80 @@ if (policyAllRedactBtn) {
 clearBtn.addEventListener("click", resetAll);
 deidBtn.addEventListener("click", copyDeidentified);
 downloadBtn.addEventListener("click", downloadJson);
+if ($("gwHideRejected")) $("gwHideRejected").addEventListener("change", (ev) => {
+  hideRejected = !!ev.target.checked;
+  if (lastEnvelope) { paintResultPane(); renderSummary(lastEnvelope); }
+});
+if ($("gwVerdictAcceptAll")) $("gwVerdictAcceptAll").addEventListener("click", () => acceptVerdictFilter(null));
+if ($("gwVerdictAcceptAgree")) $("gwVerdictAcceptAgree").addEventListener("click", () => {
+  const diff = (lastEnvelope && lastEnvelope.analysers && lastEnvelope.analysers.verdict_diff) || {};
+  const agree = {};
+  ((diff.rows && diff.rows.agree) || []).forEach((row) => {
+    const llm = row.llm || [];
+    agree[llm.join("\t")] = true;
+  });
+  acceptVerdictFilter((span) => agree[[span.start, span.end, span.entity_type].join("\t")]);
+});
+if ($("gwVerdictAcceptLlmOnly")) $("gwVerdictAcceptLlmOnly").addEventListener("click", () => {
+  const diff = (lastEnvelope && lastEnvelope.analysers && lastEnvelope.analysers.verdict_diff) || {};
+  const only = {};
+  ((diff.rows && diff.rows.llm_only) || []).forEach((row) => {
+    const llm = row.llm || [];
+    only[llm.join("\t")] = true;
+  });
+  acceptVerdictFilter((span) => only[[span.start, span.end, span.entity_type].join("\t")]);
+});
+if ($("gwVerdictDiff")) $("gwVerdictDiff").addEventListener("change", () => paintResultPane());
+if ($("gwRecommendDownload")) $("gwRecommendDownload").addEventListener("click", () => {
+  const recs = lastEnvelope && lastEnvelope.analysers && lastEnvelope.analysers.recommendations;
+  if (!recs) return;
+  const blob = new Blob([JSON.stringify(recs, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "recommendations.json";
+  a.click();
+});
+if ($("gwSaveUsecase")) $("gwSaveUsecase").addEventListener("click", async () => {
+  if (!sourceText) return;
+  askInline($("gwInlineForm"), {
+    label: "Session name",
+    value: "",
+    onOk: async (sessionName) => {
+      if (!sessionName) return;
+      let slug = sessionName;
+      const created = await fetch("/api/gateway/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: sessionName }),
+      });
+      if (created.status === 201) {
+        const meta = await created.json();
+        slug = meta.slug;
+      } else if (created.status === 409) {
+        slug = sessionName.replace(/\s+/g, "-");
+      } else if (!created.ok) {
+        paintBanners(bannerEl, [{ kind: "warn", text: "Could not create session (" + created.status + ")" }]);
+        return;
+      }
+      const spans = curatedSpans().map((s) => ({
+        start: s.start, end: s.end, entity_type: s.entity_type, value: s.text,
+      }));
+      const res = await fetch("/api/gateway/sessions/" + encodeURIComponent(slug) + "/usecases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          usecase: { name: sessionName, text: sourceText, language: langEl.value, expected_spans: spans },
+          curation: persistable(curation),
+          llm_verdict: lastEnvelope && lastEnvelope.analysers && lastEnvelope.analysers.llm_verdict,
+        }),
+      });
+      paintBanners(bannerEl, [{
+        kind: res.ok ? "ok" : "warn",
+        text: res.ok ? "Saved to session " + slug : "Save failed (" + res.status + ")",
+      }]);
+    },
+  });
+});
 if (llmDownloadBtn) llmDownloadBtn.addEventListener("click", downloadLlmLog);
 if (llmShowBtn) llmShowBtn.addEventListener("click", toggleLlmLog);
 if (llmDownloadBarBtn) llmDownloadBarBtn.addEventListener("click", downloadLlmLog);

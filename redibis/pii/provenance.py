@@ -286,6 +286,8 @@ def _regex_inventory(ruleset: Any) -> tuple[str, ...]:
 
 def _engine_set(engines: str | None) -> set[str]:
     e = (engines or "both").lower().strip()
+    if e in ("none", "off"):
+        return set()
     if e in ("both", "all"):
         return {"regex", "phone", "ner"}
     if e == "regex":

@@ -227,6 +227,8 @@ def test_capability_table_is_the_policy():
     assert not role_can("explorer", "manage_users")
     assert role_can("admin", "mutate")
     assert role_can("admin", "manage_users")
+    assert role_can("admin", "view_samples")
+    assert not role_can("explorer", "view_samples")
     assert set(ROLE_CAPABILITIES) == {"admin", "explorer"}
 
 

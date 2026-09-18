@@ -128,7 +128,13 @@ export function createRulesEditor(host, options) {
   function render() {
     host.textContent = "";
     const head = el("button", { type: "button", className: "gw-rules-toggle" });
-    head.appendChild(document.createTextNode(state.dirty ? "Detection rules · unsaved draft" : "Detection rules"));
+    const ineffectiveN = (state.ineffective || []).length;
+    const stagedN = (state.applyToRun || state.dirty) ? 1 : 0;
+    let title = state.dirty ? "Detection rules · unsaved draft" : "Detection rules";
+    if (state.applyToRun) title += " · staged";
+    if (ineffectiveN) title += " · " + ineffectiveN + " ineffective";
+    head.appendChild(document.createTextNode(title));
+    if (ineffectiveN) head.style.color = "#991b1b";
     const body = el("div", { className: "gw-rules-body" });
     body.hidden = !!state.collapsed;
     head.addEventListener("click", () => {
@@ -145,8 +151,7 @@ export function createRulesEditor(host, options) {
         markDirty();
       }));
       body.appendChild(addRow("Add " + title.toLowerCase(), (v) => {
-        state.draft[key] = uniquePush(state.draft[key] || [], v);
-        markDirty();
+        addTermChecked(v, { preferred: key, spans: opts.getSpans ? opts.getSpans() : [] });
       }));
     }
     section("Noise terms", "noise_terms");
@@ -278,6 +283,7 @@ export function createRulesEditor(host, options) {
     }
     const body = await res.json();
     state.lastDiff = body.diff;
+    state.ineffective = body.ineffective_terms || [];
     render();
     if (opts.onPreview) opts.onPreview(body);
     return body;
@@ -308,11 +314,121 @@ export function createRulesEditor(host, options) {
       const et = (arguments[2] || "LOCATION").toUpperCase();
       const cue = state.draft.context_cues[et] || { triggers: [], extend: "sentence" };
       state.draft.context_cues[et] = { ...cue, triggers: uniquePush(cue.triggers || [], value) };
+    } else if (field === "forbidden_span") {
+      return;
     } else {
       state.draft[field] = uniquePush(state.draft[field] || [], value);
     }
     state.applyToRun = true;
     markDirty();
+  }
+
+  async function addTermChecked(value, options) {
+    const optsLocal = options || {};
+    const term = String(value || "").trim();
+    if (!term) return null;
+    const text = opts.getText ? opts.getText() : "";
+    const res = await fetch("/api/gateway/rules/advise", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        term,
+        text,
+        spans: optsLocal.spans || [],
+        draft_rules: state.draft,
+        requested: optsLocal.preferred || "",
+      }),
+    });
+    if (!res.ok) {
+      if (opts.onError) opts.onError(new Error("Advise failed (" + res.status + ")"));
+      return null;
+    }
+    const body = await res.json();
+    const advice = body.advice || [];
+    const viable = advice.filter((a) => (a.would_remove || []).length);
+    if (!viable.length) {
+      const reason = (advice.find((a) => a.reason) || {}).reason || ("No rule field can remove " + term);
+      const hostRefuse = opts.chooserHost || (typeof document !== "undefined" && document.getElementById("gwInlineForm"))
+        || (typeof document !== "undefined" && document.getElementById("evInlineForm"));
+      if (hostRefuse && (optsLocal.onReject || opts.onRefuse)) {
+        return new Promise((resolve) => {
+          hostRefuse.hidden = false;
+          hostRefuse.textContent = "";
+          hostRefuse.appendChild(el("div", { className: "gw-hint", text: reason }));
+          if (optsLocal.onReject) {
+            const rej = el("button", { type: "button", className: "btn btn-ghost btn-sm", text: "Reject this span" });
+            rej.addEventListener("click", () => {
+              hostRefuse.hidden = true;
+              hostRefuse.textContent = "";
+              optsLocal.onReject();
+              resolve({ refused: true, reason, advice, action: "reject_span" });
+            });
+            hostRefuse.appendChild(rej);
+          }
+          const cancel = el("button", { type: "button", className: "btn btn-ghost btn-sm", text: "Cancel" });
+          cancel.addEventListener("click", () => {
+            hostRefuse.hidden = true;
+            hostRefuse.textContent = "";
+            resolve({ refused: true, reason, advice });
+          });
+          hostRefuse.appendChild(cancel);
+        });
+      }
+      if (opts.onError) opts.onError(new Error(reason));
+      else if (opts.onRefuse) opts.onRefuse(reason, advice);
+      state.lastAdvice = advice;
+      render();
+      return { refused: true, reason, advice };
+    }
+    const preferred = optsLocal.preferred;
+    const pick = viable.find((a) => a.target === preferred && a.would_remove && a.would_remove.length)
+      || viable.find((a) => a.default)
+      || viable[0];
+    if (optsLocal.skipChooser) {
+      addTerm(pick.target, term);
+      return pick;
+    }
+    return new Promise((resolve) => {
+      const host = opts.chooserHost || (typeof document !== "undefined" && document.getElementById("gwInlineForm"))
+        || (typeof document !== "undefined" && document.getElementById("evInlineForm"));
+      if (!host || typeof window === "undefined") {
+        addTerm(pick.target, term);
+        resolve(pick);
+        return;
+      }
+      host.hidden = false;
+      host.textContent = "";
+      host.appendChild(el("div", { className: "gw-hint", text: "Which field should receive “" + term + "”?" }));
+      advice.forEach((row) => {
+        const btn = el("button", {
+          type: "button",
+          className: "btn btn-ghost btn-sm",
+          text: row.target + (row.would_remove && row.would_remove.length
+            ? (" · removes " + row.would_remove.length)
+            : " · no effect"),
+        });
+        btn.disabled = !(row.would_remove && row.would_remove.length) && row.target !== "forbidden_span";
+        btn.title = row.reason || "";
+        btn.addEventListener("click", () => {
+          host.hidden = true;
+          host.textContent = "";
+          if (row.target === "forbidden_span") {
+            resolve({ ...row, action: "forbidden_span" });
+            return;
+          }
+          addTerm(row.target, term);
+          resolve(row);
+        });
+        host.appendChild(btn);
+      });
+      const cancel = el("button", { type: "button", className: "btn btn-ghost btn-sm", text: "Cancel" });
+      cancel.addEventListener("click", () => {
+        host.hidden = true;
+        host.textContent = "";
+        resolve(null);
+      });
+      host.appendChild(cancel);
+    });
   }
 
   host && load();
@@ -321,6 +437,7 @@ export function createRulesEditor(host, options) {
     getDraft: () => (state.applyToRun || state.dirty ? clone(state.draft) : null),
     getDraftAlways: () => clone(state.draft),
     addTerm,
+    addTermChecked,
     preview,
     save,
     load,

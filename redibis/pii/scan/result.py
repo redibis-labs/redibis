@@ -68,6 +68,7 @@ class Detection:
     llm_verdict: str = ""            # "PII" | "NOT_PII" | "UNSURE" | ""
     llm_score: Optional[float] = None
     llm_reason: str = ""             # scrubbed
+    source: str = ""                 # "engine" | "llm_verdict" | "manual" | ""
 
     def to_dict(self, *, return_text: bool = True) -> dict:
         d = {
@@ -94,6 +95,8 @@ class Detection:
             d["llm_score"] = self.llm_score
         if self.llm_reason:
             d["llm_reason"] = self.llm_reason
+        if self.source:
+            d["source"] = self.source
         if return_text:
             d["text"] = self.text
         else:
@@ -130,6 +133,8 @@ class DetectionResult:
     provenance: Optional[Mapping[str, object]] = None
     coverage: Mapping[str, object] = field(default_factory=dict)
     arbitration: Mapping[str, object] = field(default_factory=dict)
+    llm_verdict: Optional[Mapping[str, object]] = None
+    recommendations: Optional[Mapping[str, object]] = None
 
     @property
     def spans(self) -> tuple[Detection, ...]:
@@ -165,6 +170,10 @@ class DetectionResult:
             d["provenance_degraded_reason"] = self.provenance_degraded_reason
         if self.provenance:
             d["provenance"] = dict(self.provenance)
+        if self.llm_verdict:
+            d["llm_verdict"] = dict(self.llm_verdict)
+        if self.recommendations:
+            d["recommendations"] = dict(self.recommendations)
         return d
 
 
@@ -197,3 +206,4 @@ class TextScanConfig:
     llm_max_windows: int = 8
     equation: str = "independent"  # same vocabulary as column decide_pii
     include_arbitration: bool = False
+    llm_verdict: str = "off"  # "off" | "independent" | "both"

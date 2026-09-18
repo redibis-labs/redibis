@@ -252,6 +252,7 @@ def compile_pack_context(
     model: str = "",
     sample_policy: str = "raw",
     extra_instructions: str = "",
+    steward_context: str = "",
     approve_reduction_plan_id: Optional[str] = None,
     approval_source: str = "cli_flag",
     approved_by: str = "",
@@ -575,6 +576,7 @@ def compile_pack_context(
         f"{trust_preamble}"
         f"{_section('Pack domain guidance', domain_md)}"
         f"{_section('Pack terminology', terminology_md)}"
+        f"{_section('Steward review context', steward_context)}"
     )
 
     user_parts = [
@@ -587,6 +589,7 @@ def compile_pack_context(
         _section("Column glossary (selected)", _render_glossary(render_glossary_entries)),
         _section("Edge cases", edge_md),
         _section("Golden examples", _render_examples(pack, render_examples)),
+        _section("Steward review context", steward_context),
         PACK_END,
     ]
     user_addendum = "\n".join(p for p in user_parts if p)

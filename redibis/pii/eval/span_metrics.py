@@ -245,16 +245,18 @@ def validate_dataset(
             forbidden.append(item)
         tags = [str(t).strip() for t in (raw_case.get("tags") or []) if str(t).strip()]
         language = str(raw_case.get("language") or "").strip() or fallback_lang
-        normalized_cases.append(
-            {
-                "id": case_id,
-                "text": text,
-                "language": language,
-                "tags": tags,
-                "expected_spans": spans,
-                "forbidden_spans": forbidden,
-            }
-        )
+        case_out = {
+            "id": case_id,
+            "text": text,
+            "language": language,
+            "tags": tags,
+            "expected_spans": spans,
+            "forbidden_spans": forbidden,
+        }
+        name = str(raw_case.get("name") or "").strip()
+        if name:
+            case_out["name"] = name
+        normalized_cases.append(case_out)
 
     return {
         "kind": DATASET_KIND,

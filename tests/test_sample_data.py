@@ -81,6 +81,14 @@ def test_absolute_path_cannot_escape(library, cfg):
         sd.resolve("", "/etc/passwd", cfg)
 
 
+def test_absolute_path_inside_the_root_is_accepted(library, cfg):
+    inside = library.root / "customers.csv"
+    assert sd.resolve("", str(inside), cfg) == inside.resolve()
+    preview = sd.preview("", str(inside), cfg=cfg)
+    assert preview["path"] == "customers.csv"
+    assert preview["name"] == "customers.csv"
+
+
 def test_unlisted_extension_is_rejected(library, cfg):
     with pytest.raises(sd.SampleDataError, match="unsupported file type"):
         sd.resolve("", "notes.txt", cfg)
@@ -136,19 +144,25 @@ def test_depth_limit_is_respected(library, tmp_path):
     assert "a/b/c/d/e/buried.csv" not in paths
 
 
-def test_cwd_is_the_root_when_nothing_is_configured(tmp_path, monkeypatch, cfg):
+def test_webapp_samples_is_the_root_when_nothing_is_configured(tmp_path, monkeypatch, cfg):
     monkeypatch.delenv(sd.ENV_ROOT, raising=False)
     monkeypatch.delenv("REDIBIS_CONFIG", raising=False)
-    here = tmp_path / "launch-dir"
-    here.mkdir()
-    (here / "local.csv").write_text("a\n1\n", encoding="utf-8")
-    monkeypatch.chdir(here)
+    samples = tmp_path / "webapp" / "samples"
+    samples.mkdir(parents=True)
+    (samples / "demo.csv").write_text("a\n1\n", encoding="utf-8")
+    monkeypatch.setattr(sd, "default_root_path", lambda: samples.resolve())
     assert sd.is_enabled(cfg) is True
     roots = sd.list_roots(cfg)
     assert len(roots) == 1
-    assert roots[0].name == "cwd"
-    assert roots[0].path == here.resolve()
-    assert {f["path"] for f in sd.list_files("", cfg)["files"]} == {"local.csv"}
+    assert roots[0].name == "samples"
+    assert roots[0].path == samples.resolve()
+    assert {f["path"] for f in sd.list_files("", cfg)["files"]} == {"demo.csv"}
+
+
+def test_default_root_path_is_webapp_samples():
+    path = sd.default_root_path()
+    assert path is not None
+    assert path.as_posix().endswith("redibis/webapp/samples")
 
 
 def test_config_roots_support_named_mappings(tmp_path, monkeypatch):
@@ -206,14 +220,15 @@ def test_index_lists_files(client):
     assert {f["path"] for f in body["files"]} == {"customers.csv", "nested/deep.csv"}
 
 
-def test_index_falls_back_to_cwd_when_env_unset(client, tmp_path, monkeypatch):
+def test_index_falls_back_to_webapp_samples_when_env_unset(client, tmp_path, monkeypatch):
     monkeypatch.delenv(sd.ENV_ROOT, raising=False)
-    here = tmp_path / "launch-dir"
-    here.mkdir()
-    (here / "boot.csv").write_text("x\n1\n", encoding="utf-8")
-    monkeypatch.chdir(here)
+    samples = tmp_path / "webapp" / "samples"
+    samples.mkdir(parents=True)
+    (samples / "boot.csv").write_text("x\n1\n", encoding="utf-8")
+    monkeypatch.setattr(sd, "default_root_path", lambda: samples.resolve())
     body = client.get("/api/sample-data").json()
     assert body["enabled"] is True
+    assert body["root"] == "samples"
     assert {f["path"] for f in body["files"]} == {"boot.csv"}
 
 
@@ -234,6 +249,12 @@ def test_scan_endpoint_creates_a_session(client):
     assert body["source"] == {"kind": "sample_data", "root": "", "path": "customers.csv"}
     cols = client.get(f"/api/sessions/{body['session_id']}/data/columns").json()
     assert [c["column"] for c in cols["columns"]] == ["id", "name", "phone"]
+
+
+def test_scan_endpoint_accepts_absolute_path_inside_the_root(client, library):
+    abs_path = str((library.root / "customers.csv").resolve())
+    resp = client.post("/api/sessions/from-sample", json={"path": abs_path})
+    assert resp.status_code == 200, resp.text
 
 
 def test_scan_endpoint_rejects_escapes(client):
@@ -291,3 +312,19 @@ def test_scan_button_posts_from_sample_not_a_null_file():
         body = js.split("async function " + fn)[1].split("async function ")[0]
         assert "createSessionFromCurrentSource" in body
         assert 'fd.append("file",S.file)' not in body
+
+
+def test_homepage_is_a_csv_path_box_not_a_dropzone():
+    js = (
+        Path(__file__).resolve().parents[1]
+        / "redibis"
+        / "webapp"
+        / "static"
+        / "app.js"
+    ).read_text(encoding="utf-8")
+    assert "function csvPathPickerHtml" in js
+    assert "function loadTypedCsv" in js
+    assert "function isCsvPath" in js
+    assert "only .csv files are accepted" in js
+    assert "drop your CSV here" not in js
+    assert "function uploadDropzoneHtml" not in js

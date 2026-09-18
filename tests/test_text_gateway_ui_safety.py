@@ -16,7 +16,8 @@ def test_no_web_storage_or_innerhtml_of_user_text():
     usecase_js = (STATIC / "gateway_usecase.js").read_text(encoding="utf-8")
     run_js = (STATIC / "gateway_run.js").read_text(encoding="utf-8")
     rules_js = (STATIC / "gateway_rules.mjs").read_text(encoding="utf-8")
-    blob = js + "\n" + eval_js + "\n" + mjs + "\n" + usecase_js + "\n" + run_js + "\n" + rules_js
+    curation_js = (STATIC / "gateway_curation.mjs").read_text(encoding="utf-8")
+    blob = js + "\n" + eval_js + "\n" + mjs + "\n" + usecase_js + "\n" + run_js + "\n" + rules_js + "\n" + curation_js
     assert "localStorage" not in blob
     assert "sessionStorage" not in blob
     assert "indexedDB" not in blob
@@ -27,6 +28,7 @@ def test_no_web_storage_or_innerhtml_of_user_text():
     assert "innerHTML" not in usecase_js
     assert "innerHTML" not in run_js
     assert "innerHTML" not in rules_js
+    assert "innerHTML" not in curation_js
     assert "insertAdjacentHTML" not in blob
     assert "document.write" not in blob
 
