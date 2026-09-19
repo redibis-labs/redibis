@@ -173,18 +173,41 @@ def test_no_contract_route_calls_the_global_accessor_directly():
                     return arg0.value
         return ""
 
+    ok_getters = {"_cs", "current_stores"}
+    bad_getters = {"get_contract_store", "_contract_store"}
+    store_signals = {"get_active", "upsert", "ContractStore"} | bad_getters
+    exempt_no_store = {"list_contracts", "synthesis_run_file", "synthesis_graph"}
     offenders = []
-    for node in tree.body:
+
+    for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         path = _route_path(node)
         if "/api/contracts" not in path and "/api/synthesis" not in path:
             continue
+        names = set()
+        constructs_store = False
         for child in ast.walk(node):
-            if isinstance(child, ast.Name) and child.id == "get_contract_store":
-                offenders.append(f"{node.name}:{path}")
-            if isinstance(child, ast.Attribute) and child.attr == "get_contract_store":
-                offenders.append(f"{node.name}:{path}")
+            if isinstance(child, ast.Name) and child.id in bad_getters | ok_getters | {"ContractStore"}:
+                names.add(child.id)
+            if isinstance(child, ast.Call):
+                func = child.func
+                if isinstance(func, ast.Name):
+                    names.add(func.id)
+                    if func.id == "ContractStore":
+                        constructs_store = True
+                elif isinstance(func, ast.Attribute):
+                    names.add(func.attr)
+                    if func.attr == "ContractStore":
+                        constructs_store = True
+        if names & bad_getters:
+            offenders.append(f"{node.name}:{path} uses {sorted(names & bad_getters)}")
+        if constructs_store:
+            offenders.append(f"{node.name}:{path} constructs ContractStore")
+        if node.name in exempt_no_store:
+            continue
+        if (names & store_signals) and not (names & ok_getters):
+            offenders.append(f"{node.name}:{path} obtains a store without _cs/current_stores")
     assert offenders == []
 
     for rel in (
@@ -194,3 +217,4 @@ def test_no_contract_route_calls_the_global_accessor_directly():
     ):
         text = (root / rel).read_text(encoding="utf-8")
         assert "get_contract_store(" not in text
+        assert "_contract_store(" not in text

@@ -177,6 +177,8 @@ class ContractStore:
         *,
         memory_config: Optional["MemoryConfig"] = None,
         on_upsert: Optional[Any] = None,
+        metadata_prefix: Optional[str] = None,
+        metadata_backend: Optional[StorageBackend] = None,
     ):
         from redibis.config import MemoryConfig
 
@@ -200,9 +202,16 @@ class ContractStore:
         # Operational telemetry (provenance, pii_summary, last_updated) — separate
         # from the declarative contract spec. Uses a dedicated metadata bucket when
         # S3_METADATA_BUCKET is set; otherwise _meta/telemetry/ in the contracts bucket.
+        # Workspaces may pass metadata_backend / metadata_prefix to isolate keys.
+        meta_be = metadata_backend or backend
         meta_bucket = metadata_bucket or os.getenv("S3_METADATA_BUCKET") or bucket
-        meta_prefix = "" if os.getenv("S3_METADATA_BUCKET") else ContractMetadataStore.DEFAULT_PREFIX
-        self.metadata = ContractMetadataStore(backend, meta_bucket, prefix=meta_prefix)
+        if metadata_prefix is not None:
+            meta_prefix = metadata_prefix
+        elif os.getenv("S3_METADATA_BUCKET"):
+            meta_prefix = ""
+        else:
+            meta_prefix = ContractMetadataStore.DEFAULT_PREFIX
+        self.metadata = ContractMetadataStore(meta_be, meta_bucket, prefix=meta_prefix)
         # Per-table PII decision overlay (single source of truth for which
         # columns are PII). Enforced on every upsert so it always wins over the
         # union-merge — the only way to REMOVE PII from a column.

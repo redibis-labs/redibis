@@ -3894,7 +3894,7 @@ async def synthesis_run(
         raw = await f.read()
         uploaded[f.filename or f"upload-{len(uploaded)}"] = raw
 
-    store = _contract_store()
+    store = _cs()
     try:
         base = store.get_active(table)
     except Exception as exc:

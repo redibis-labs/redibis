@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -186,3 +187,110 @@ def test_scan_batch_50_csvs_resume_and_isolation(tmp_path):
     stores2 = open_workspace_root(str(ws2))
     assert len(stores2.contract.list_tables()) == 10
     assert man2["counts"]["done"] >= 4
+
+
+def _active_snapshot(store, table: str) -> dict:
+    active = store.get_active(table)
+    meta = store.get_metadata(table)
+    return {
+        "contract": copy.deepcopy(active),
+        "version": (active or {}).get("version"),
+        "status": (active or {}).get("status"),
+        "provenance": list(meta.get("provenance") or []),
+    }
+
+
+def test_batch_synthesize_does_not_upsert_the_active_contract(ws_pair):
+    stores = ws_pair.stores
+    table = "db.customers"
+    stores.contract.upsert(_contract(table), table=table, workflow="manual")
+    before = _active_snapshot(stores.contract, table)
+    runner = BatchRunner(stores)
+    bid = runner.submit("synthesize", [table], options={"analysis_mode": "deterministic"})
+    man = runner.run(bid)
+    assert man["status"] == "done", man
+    assert man["counts"]["error"] == 0
+    after = _active_snapshot(stores.contract, table)
+    assert after["version"] == before["version"] == "1.0.0"
+    assert after["status"] == before["status"] == "active"
+    assert after["contract"] == before["contract"]
+    assert after["provenance"] == before["provenance"]
+    assert not any(
+        isinstance(p, dict) and p.get("workflow") == "synthesis"
+        for p in after["provenance"]
+    )
+
+
+def test_batch_synthesize_writes_portable_candidate_artifact(ws_pair):
+    stores = ws_pair.stores
+    table = "db.customers"
+    stores.contract.upsert(_contract(table), table=table, workflow="manual")
+    runner = BatchRunner(stores)
+    bid = runner.submit("synthesize", [table])
+    man = runner.run(bid)
+    item = man["items"][0]
+    assert item["status"] == "done"
+    result = item["result"]
+    assert result.get("writes_active_contract") is False
+    artifacts = result.get("artifacts") or {}
+    json_key = artifacts.get("contract.synthesized.v3.1.json")
+    assert json_key
+    assert json_key.startswith(f"runs/{table}/synthesis/")
+    assert stores.backend.exists(stores.bucket, json_key)
+    payload = stores.backend.get_json(stores.bucket, json_key)
+    assert payload.get("status") == "draft"
+    assert item["run_id"]
+    assert item["run_id"] in json_key
+
+
+def test_batch_synthesize_assisted_mode_never_touches_active_without_explicit_opt_in(ws_pair):
+    stores = ws_pair.stores
+    table = "db.customers"
+    stores.contract.upsert(_contract(table), table=table, workflow="manual")
+    before = _active_snapshot(stores.contract, table)
+    runner = BatchRunner(stores)
+    bid = runner.submit(
+        "synthesize", [table],
+        options={"analysis_mode": "assisted", "provider": "no-such-provider-xyz"},
+    )
+    man = runner.run(bid)
+    assert man["items"][0]["status"] == "error"
+    after = _active_snapshot(stores.contract, table)
+    assert after == before
+    keys = stores.backend.list_keys(stores.bucket, prefix=f"runs/{table}/synthesis/")
+    assert keys == []
+
+
+def test_batch_synthesize_resume_skips_completed(ws_pair, monkeypatch):
+    stores = ws_pair.stores
+    table = "db.customers"
+    stores.contract.upsert(_contract(table), table=table, workflow="manual")
+    runner = BatchRunner(stores)
+    bid = runner.submit("synthesize", [table])
+    man = runner.run(bid)
+    run_id = man["items"][0]["run_id"]
+    json_key = (man["items"][0].get("result") or {}).get("artifacts", {}).get(
+        "contract.synthesized.v3.1.json"
+    )
+    assert run_id and json_key
+
+    import redibis.workspace.batch as batchmod
+
+    def boom(*_a, **_k):
+        raise AssertionError("completed synthesize item must not rerun")
+
+    monkeypatch.setattr(batchmod, "_run_synthesize", boom)
+    man2 = runner.run(bid)
+    assert man2["items"][0]["status"] == "done"
+    assert man2["items"][0]["run_id"] == run_id
+    assert stores.backend.exists(stores.bucket, json_key)
+
+
+def test_batch_export_kind_is_rejected(ws_pair):
+    stores = ws_pair.stores
+    stores.contract.upsert(_contract("db.keep"), table="db.keep", workflow="manual")
+    runner = BatchRunner(stores)
+    with pytest.raises(ValueError, match="GET /api/workspaces"):
+        runner.submit("export", ["db.keep"])
+    keys = stores.backend.list_keys(stores.bucket, prefix="batches/")
+    assert keys == []

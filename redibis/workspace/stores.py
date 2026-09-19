@@ -13,6 +13,7 @@ from redibis.store.review_store import ReviewStore
 from redibis.store.storage_backend import StorageBackend
 from redibis.workspace.backends import backend_for
 from redibis.workspace.index import WorkspaceIndex, row_from_contract
+from redibis.workspace.metadata_scope import contract_store_metadata_kwargs
 from redibis.workspace.model import DEFAULT_SLUG, WorkspaceNotFound, WorkspaceRef
 from redibis.workspace.registry import get_registry
 
@@ -160,7 +161,10 @@ def _build(slug: str) -> WorkspaceStores:
         return WorkspaceStores(registry.default(), contract)
     ref = registry.get(slug)
     backend, bucket = backend_for(ref)
-    contract = ContractStore(backend, bucket=bucket)
+    contract = ContractStore(
+        backend, bucket=bucket,
+        **contract_store_metadata_kwargs(ref, backend, bucket),
+    )
     return WorkspaceStores(ref, contract)
 
 

@@ -207,3 +207,103 @@ def test_add_local_workspace_respects_allowed_roots(api_env, tmp_path, monkeypat
     assert gone.status_code == 200
     assert folder.exists()
     assert gone.json().get("data_deleted") is False
+
+
+def test_synthesis_run_route_does_not_raise_on_a_seeded_contract(api_env):
+    client, store = api_env
+    table = "db.customers"
+    store.upsert(_contract(table), table=table, workflow="manual")
+    r = client.post(
+        f"/api/synthesis/{table}/run",
+        data={"analysis_mode": "deterministic"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert "valid" in body
+    active = store.get_active(table)
+    assert active["version"] == "1.0.0"
+    assert active["status"] == "active"
+
+
+def test_synthesis_run_route_operates_on_the_bound_workspace_not_default(
+    api_env, tmp_path, monkeypatch,
+):
+    client, store = api_env
+    table = "db.customers"
+    store.upsert(_contract(table, name="default_customers"), table=table, workflow="manual")
+    allowed = tmp_path / "allowed"
+    folder = allowed / "telco"
+    folder.mkdir(parents=True)
+    import yaml
+    cfg = tmp_path / "redibis.yaml"
+    cfg.write_text(
+        yaml.safe_dump({"workspaces": {"allowed_roots": [str(allowed)]}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("REDIBIS_CONFIG", str(cfg))
+    from redibis.workspace.registry import reset_registry
+    reset_registry()
+    invalidate_stores()
+    added = client.post(
+        "/api/workspaces",
+        json={"name": "telco", "kind": "local", "root": str(folder)},
+    )
+    assert added.status_code == 200, added.text
+    slug = added.json()["slug"]
+    from redibis.workspace.stores import stores_for
+    other = stores_for(slug)
+    other.contract.upsert(
+        _contract(table, name="telco_customers"), table=table, workflow="manual",
+    )
+    r = client.post(
+        f"/api/synthesis/{table}/run",
+        data={"analysis_mode": "deterministic"},
+        headers={"X-Redibis-Workspace": slug},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["candidate_preview"]["name"] == "telco_customers"
+    default_active = store.get_active(table)
+    assert default_active["name"] == "default_customers"
+    assert default_active["version"] == "1.0.0"
+
+
+def test_batch_export_kind_is_rejected_via_http(api_env):
+    client, store = api_env
+    store.upsert(_contract("db.keep"), table="db.keep", workflow="manual")
+    invalidate_stores()
+    r = client.post(
+        "/api/workspaces/default/batches",
+        json={"kind": "export", "tables": ["db.keep"]},
+    )
+    assert r.status_code == 400, r.text
+    assert "GET /api/workspaces" in (r.json().get("detail") or "")
+
+
+def test_a_single_column_verdict_flips_the_index_row_to_in_progress(api_env):
+    client, store = api_env
+    table = "db.customers"
+    store.upsert(_contract(table), table=table, workflow="manual")
+    invalidate_stores()
+    listed = client.get("/api/workspaces/default/contracts")
+    assert listed.status_code == 200, listed.text
+    row = next(x for x in listed.json()["rows"] if x["table"] == table)
+    assert row["review"] == "none"
+    verdict = client.post(
+        f"/api/contracts/{table}/steward/columns/email/verdict",
+        json={
+            "field": "pii",
+            "decision": "no_action",
+            "chosen_source": "human",
+            "rationale_code": "deprecated_column",
+        },
+    )
+    assert verdict.status_code == 200, verdict.text
+    progress = client.get("/api/workspaces/default/contracts?review=in_progress")
+    assert table in [x["table"] for x in progress.json()["rows"]]
+    none = client.get("/api/workspaces/default/contracts?review=none")
+    assert table not in [x["table"] for x in none.json()["rows"]]
+    chip = next(
+        x for x in client.get("/api/workspaces/default/contracts").json()["rows"]
+        if x["table"] == table
+    )
+    assert chip["review"] == "in_progress"

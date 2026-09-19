@@ -232,6 +232,8 @@ def register_workspace_routes(app: Any) -> None:
                 resume=body.resume,
                 batch_id=body.batch_id,
             )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:
             _raise(exc)
             raise

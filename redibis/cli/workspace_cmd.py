@@ -46,10 +46,15 @@ def register_workspace_commands(sub) -> None:
     p_en.add_argument("--resume", action="store_true")
     p_en.add_argument("--batch-id", default="")
 
-    p_sy = ssub.add_parser("synthesize", help="batch synthesise tables in a workspace")
+    p_sy = ssub.add_parser("synthesize", help="batch synthesise tables in a workspace (portable artifacts; never writes active)")
     p_sy.add_argument("slug")
     p_sy.add_argument("--tables", default="")
     p_sy.add_argument("--q", default="")
+    p_sy.add_argument(
+        "--analysis-mode", default="deterministic",
+        choices=["deterministic", "assisted"],
+    )
+    p_sy.add_argument("--provider", default="", help="required when --analysis-mode assisted")
     p_sy.add_argument("--resume", action="store_true")
     p_sy.add_argument("--batch-id", default="")
 
@@ -155,9 +160,16 @@ def run_workspace(args) -> int:
                 rows, _ = stores.index.query(q=args.q or "", limit=2000, offset=0)
                 tables = [r.table for r in rows]
             runner = BatchRunner(stores)
+            if action == "synthesize":
+                options = {
+                    "analysis_mode": getattr(args, "analysis_mode", "deterministic"),
+                    "provider": getattr(args, "provider", "") or "",
+                }
+            else:
+                options = {"provider": getattr(args, "provider", "demo")}
             bid = runner.submit(
                 action, tables,
-                options={"provider": getattr(args, "provider", "demo")},
+                options=options,
                 resume=args.resume, batch_id=args.batch_id or None,
             )
             man = runner.run(bid)

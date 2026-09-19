@@ -1414,6 +1414,7 @@ async function runSynthesis(){
     const token = (window.CSRF_TOKEN || document.querySelector('meta[name="csrf-token"]')?.content || "");
     const headers = {};
     if(token) headers["X-CSRF-Token"] = token;
+    if(STATE.ws) headers["X-Redibis-Workspace"] = STATE.ws;
     const resp = await fetch("/api/synthesis/"+encodeURIComponent(STATE.table)+"/run", {
       method: "POST", body: fd, headers, credentials: "same-origin",
     });

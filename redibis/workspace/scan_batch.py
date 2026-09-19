@@ -12,6 +12,7 @@ from typing import Any, Callable, Optional
 from redibis.store.contract_store import ContractStore
 from redibis.workspace.backends import backend_for
 from redibis.workspace.batch import BatchRunner
+from redibis.workspace.metadata_scope import contract_store_metadata_kwargs
 from redibis.workspace.model import WorkspaceRef, _utc_now_iso, parse_s3_url, slugify
 from redibis.workspace.stores import WorkspaceStores
 
@@ -88,7 +89,13 @@ def discover_scan_files(
 
 
 def open_workspace_root(root: str, *, name: str = "") -> WorkspaceStores:
-    """Bind stores to a local folder or s3:// URL without registering it."""
+    """Bind stores to a local folder or s3:// URL without registering it.
+
+    Trusted CLI entry point: the operator-supplied path is used as-is.
+    Unlike ``WorkspaceRegistry.add_local``, this does **not** apply
+    ``workspaces.allowed_roots`` (or configs-dir / default-store) containment.
+    Do not reuse this from an HTTP-reachable path without those checks.
+    """
     text = (root or "").strip()
     if text.startswith("s3://"):
         bucket, prefix = parse_s3_url(text)
@@ -100,7 +107,10 @@ def open_workspace_root(root: str, *, name: str = "") -> WorkspaceStores:
             created=_utc_now_iso(),
         )
         backend, bucket_name = backend_for(ref)
-        contract = ContractStore(backend, bucket=bucket_name)
+        contract = ContractStore(
+            backend, bucket=bucket_name,
+            **contract_store_metadata_kwargs(ref, backend, bucket_name),
+        )
         return WorkspaceStores(ref, contract)
     path = Path(text).expanduser()
     path.mkdir(parents=True, exist_ok=True)
@@ -113,7 +123,10 @@ def open_workspace_root(root: str, *, name: str = "") -> WorkspaceStores:
         created=_utc_now_iso(),
     )
     backend, bucket_name = backend_for(ref)
-    contract = ContractStore(backend, bucket=bucket_name)
+    contract = ContractStore(
+        backend, bucket=bucket_name,
+        **contract_store_metadata_kwargs(ref, backend, bucket_name),
+    )
     stores = WorkspaceStores(ref, contract)
     from redibis.workspace.atomic import atomic_put_json
     from redibis.workspace.model import WORKSPACE_LAYOUT

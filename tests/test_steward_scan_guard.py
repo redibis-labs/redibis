@@ -32,3 +32,18 @@ def test_workspace_module_has_no_scan_fetch():
     assert "mountContractWorkspace" in WS
     assert "mountContractWorkspace" in V2
     assert "?ws=" in V2 or "X-Redibis-Workspace" in V2
+
+
+def test_v2_contract_and_synthesis_fetches_carry_workspace():
+    """Raw fetch() to contract/synthesis APIs must set X-Redibis-Workspace."""
+    assert 'opt.headers["X-Redibis-Workspace"] = STATE.ws' in V2
+    fetches = [m.start() for m in re.finditer(r"\bfetch\s*\(", V2)]
+    assert fetches, "expected fetch() in v2.html"
+    for idx in fetches:
+        window = V2[max(0, idx - 500): idx + 250]
+        hits_contract = "/api/contracts" in window or "/api/synthesis" in window
+        if not hits_contract:
+            continue
+        through_api = "async function api(" in V2[max(0, idx - 800): idx]
+        sets_header = "X-Redibis-Workspace" in window
+        assert through_api or sets_header, window[-400:]

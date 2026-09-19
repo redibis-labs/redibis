@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from redibis.store.contract_metadata import ContractMetadataStore
 from redibis.store.merger import make_provenance_entry
 from redibis.workspace.model import DEFAULT_SLUG, WorkspaceDenied
 from redibis.workspace.stores import WorkspaceStores, stores_for
@@ -45,6 +46,49 @@ def _copy_prefix(src: WorkspaceStores, dst: WorkspaceStores, prefix: str) -> int
     return n
 
 
+def _metadata_lives_on_contract_backend(stores: WorkspaceStores) -> bool:
+    meta = getattr(stores.contract, "metadata", None)
+    if meta is None:
+        return True
+    return (
+        meta.bucket == stores.bucket
+        and meta.prefix == ContractMetadataStore.DEFAULT_PREFIX
+        and meta.backend is stores.backend
+    )
+
+
+def _copy_dedicated_metadata(source: WorkspaceStores, dest: WorkspaceStores, table: str) -> int:
+    """Copy operational telemetry that lives outside the contracts bucket.
+
+    When ``S3_METADATA_BUCKET`` is unset, ``_meta/telemetry/{table}/`` is
+    already copied by the overlay-prefix walk. Dedicated-bucket metadata
+    would otherwise be dropped on promote.
+    """
+    if _metadata_lives_on_contract_backend(source):
+        return 0
+    src_meta = source.contract.metadata
+    dst_meta = dest.contract.metadata
+    n = 0
+    for entry in src_meta.get_provenance(table, limit=10_000):
+        dst_meta.append_provenance(table, entry)
+        n += 1
+    summary = src_meta.get_pii_summary(table)
+    if summary:
+        dst_meta.set_pii_summary(table, summary)
+        n += 1
+    telemetry = src_meta.get_telemetry(table)
+    if telemetry:
+        dst_meta.backend.put_json(
+            dst_meta.bucket, dst_meta._telemetry_key(table), telemetry,
+        )
+        n += 1
+    columns = src_meta.get_column_telemetry(table)
+    if columns:
+        dst_meta.merge_column_telemetry(table, columns)
+        n += 1
+    return n
+
+
 def promote_table(
     source: WorkspaceStores,
     table: str,
@@ -78,6 +122,7 @@ def promote_table(
             copied += 1
     for tmpl in _OVERLAY_PREFIXES:
         copied += _copy_prefix(source, dest, tmpl.format(table=table))
+    copied += _copy_dedicated_metadata(source, dest, table)
     digest = ""
     try:
         from redibis.review.artifacts import list_artifacts as list_steward

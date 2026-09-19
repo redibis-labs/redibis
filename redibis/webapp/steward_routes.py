@@ -50,6 +50,14 @@ def _role_from_request(request: Request) -> str:
     return "admin"
 
 
+def _touch_index(table: str) -> None:
+    try:
+        from redibis.workspace.stores import current_stores
+        current_stores().touch(table)
+    except Exception:
+        pass
+
+
 def register_steward_routes(app: Any, store_getter: StoreGetter) -> None:
     def _store() -> ContractStore:
         return store_getter() if callable(store_getter) else store_getter
@@ -86,22 +94,22 @@ def register_steward_routes(app: Any, store_getter: StoreGetter) -> None:
         actor = _actor_from_request(request)
         payload = body.model_dump()
         payload["evidence_refs"] = payload.get("evidence_refs") or []
-        return _call(_svc().decide, table, column, body.field, payload, actor=actor)
+        result = _call(_svc().decide, table, column, body.field, payload, actor=actor)
+        _touch_index(table)
+        return result
 
     @app.post("/api/contracts/{table}/steward/table/verdict")
     def steward_table_verdict(request: Request, table: str, body: TableVerdictBody) -> dict:
         actor = _actor_from_request(request)
-        return _call(_svc().decide_table, table, body.item, body.model_dump(), actor=actor)
+        result = _call(_svc().decide_table, table, body.item, body.model_dump(), actor=actor)
+        _touch_index(table)
+        return result
 
     @app.post("/api/contracts/{table}/steward/finalize")
     def steward_finalize(request: Request, table: str):
         actor = _actor_from_request(request)
         result = _call(_svc().finalize, table, actor=actor)
-        try:
-            from redibis.workspace.stores import current_stores
-            current_stores().touch(table)
-        except Exception:
-            pass
+        _touch_index(table)
         header = "guaranteed" if result.get("ok") and result.get("guaranteed") else "blocked"
         resp = JSONResponse(content=result)
         resp.headers["X-Redibis-Guarantee"] = header

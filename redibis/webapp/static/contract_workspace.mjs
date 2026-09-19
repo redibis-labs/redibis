@@ -270,6 +270,13 @@ export async function mountContractWorkspace(opts) {
       const provider = prompt("Enrich provider:", "demo") || "demo";
       options.provider = provider;
     }
+    if (kind === "synthesize") {
+      const mode = prompt("Synthesis analysis mode:", "deterministic") || "deterministic";
+      options.analysis_mode = mode;
+      if (mode === "assisted") {
+        options.provider = prompt("LLM provider:", "demo") || "demo";
+      }
+    }
     if (kind === "export") {
       const arts = prompt("Artifacts (comma):", ARTIFACTS.join(","));
       const qtables = tables.length ? tables.join(",") : "";

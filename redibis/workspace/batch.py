@@ -18,9 +18,13 @@ from redibis.workspace.stores import WorkspaceStores, stores_for
 log = logging.getLogger("redibis.workspace.batch")
 
 KINDS = frozenset({
-    "scan", "enrich", "synthesize", "export", "reindex", "steward_finalize", "promote",
+    "scan", "enrich", "synthesize", "reindex", "steward_finalize", "promote",
 })
 _BATCH_PREFIX = WORKSPACE_LAYOUT["batches"].rstrip("/")
+_EXPORT_HINT = (
+    "batch kind 'export' is not supported; use GET /api/workspaces/{slug}/export "
+    "or `redibis workspace export`"
+)
 
 
 def _utc_now_iso() -> str:
@@ -98,9 +102,11 @@ class BatchRunner:
         resume: bool = False,
     ) -> str:
         kind = (kind or "").strip()
+        if kind == "export":
+            raise ValueError(_EXPORT_HINT)
         if kind not in KINDS:
             raise ValueError(f"unknown batch kind {kind!r}")
-        if self.stores.ref.read_only and kind not in ("export", "reindex"):
+        if self.stores.ref.read_only and kind not in ("reindex",):
             raise WorkspaceDenied("workspace is read-only")
         options = dict(options or {})
         if resume and batch_id:
@@ -201,7 +207,7 @@ class BatchRunner:
                 actor=str(options.get("actor") or ""),
             )
         if kind == "export":
-            return {"table": table}
+            raise ValueError(_EXPORT_HINT)
         raise ValueError(f"unsupported kind {kind!r}")
 
 
@@ -220,21 +226,95 @@ def _run_enrich(stores: WorkspaceStores, table: str, options: dict) -> dict:
 
 
 def _run_synthesize(stores: WorkspaceStores, table: str, options: dict) -> dict:
+    """Portable synthesis preview. Never writes the active governed contract."""
     from redibis.synthesis import ContractSynthesisRunner
 
     base = stores.contract.get_active(table)
     if not base:
         raise ValueError(f"no active contract for {table}")
+    analysis_mode = str(options.get("analysis_mode") or "deterministic").lower()
+    provider_obj = None
+    if analysis_mode == "assisted":
+        from redibis.enrich.providers import get_provider
+
+        try:
+            provider_obj = get_provider(str(options.get("provider") or ""))
+        except Exception as exc:
+            raise ValueError(str(exc)) from exc
+        if provider_obj is None:
+            raise ValueError("assisted mode requested but no provider configured")
     runner = ContractSynthesisRunner(
-        analysis_mode=str(options.get("analysis_mode") or "deterministic"),
+        analysis_mode=analysis_mode or "deterministic",
+        provider=provider_obj,
     )
     result = runner.run(base_contract=base, output_dir=None)
-    candidate = getattr(result, "candidate", None) or {}
-    if candidate:
-        stores.contract.upsert(candidate, table=table, workflow="synthesis",
-                               run_id=str(getattr(result, "run_id", "") or "synth"))
+    run_id = uuid.uuid4().hex[:12]
+    artifacts = _persist_synthesis_artifacts(stores, table, run_id, result, base)
     payload = result.to_dict() if hasattr(result, "to_dict") else {"table": table}
+    payload["run_id"] = run_id
+    payload["artifacts"] = artifacts
+    payload["writes_active_contract"] = False
     return payload
+
+
+def _persist_synthesis_artifacts(
+    stores: WorkspaceStores,
+    table: str,
+    run_id: str,
+    result: Any,
+    base: dict,
+) -> dict[str, str]:
+    """Write synthesis outputs under ``runs/{table}/synthesis/{run_id}/``."""
+    import yaml
+
+    backend = stores.backend
+    if backend is None:
+        raise ValueError("workspace store has no backend")
+    bucket = stores.bucket
+    prefix = f"runs/{table}/synthesis/{run_id}"
+    written: dict[str, str] = {}
+
+    def _yaml(name: str, data: Any) -> None:
+        key = f"{prefix}/{name}"
+        backend.put_text(
+            bucket, key,
+            yaml.safe_dump(data, sort_keys=False, allow_unicode=True),
+            content_type="application/x-yaml",
+        )
+        written[name] = key
+
+    def _json(name: str, data: Any) -> None:
+        key = f"{prefix}/{name}"
+        backend.put_json(bucket, key, data)
+        written[name] = key
+
+    _yaml("contract.base.v3.yaml", base)
+    candidate = getattr(result, "candidate", None) or {}
+    _yaml("contract.synthesized.v3.1.yaml", candidate)
+    _json("contract.synthesized.v3.1.json", candidate)
+    evidence = getattr(result, "evidence", None)
+    if evidence:
+        _json("evidence_bundle.json", evidence)
+    lineage = getattr(result, "lineage", None)
+    if lineage:
+        _json("lineage.json", lineage)
+    flow = getattr(result, "lineage_react_flow", None)
+    if flow:
+        _json("lineage_graph.json", flow)
+    traceability = getattr(result, "traceability", None)
+    if traceability:
+        _json("requirements_traceability.json", traceability)
+    stages = getattr(result, "stage_results", None)
+    if stages:
+        _json("stage_results.json", stages)
+    meta = getattr(result, "meta", None)
+    if meta:
+        atomic_put_json(backend, bucket, f"{prefix}/synthesis_meta.json", meta)
+        written["synthesis_meta.json"] = f"{prefix}/synthesis_meta.json"
+    comparison = getattr(result, "comparison", None)
+    if comparison:
+        _json("analysis_comparison.json", comparison)
+    return written
 
 
 def _run_finalize(stores: WorkspaceStores, table: str, options: dict) -> dict:
