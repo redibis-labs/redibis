@@ -744,8 +744,17 @@ def _prepare_evaluation(body: GatewayEvaluationBody, actor: str) -> tuple[dict, 
             status_code=503,
             detail="PII entity catalogue is unavailable; evaluation cannot validate labels",
         )
+    from redibis.pii.eval.coerce import coerce_eval_dataset
+
+    raw = coerce_eval_dataset(body.dataset) or body.dataset
+    extra_types = set()
+    for case in (raw.get("cases") or []) if isinstance(raw, dict) else []:
+        for span in list(case.get("expected_spans") or []) + list(case.get("forbidden_spans") or []):
+            et = str((span or {}).get("entity_type") or "").upper()
+            if et:
+                extra_types.add(et)
     try:
-        dataset = validate_dataset(body.dataset, allowed_entity_types=allowed)
+        dataset = validate_dataset(raw, allowed_entity_types=allowed | extra_types)
     except DatasetValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if len(dataset["cases"]) > EVAL_MAX_CASES:
@@ -904,6 +913,7 @@ def register_gateway_routes(
                 render_v=asset_v_fn("gateway_render.mjs"),
                 rules_v=asset_v_fn("gateway_rules.mjs"),
                 curation_v=asset_v_fn("gateway_curation.mjs"),
+                cases_v=asset_v_fn("gateway_cases.mjs"),
                 ui_max_chars=_ui_max_chars(),
             ),
         )
@@ -922,6 +932,7 @@ def register_gateway_routes(
                 render_v=asset_v_fn("gateway_render.mjs"),
                 rules_v=asset_v_fn("gateway_rules.mjs"),
                 curation_v=asset_v_fn("gateway_curation.mjs"),
+                cases_v=asset_v_fn("gateway_cases.mjs"),
                 ui_max_chars=_ui_max_chars(),
                 eval_max_cases=EVAL_MAX_CASES,
                 redibis_version=REDIBIS_VERSION,

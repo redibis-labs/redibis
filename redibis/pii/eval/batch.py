@@ -177,7 +177,11 @@ def evaluate_path(
             if fail_fast:
                 break
             continue
-        status, reason = classify_eval_payload(raw)
+        from redibis.pii.eval.coerce import coerce_eval_dataset
+
+        coerced = coerce_eval_dataset(raw, default_id=file_path.stem)
+        payload = coerced if coerced is not None else raw
+        status, reason = classify_eval_payload(payload)
         if status != "ok":
             entries.append(_file_entry(file_path, root=root, status="failed", error=reason))
             if fail_fast:
@@ -186,7 +190,7 @@ def evaluate_path(
         try:
             report = evaluate_with_service(
                 svc,
-                raw,
+                payload,
                 options=opts,
                 progress_cb=progress_cb,
                 cancel_event=cancel_event,

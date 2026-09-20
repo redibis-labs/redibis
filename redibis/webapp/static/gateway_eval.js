@@ -9,6 +9,7 @@ const {
 } = await import(`./gateway_render.mjs?v=${window.GW_RENDER_V || ""}`);
 const { askInline, createRulesEditor } = await import(`./gateway_rules.mjs?v=${window.GW_RULES_V || window.GW_RENDER_V || ""}`);
 const { applyCuration, emptyCuration, entityCounts, isRejected, persistable, spanKey, upsertEntry } = await import(`./gateway_curation.mjs?v=${window.GW_CURATION_V || window.GW_RENDER_V || ""}`);
+const { coerceImported, mergeCases } = await import(`./gateway_cases.mjs?v=${window.GW_CASES_V || window.GW_RENDER_V || ""}`);
 
 const MAX = Number(window.GW_MAX_CHARS || 200000);
 const MAX_CASES = Number(window.GW_EVAL_MAX_CASES || 100);
@@ -908,37 +909,40 @@ async function runEvaluation() {
   }
 }
 
+function isBlankDataset() {
+  return dataset.cases.length === 1
+    && !(dataset.cases[0].text || "").trim()
+    && !(dataset.cases[0].expected_spans || []).length;
+}
+
+function mergeImportedCases(incoming, extra) {
+  persistCurrentText();
+  const x = extra || {};
+  const base = (x.replace || isBlankDataset()) ? [] : dataset.cases;
+  let merged = mergeCases(base, incoming);
+  const truncated = merged.length > MAX_CASES;
+  if (truncated) merged = merged.slice(0, MAX_CASES);
+  dataset = {
+    kind: DATASET_KIND,
+    schema_version: dataset.schema_version || "1.2",
+    redibis_version: window.REDIBIS_VERSION || dataset.redibis_version || "",
+    offset_unit: "unicode_codepoint",
+    id: x.id || dataset.id || "",
+    cases: merged.length ? merged : [emptyCase(1)],
+  };
+  if (!x.keepReport) invalidateReport();
+  viewMode = x.keepReport ? "view" : "edit";
+  selectCase(0);
+  return truncated;
+}
+
 function importDataset(raw) {
   if (raw && (raw.kind === REPORT_KIND || raw.kind === BATCH_REPORT_KIND)) {
     importReport(raw);
     return;
   }
-  if (!raw || raw.kind !== DATASET_KIND) {
-    throw new Error("Not a redibis.text_span_eval_dataset file.");
-  }
-  const cases = Array.isArray(raw.cases) ? raw.cases : [];
-  if (!cases.length) throw new Error("Dataset has no cases.");
-  dataset = {
-    kind: DATASET_KIND,
-    schema_version: String(raw.schema_version || "1.0"),
-    redibis_version: String(raw.redibis_version || window.REDIBIS_VERSION || ""),
-    offset_unit: "unicode_codepoint",
-    id: String(raw.id || ""),
-    cases: cases.map((c, i) => ({
-      id: String(c.id || ("case-" + (i + 1))),
-      name: String(c.name || ""),
-      text: String(c.text || ""),
-      language: String(c.language || "en"),
-      tags: Array.isArray(c.tags) ? c.tags : [],
-      expected_spans: Array.isArray(c.expected_spans)
-        ? c.expected_spans
-        : Array.isArray(c.gold_spans) ? c.gold_spans : [],
-      forbidden_spans: Array.isArray(c.forbidden_spans) ? c.forbidden_spans : [],
-    })),
-  };
-  invalidateReport();
-  viewMode = "edit";
-  selectCase(0);
+  const parsed = coerceImported(raw);
+  mergeImportedCases(parsed.cases, { id: parsed.id });
 }
 
 function importReport(raw) {
@@ -1039,12 +1043,25 @@ $("evCancel").addEventListener("click", () => {
 });
 $("evImport").addEventListener("click", () => $("evFile").click());
 $("evFile").addEventListener("change", async (ev) => {
-  const file = ev.target.files && ev.target.files[0];
+  const files = Array.from(ev.target.files || []);
   ev.target.value = "";
-  if (!file) return;
+  if (!files.length) return;
   try {
-    importDataset(JSON.parse(await file.text()));
-    paintBanners(bannerEl, [{ kind: "ok", text: "Imported " + dataset.cases.length + " case(s)." }]);
+    if (files.length === 1) {
+      importDataset(JSON.parse(await files[0].text()));
+      paintBanners(bannerEl, [{ kind: "ok", text: "Imported " + dataset.cases.length + " case(s)." }]);
+      return;
+    }
+    let truncated = false;
+    for (const file of files) {
+      const parsed = coerceImported(JSON.parse(await file.text()));
+      truncated = mergeImportedCases(parsed.cases, { id: parsed.id || dataset.id }) || truncated;
+    }
+    paintBanners(bannerEl, [{
+      kind: truncated ? "warn" : "ok",
+      text: "Imported " + dataset.cases.length + " case(s)" +
+        (truncated ? " (capped at " + MAX_CASES + ")" : "") + ".",
+    }]);
   } catch (err) {
     paintBanners(bannerEl, [{ kind: "warn", text: err.message }]);
   }

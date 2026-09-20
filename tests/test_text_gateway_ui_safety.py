@@ -17,7 +17,8 @@ def test_no_web_storage_or_innerhtml_of_user_text():
     run_js = (STATIC / "gateway_run.js").read_text(encoding="utf-8")
     rules_js = (STATIC / "gateway_rules.mjs").read_text(encoding="utf-8")
     curation_js = (STATIC / "gateway_curation.mjs").read_text(encoding="utf-8")
-    blob = js + "\n" + eval_js + "\n" + mjs + "\n" + usecase_js + "\n" + run_js + "\n" + rules_js + "\n" + curation_js
+    cases_js = (STATIC / "gateway_cases.mjs").read_text(encoding="utf-8")
+    blob = js + "\n" + eval_js + "\n" + mjs + "\n" + usecase_js + "\n" + run_js + "\n" + rules_js + "\n" + curation_js + "\n" + cases_js
     assert "localStorage" not in blob
     assert "sessionStorage" not in blob
     assert "indexedDB" not in blob
@@ -29,6 +30,7 @@ def test_no_web_storage_or_innerhtml_of_user_text():
     assert "innerHTML" not in run_js
     assert "innerHTML" not in rules_js
     assert "innerHTML" not in curation_js
+    assert "innerHTML" not in cases_js
     assert "insertAdjacentHTML" not in blob
     assert "document.write" not in blob
 
@@ -228,6 +230,11 @@ def test_evaluation_builder_page_and_health_refresh():
     assert "mouseup" not in js
     assert "visibilitychange" in gw
     assert "loadLlmRoutesRuntime" in app
+    assert 'id="gwCasesCard"' in (TEMPLATES / "gateway.html").read_text(encoding="utf-8")
+    assert "/api/gateway/evaluations/run/stream" in gw
+    assert "runCasePack" in gw
+    assert "Download test case" in (TEMPLATES / "gateway.html").read_text(encoding="utf-8")
+    assert "Import JSON (one or many)" in html
     assert "Object.assign({}, existing" in app
     assert "Object.assign({}, current" in app
     assert "await persistLlmSettingsToRegistry" in app
@@ -274,10 +281,13 @@ def test_gateway_modules_are_cache_busted():
     for html in (gw, ev, uc):
         assert "GW_RENDER_V" in html
     assert "GW_RULES_V" in gw and "GW_RULES_V" in ev
+    assert "GW_CASES_V" in gw and "GW_CASES_V" in ev
     for blob in (js, eval_js, usecase_js):
         assert "gateway_render.mjs?v=${window.GW_RENDER_V" in blob
     assert "gateway_rules.mjs?v=${window.GW_RULES_V" in js
     assert "gateway_rules.mjs?v=${window.GW_RULES_V" in eval_js
+    assert "gateway_cases.mjs?v=${window.GW_CASES_V" in js
+    assert "gateway_cases.mjs?v=${window.GW_CASES_V" in eval_js
 
 
 def test_evaluation_actions_do_not_use_window_prompt():

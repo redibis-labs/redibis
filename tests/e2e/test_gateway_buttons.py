@@ -58,6 +58,13 @@ GATEWAY_BUTTONS = [
     ("gwSaveUsecase", "gateway", 0),
     ("gwAutoTrim", "gateway", 0),
     ("gwHideRejected", "gateway", 0),
+    ("gwDownloadCase", "gateway", 0),
+    ("gwOpenCases", "gateway", 0),
+    ("gwCasesFile", "gateway", 0),
+    ("gwAddCase", "gateway", 0),
+    ("gwDownloadCases", "gateway", 0),
+    ("gwRunCases", "gateway", 0),
+    ("gwDownloadCaseReport", "gateway", 0),
 ]
 
 EVAL_BUTTONS = [

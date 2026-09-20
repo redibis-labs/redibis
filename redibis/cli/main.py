@@ -1740,9 +1740,13 @@ def _run_pii_eval(args) -> int:
                 fail_fast=bool(getattr(args, "fail_fast", False)),
             )
         else:
+            from redibis.pii.eval.coerce import coerce_eval_dataset
+
+            raw = json.loads(source.read_text(encoding="utf-8"))
+            payload = coerce_eval_dataset(raw, default_id=source.stem) or raw
             report = evaluate_with_service(
                 svc,
-                json.loads(source.read_text(encoding="utf-8")),
+                payload,
                 options=options,
             )
     except FileNotFoundError as exc:

@@ -159,6 +159,26 @@
             <button id="gwRecommendDownload" type="button" class="btn btn-ghost btn-sm">Download recommendations</button>
           </div>
         </div>
+        <div class="gw-card" id="gwCasesCard">
+          <h2>Test cases</h2>
+          <p class="gw-hint">
+            Raw text plus expected PII spans (offsets are Unicode code points).
+            Open the same JSON on Evaluations, or score a folder with
+            <span class="mono">redibis pii eval --dataset DIR --recursive</span>.
+          </p>
+          <div id="gwCasesList" class="gw-eval-cases"></div>
+          <div id="gwCasesMeta" class="gw-hint">No cases in the pack yet.</div>
+          <div id="gwCasesReport" class="gw-eval-kpis" hidden></div>
+          <input id="gwCasesFile" type="file" accept="application/json,.json" multiple hidden/>
+          <div class="gw-pol-actions">
+            <button id="gwOpenCases" type="button" class="btn btn-ghost btn-sm">Open files…</button>
+            <button id="gwAddCase" type="button" class="btn btn-ghost btn-sm">Add current scan</button>
+            <button id="gwDownloadCases" type="button" class="btn btn-ghost btn-sm">Download all cases</button>
+            <button id="gwRunCases" type="button" class="btn btn-sm">Run batch</button>
+            <button id="gwDownloadCaseReport" type="button" class="btn btn-ghost btn-sm" disabled>Download report</button>
+            <a class="btn btn-ghost btn-sm" href="/gateway/evaluations">Open in Evaluations</a>
+          </div>
+        </div>
         <div class="gw-card" id="gwSessionCard">
           <h2>Session</h2>
           <p class="gw-hint">Save the current text and curated spans as a use case under a session.</p>
@@ -200,7 +220,8 @@
         <div class="gw-card" id="gwActions" hidden>
           <h2>Actions</h2>
           <button id="gwDeid" type="button" class="btn btn-ghost" disabled>Copy de-identified text</button>
-          <button id="gwDownload" type="button" class="btn btn-ghost">Download JSON</button>
+          <button id="gwDownload" type="button" class="btn btn-ghost">Download scan JSON</button>
+          <button id="gwDownloadCase" type="button" class="btn btn-ghost">Download test case</button>
           <button id="gwLlmDownloadBar" type="button" class="btn btn-ghost" hidden>Download LLM log</button>
           <button id="gwClear" type="button" class="btn btn-red">Clear</button>
         </div>
@@ -217,6 +238,7 @@
     window.GW_RENDER_V = {{ (render_v or "")|tojson }};
     window.GW_RULES_V = {{ (rules_v or "")|tojson }};
     window.GW_CURATION_V = {{ (curation_v or "")|tojson }};
+    window.GW_CASES_V = {{ (cases_v or "")|tojson }};
   </script>
   <script src="/static/auth.js"></script>
   <script type="module" src="/static/gateway.js?v={{ js_v }}"></script>

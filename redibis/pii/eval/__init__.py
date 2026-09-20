@@ -1,6 +1,7 @@
 """Portable, deterministic evaluation helpers for free-text PII spans."""
 
 from .batch import assemble_batch_report, discover_eval_files, evaluate_path
+from .coerce import coerce_eval_dataset, from_gateway_scan, from_usecase
 from .builder import CorpusBuildError, build_dataset, build_path, locate_unique_value
 from .gates import GateError, apply_gates_to_report, evaluate_gates, format_gate_failure, load_gate_file
 from .report_html import render_report_html
@@ -36,6 +37,7 @@ __all__ = [
     "build_dataset",
     "build_path",
     "classify_eval_payload",
+    "coerce_eval_dataset",
     "current_redibis_version",
     "discover_eval_files",
     "eval_limiter_weight",
@@ -45,6 +47,8 @@ __all__ = [
     "evaluate_path",
     "evaluate_with_service",
     "format_gate_failure",
+    "from_gateway_scan",
+    "from_usecase",
     "load_gate_file",
     "locate_unique_value",
     "render_report_html",

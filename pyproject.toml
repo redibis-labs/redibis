@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "redibis"
-version = "0.6.16"
+version = "0.6.17"
 description = "Data contract pipeline — ODCS v3 with GE quality, Presidio + GLiNER PII detection, and Arabic + English support."
 readme = "README.md"
 requires-python = ">=3.10"

@@ -17,7 +17,7 @@ Scan facades, runners, and store helpers load on first attribute access.
 
 from __future__ import annotations
 
-__version__ = "0.6.16"
+__version__ = "0.6.17"
 
 # ── Eager: lightweight core (no GE / Presidio import chain) ───────────────
 from redibis.config import RedibisConfig  # noqa: F401

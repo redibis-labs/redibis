@@ -17,6 +17,12 @@ const {
   spanKey,
   upsertEntry,
 } = await import(`./gateway_curation.mjs?v=${window.GW_CURATION_V || window.GW_RENDER_V || ""}`);
+const {
+  caseFromScan,
+  coerceImported,
+  mergeCases,
+  stampedDataset,
+} = await import(`./gateway_cases.mjs?v=${window.GW_CASES_V || window.GW_RENDER_V || ""}`);
 
 const MAX = Number(window.GW_MAX_CHARS || 200000);
 const STRATEGIES = ["redact", "mask", "hash", "fpe", "fake", "passthrough"];
@@ -109,6 +115,9 @@ const rulesEditor = $("gwRules")
 let reviewedPolicy = null;
 let health = null;
 let scanAbort = null;
+let casePack = { id: "", cases: [] };
+let lastCaseReport = null;
+let selectedPackIndex = -1;
 let maskPreviewOn = false;
 let maskedText = "";
 let maskedSpans = [];
@@ -1142,6 +1151,8 @@ async function copyDeidentified() {
 function downloadJson() {
   if (!lastEnvelope) return;
   const payload = JSON.parse(JSON.stringify(lastEnvelope));
+  payload.text = sourceText;
+  payload.source_text = sourceText;
   payload.curation = persistable(curation);
   payload.analysers = payload.analysers || {};
   payload.analysers.pii = payload.analysers.pii || {};
@@ -1172,6 +1183,280 @@ async function downloadLlmLog() {
   a.download = "llm-log-" + stem + ".json";
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+const MAX_CASES = 100;
+
+function downloadNamedJson(name, payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function currentExpectedCase() {
+  if (!sourceText) return null;
+  const rejected = applyCuration(rawSpans(), curation, sourceText, { keepRejected: true })
+    .filter((s) => s.rejected);
+  return caseFromScan({
+    text: sourceText,
+    language: langEl.value,
+    spans: lastEnvelope ? curatedSpans() : [],
+    rejected,
+    id: (lastEnvelope && lastEnvelope.run_uuid) || ("case-" + (casePack.cases.length + 1)),
+    name: "",
+  });
+}
+
+function renderCasePack() {
+  const list = $("gwCasesList");
+  const meta = $("gwCasesMeta");
+  if (!list || !meta) return;
+  list.textContent = "";
+  casePack.cases.forEach((c, i) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "gw-eval-case" + (i === selectedPackIndex ? " active" : "");
+    btn.appendChild(document.createTextNode(
+      (c.name || c.id) + " · " + ((c.expected_spans || []).length) + " expected"
+    ));
+    btn.addEventListener("click", () => openPackedCase(i));
+    list.appendChild(btn);
+  });
+  meta.textContent = casePack.cases.length
+    ? (casePack.cases.length + " case(s) in the pack.")
+    : "No cases in the pack yet.";
+}
+
+function openPackedCase(index) {
+  const c = casePack.cases[index];
+  if (!c) return;
+  selectedPackIndex = index;
+  sourceText = c.text || "";
+  input.value = sourceText;
+  updateCount();
+  lastEnvelope = {
+    text_meta: {
+      language: c.language || "en",
+      char_count: Array.from(sourceText).length,
+      truncated: false,
+    },
+    analysers: {
+      pii: {
+        spans: (c.expected_spans || []).map((s) => Object.assign({}, s, {
+          text: s.value || s.text || "",
+          engine: "gold",
+        })),
+        entity_counts: entityCounts(c.expected_spans || []),
+        engines_ran: ["gold"],
+      },
+    },
+    run_uuid: c.id || "",
+  };
+  curation = emptyCuration(c.id);
+  paintResultPane();
+  renderSummary(lastEnvelope);
+  showResultMode(true);
+  renderCasePack();
+  paintBanners(bannerEl, [{
+    kind: "info",
+    text: "Opened “" + (c.name || c.id) + "” with " +
+      ((c.expected_spans || []).length) +
+      " expected span(s). Scan to compare, or Run batch to score the pack.",
+  }]);
+}
+
+function addCurrentScanToPack() {
+  const c = currentExpectedCase();
+  if (!c || !(c.text || "").trim()) {
+    paintBanners(bannerEl, [{ kind: "warn", text: "Scan or paste text first." }]);
+    return;
+  }
+  if (casePack.cases.length >= MAX_CASES) {
+    paintBanners(bannerEl, [{ kind: "warn", text: "Case limit reached (" + MAX_CASES + ")." }]);
+    return;
+  }
+  casePack.cases = mergeCases(casePack.cases, [c]).slice(0, MAX_CASES);
+  selectedPackIndex = casePack.cases.length - 1;
+  renderCasePack();
+  paintBanners(bannerEl, [{
+    kind: "ok",
+    text: "Added case with " + (c.expected_spans || []).length + " expected span(s).",
+  }]);
+}
+
+function downloadCurrentCase() {
+  const c = currentExpectedCase();
+  if (!c || !(c.text || "").trim()) {
+    paintBanners(bannerEl, [{ kind: "warn", text: "Scan or paste text first." }]);
+    return;
+  }
+  downloadNamedJson((c.id || "case") + ".eval.json", stampedDataset([c], { id: c.id }));
+}
+
+function downloadCasePack() {
+  if (!casePack.cases.length) {
+    downloadCurrentCase();
+    return;
+  }
+  downloadNamedJson("gateway-cases.eval.json", stampedDataset(casePack.cases, { id: casePack.id }));
+}
+
+function paintCaseReport(report) {
+  const host = $("gwCasesReport");
+  const dl = $("gwDownloadCaseReport");
+  if (dl) dl.disabled = !report;
+  if (!host) return;
+  host.textContent = "";
+  if (!report) {
+    host.hidden = true;
+    return;
+  }
+  host.hidden = false;
+  const exact = (report.exact && report.exact.micro) || (report.strict && report.strict.micro) || {};
+  const value = (report.value && report.value.micro) || {};
+  const overlap = (report.overlap && report.overlap.micro) || {};
+  [
+    ["cases", String(report.case_count || (report.cases || []).length || 0)],
+    ["strict F1", exact.f1 != null ? String(exact.f1) : "—"],
+    ["value F1", value.f1 != null ? String(value.f1) : "—"],
+    ["overlap F1", overlap.f1 != null ? String(overlap.f1) : "—"],
+  ].forEach(([k, v]) => {
+    const row = document.createElement("div");
+    row.appendChild(document.createTextNode(k + " · " + v));
+    host.appendChild(row);
+  });
+}
+
+async function streamCaseEval(payload, { signal } = {}) {
+  const res = await fetch("/api/gateway/evaluations/run/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  if (res.status === 401) {
+    window.location.href = "/login?next=/gateway";
+    return null;
+  }
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(typeof d.detail === "string" ? d.detail : "Evaluation failed (" + res.status + ")");
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  let report = null;
+  let serverError = null;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buf.indexOf("\n")) !== -1) {
+      const line = buf.slice(0, idx);
+      buf = buf.slice(idx + 1);
+      if (!line.trim()) continue;
+      let evt;
+      try { evt = JSON.parse(line); } catch { continue; }
+      if (evt.event === "stage") {
+        const total = Number(evt.total || 0);
+        const index = Number(evt.index || 0);
+        const pct = total ? Math.round(100 * index / total) : Number(evt.percent || 0);
+        setProgress(pct, evt.stage === "case" ? ("Scoring " + (evt.id || (index + 1))) : (evt.stage || "Scoring…"));
+      } else if (evt.event === "result") {
+        report = evt.report;
+        setProgress(100, "Done");
+      } else if (evt.event === "error") {
+        serverError = evt.detail || "evaluation failed";
+      }
+    }
+  }
+  if (serverError) throw new Error(serverError);
+  return report;
+}
+
+async function runCasePack() {
+  if (!casePack.cases.length) {
+    const one = currentExpectedCase();
+    if (one && (one.text || "").trim()) {
+      casePack.cases = mergeCases(casePack.cases, [one]);
+      renderCasePack();
+    }
+  }
+  const nonempty = casePack.cases.filter((c) => (c.text || "").trim());
+  if (!nonempty.length) {
+    paintBanners(bannerEl, [{ kind: "warn", text: "Add or open at least one case." }]);
+    return;
+  }
+  showProgress();
+  setProgress(8, "Scoring " + nonempty.length + " case(s)…");
+  scanAbort = new AbortController();
+  try {
+    lastCaseReport = await streamCaseEval({
+      dataset: stampedDataset(nonempty, { id: casePack.id }),
+      language: langEl.value,
+      engines: enginesEl.value,
+      min_score: Number(minScoreEl.value || 0.35),
+      use_llm: !!(useLlmEl && useLlmEl.checked),
+      llm_provider: (useLlmEl && useLlmEl.checked && llmProviderEl.value) || "",
+      llm_model: (useLlmEl && useLlmEl.checked && llmModelEl.value.trim()) || "",
+      llm_api_key: (useLlmEl && useLlmEl.checked && llmKeyEl && llmKeyEl.value.trim()) || "",
+      overlap_iou: 0.5,
+      normalization: "v1",
+      tier: ["strict", "value", "overlap", "type"],
+      draft_rules: rulesEditor && rulesEditor.getDraft() || undefined,
+    }, { signal: scanAbort.signal });
+    paintCaseReport(lastCaseReport);
+    const exact = lastCaseReport && lastCaseReport.exact && lastCaseReport.exact.micro || {};
+    const value = lastCaseReport && lastCaseReport.value && lastCaseReport.value.micro || {};
+    paintBanners(bannerEl, [{
+      kind: "ok",
+      text: "Batch scored " + nonempty.length + " case(s). Strict F1 " +
+        (exact.f1 != null ? exact.f1 : "—") + " · value F1 " +
+        (value.f1 != null ? value.f1 : "—") +
+        ". This score is how well the engines match the expected spans.",
+    }]);
+  } catch (err) {
+    if (err && err.name === "AbortError") {
+      paintBanners(bannerEl, [{ kind: "info", text: "Batch cancelled." }]);
+    } else {
+      paintBanners(bannerEl, [{ kind: "warn", text: err.message }]);
+    }
+  } finally {
+    scanAbort = null;
+    hideProgress();
+  }
+}
+
+async function importCaseFiles(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  let added = 0;
+  for (const file of files) {
+    try {
+      const parsed = coerceImported(JSON.parse(await file.text()));
+      casePack.cases = mergeCases(casePack.cases, parsed.cases).slice(0, MAX_CASES);
+      added += (parsed.cases || []).length;
+      if (parsed.report) {
+        lastCaseReport = parsed.report;
+        paintCaseReport(lastCaseReport);
+      }
+    } catch (err) {
+      paintBanners(bannerEl, [{ kind: "warn", text: file.name + ": " + err.message }]);
+      renderCasePack();
+      return;
+    }
+  }
+  renderCasePack();
+  if (casePack.cases.length === 1) openPackedCase(0);
+  paintBanners(bannerEl, [{
+    kind: "ok",
+    text: "Opened " + added + " case(s)" +
+      (casePack.cases.length >= MAX_CASES ? " (capped at " + MAX_CASES + ")" : "") + ".",
+  }]);
 }
 
 function renderVerdictPane() {
@@ -1326,6 +1611,19 @@ if (policyAllRedactBtn) {
 clearBtn.addEventListener("click", resetAll);
 deidBtn.addEventListener("click", copyDeidentified);
 downloadBtn.addEventListener("click", downloadJson);
+if ($("gwDownloadCase")) $("gwDownloadCase").addEventListener("click", downloadCurrentCase);
+if ($("gwOpenCases")) $("gwOpenCases").addEventListener("click", () => $("gwCasesFile") && $("gwCasesFile").click());
+if ($("gwCasesFile")) $("gwCasesFile").addEventListener("change", async (ev) => {
+  const files = ev.target.files;
+  ev.target.value = "";
+  await importCaseFiles(files);
+});
+if ($("gwAddCase")) $("gwAddCase").addEventListener("click", addCurrentScanToPack);
+if ($("gwDownloadCases")) $("gwDownloadCases").addEventListener("click", downloadCasePack);
+if ($("gwRunCases")) $("gwRunCases").addEventListener("click", runCasePack);
+if ($("gwDownloadCaseReport")) $("gwDownloadCaseReport").addEventListener("click", () => {
+  if (lastCaseReport) downloadNamedJson("gateway-case-report.json", lastCaseReport);
+});
 if ($("gwHideRejected")) $("gwHideRejected").addEventListener("change", (ev) => {
   hideRejected = !!ev.target.checked;
   if (lastEnvelope) { paintResultPane(); renderSummary(lastEnvelope); }

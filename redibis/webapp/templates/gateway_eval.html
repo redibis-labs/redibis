@@ -217,8 +217,8 @@
         </div>
         <div class="gw-card">
           <h2>Dataset</h2>
-          <input id="evFile" type="file" accept="application/json,.json" hidden/>
-          <button id="evImport" type="button" class="btn btn-ghost" style="width:100%">Import JSON</button>
+          <input id="evFile" type="file" accept="application/json,.json" multiple hidden/>
+          <button id="evImport" type="button" class="btn btn-ghost" style="width:100%">Import JSON (one or many)</button>
           <button id="evDownload" type="button" class="btn btn-ghost" style="width:100%">Download all cases</button>
           <button id="evDownloadCase" type="button" class="btn btn-ghost" style="width:100%">Download this case</button>
           <button id="evDownloadReport" type="button" class="btn btn-ghost" style="width:100%" disabled>Download report</button>
@@ -239,6 +239,7 @@
     window.GW_RENDER_V = {{ (render_v or "")|tojson }};
     window.GW_RULES_V = {{ (rules_v or "")|tojson }};
     window.GW_CURATION_V = {{ (curation_v or "")|tojson }};
+    window.GW_CASES_V = {{ (cases_v or "")|tojson }};
   </script>
   <script src="/static/auth.js"></script>
   <script type="module" src="/static/gateway_eval.js?v={{ js_v }}"></script>

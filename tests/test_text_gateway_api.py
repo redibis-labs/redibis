@@ -491,6 +491,27 @@ def test_explorer_can_stream_gateway_evaluation(client):
     assert any(ev.get("event") == "result" for ev in lines)
 
 
+def test_evaluation_accepts_gateway_scan_envelope(client):
+    _explorer(client)
+    envelope = {
+        "run_uuid": "scan-eval-1",
+        "text": "alice",
+        "text_meta": {"language": "en"},
+        "analysers": {
+            "pii": {
+                "spans": [
+                    {"start": 0, "end": 5, "entity_type": "EMAIL_ADDRESS", "text": "alice"}
+                ]
+            }
+        },
+    }
+    r = _post(client, "/api/gateway/evaluations/run", {"dataset": envelope})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["kind"] == "redibis.text_span_eval_report"
+    assert body["case_count"] == 1
+
+
 def test_evaluation_fails_closed_when_llm_is_unready(client, monkeypatch):
     import redibis.webapp.gateway_routes as gw
 

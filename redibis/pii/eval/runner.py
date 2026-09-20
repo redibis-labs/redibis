@@ -22,6 +22,24 @@ class EvalCancelled(Exception):
     """Raised when a caller stops an in-flight evaluation."""
 
 
+def _gold_entity_types(dataset: Mapping[str, Any]) -> set[str]:
+    """Entity types labeled on gold/forbidden spans (including custom categories)."""
+    types: set[str] = set()
+    for case in dataset.get("cases") or []:
+        if not isinstance(case, Mapping):
+            continue
+        spans = list(case.get("expected_spans") or [])
+        spans.extend(case.get("gold_spans") or [])
+        spans.extend(case.get("forbidden_spans") or [])
+        for span in spans:
+            if not isinstance(span, Mapping):
+                continue
+            et = str(span.get("entity_type") or "").strip().upper()
+            if et:
+                types.add(et)
+    return types
+
+
 def eval_limiter_weight(
     case_count: int, total_chars: int, *, use_llm: bool = False
 ) -> int:
@@ -105,6 +123,8 @@ def evaluate_with_service(
             }
         except Exception:
             allowed = set()
+    if allowed:
+        allowed |= _gold_entity_types(dataset)
     normalized = validate_dataset(
         dataset,
         allowed_entity_types=allowed or None,
