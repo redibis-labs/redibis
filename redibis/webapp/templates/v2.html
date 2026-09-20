@@ -17,13 +17,13 @@ header #backScan{margin-left:auto}
 .wrap{display:grid;grid-template-columns:280px 1fr;gap:0;min-height:calc(100vh - 50px)}
 .side{border-right:1px solid var(--border);background:var(--surface);padding:16px;overflow:auto}
 .side h2{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:8px 0}
-.tbl-item{padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;display:flex;gap:8px;align-items:flex-start}
+.tbl-item{padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;display:flex;gap:8px;align-items:flex-start;width:100%}
 .tbl-item:hover{background:#f1f5f9}
 .tbl-item.active{background:#dbeafe;color:#1e40af;font-weight:700}
-.tbl-item > input{flex:0 0 18px;margin-top:3px}
-.ws-row-main{display:flex;flex-direction:column;min-width:0;flex:1;gap:3px}
-.ws-row-name{display:block;font-family:ui-monospace,monospace;white-space:normal;overflow-wrap:anywhere;word-break:break-word;line-height:1.35}
-.ws-row-meta{font-size:10px;color:var(--muted);font-weight:400;font-family:inherit;white-space:normal;overflow-wrap:anywhere;word-break:break-word;line-height:1.35}
+.tbl-item > input,.ws-row-cb{flex:0 0 16px;width:16px !important;min-width:16px;max-width:16px;height:16px;margin-top:4px;padding:0}
+.ws-row-main{display:flex;flex-direction:column;min-width:0;flex:1 1 auto;gap:3px;width:100%}
+.ws-row-name{display:block;font-family:ui-monospace,monospace;white-space:normal;overflow-wrap:break-word;word-break:normal;line-height:1.4}
+.ws-row-meta{font-size:10px;color:var(--muted);font-weight:400;font-family:inherit;white-space:normal;overflow-wrap:break-word;word-break:normal;line-height:1.35}
 .ws-row-chips{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
 .tbl-item:hover{background:#f1f5f9}
 .tbl-item.active{background:#dbeafe;color:#1e40af;font-weight:700}
@@ -52,6 +52,7 @@ button:hover{background:#f8fafc}
 .btn-sm{padding:4px 9px;font-size:12px}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 input,select,textarea{font:inherit;border:1px solid var(--border);border-radius:8px;padding:7px 10px;width:100%}
+input[type=checkbox],input[type=radio]{width:auto;min-width:16px;max-width:16px;height:16px;padding:0}
 textarea{font-family:ui-monospace,monospace;font-size:12px;min-height:90px}
 label{display:block;font-size:12px;color:var(--muted);margin:8px 0 4px}
 .banner{padding:12px 16px;border-radius:10px;font-weight:700;margin-bottom:14px}
@@ -75,9 +76,9 @@ tr.diff-row td{vertical-align:top}
 #workspaceBar .ws-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
 #workspaceBar select,#workspaceBar input{width:100%}
 #workspaceBar .ws-pager{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
-.tbl-item{display:flex;gap:8px;align-items:flex-start}
-.ws-row-main{display:flex;flex-direction:column;min-width:0;flex:1;gap:3px}
-.ws-row-meta{font-size:10px;color:var(--muted);font-weight:400;font-family:inherit;white-space:normal;overflow-wrap:anywhere;word-break:break-word;line-height:1.35}
+.tbl-item{display:flex;gap:8px;align-items:flex-start;width:100%}
+.ws-row-main{display:flex;flex-direction:column;min-width:0;flex:1 1 auto;gap:3px;width:100%}
+.ws-row-meta{font-size:10px;color:var(--muted);font-weight:400;font-family:inherit;white-space:normal;overflow-wrap:break-word;word-break:normal;line-height:1.35}
 .ws-select-row{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);margin:6px 0}
 .ws-table-head{display:none}
 .art-dots{display:flex;gap:2px}
@@ -204,7 +205,7 @@ async function loadTables(){
   const rows = Array.isArray(contracts) ? contracts : (contracts.rows || []);
   $("tableList").innerHTML = rows.length ? rows.map(c =>
     `<div class="tbl-item ${c.table===STATE.table?'active':''}" onclick="selectTable(${jsArg(c.table)})">
-       <span class="ws-row-main"><span class="ws-row-name">${esc(c.table)}</span>
+       <span class="ws-row-main"><span class="ws-row-name">${esc(c.table).replace(/([._/-])/g,"$1&#8203;")}</span>
        <span class="ws-row-meta">v${esc(c.version||'∅')}</span></span></div>`).join("")
     : `<div class="empty" style="padding:8px">No active contracts yet.</div>`;
 }

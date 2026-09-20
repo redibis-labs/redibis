@@ -27,7 +27,29 @@ const AGREEMENT_MARK = {
 };
 const RAIL_AGREEMENT_ORDER = { contested: 0, no_evidence: 1, majority: 2, unanimous: 3 };
 
+const MIX_FIELDS = ["pii", "definition", "tags", "classification"];
 const EDIT_FIELDS = ["pii", "entity_type", "classification", "definition", "tags"];
+
+function wrapIdent(s) {
+  return esc(s).replace(/([._/-])/g, "$1&#8203;");
+}
+
+function piiIcon(isPii, extra = "") {
+  if (isPii) {
+    return `<span class="sr-pii-icon on ${extra}" title="PII detected" aria-label="PII detected">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+        <path fill="currentColor" d="M12 2a5 5 0 00-5 5v3H6a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2v-8a2 2 0 00-2-2h-1V7a5 5 0 00-5-5zm-3 8V7a3 3 0 016 0v3H9zm3 4a2 2 0 110 4 2 2 0 010-4z"/>
+      </svg>
+      <span>PII</span>
+    </span>`;
+  }
+  return `<span class="sr-pii-icon off ${extra}" title="Not PII" aria-label="Not PII">
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+      <path fill="currentColor" d="M12 2a10 10 0 100 20 10 10 0 000-20zm-1 14.2L6.8 12l1.4-1.4 2.8 2.8 5.6-5.6L18 9.2 11 16.2z"/>
+    </svg>
+    <span>not PII</span>
+  </span>`;
+}
 
 function agreementChip(agr) {
   if (agr === "no_evidence") {
@@ -101,6 +123,8 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     colIndex: 0,
     field: "pii",
     chosenSource: "",
+    chosen: { pii: "", definition: "", tags: "", classification: "" },
+    flashStatus: "",
     rationale: "engine_correct",
     rationaleText: "",
     filter: "",
@@ -122,28 +146,43 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
   const root = document.createElement("div");
   root.className = "steward-root";
   root.innerHTML = `<style>
-    .steward-root{display:grid;grid-template-columns:minmax(196px,250px) minmax(0,1fr);grid-template-rows:auto 1fr;gap:0;min-height:620px;background:#eef2f7;border:1px solid #d4dee9;border-radius:14px;overflow:hidden}
-    .steward-header{grid-column:1/-1;background:#1e293b;color:#f8fafc;padding:12px 16px 14px;display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:10px}
-    .steward-header h2{margin:0;font-size:15px;font-weight:700;letter-spacing:.01em;line-height:1.35;overflow-wrap:anywhere;word-break:break-word;max-width:min(72ch,100%)}
+    .steward-root{display:grid;grid-template-columns:minmax(220px,280px) minmax(0,1fr);grid-template-rows:auto 1fr;gap:0;min-height:620px;background:#eef2f7;border:1px solid #d4dee9;border-radius:14px;overflow:hidden}
+    .steward-header{grid-column:1/-1;background:#1e293b;color:#f8fafc;padding:12px 16px 14px;display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:10px;transition:background .2s ease}
+    .steward-header.ok{background:#14532d}
+    .steward-header.ok .sr-kicker{color:#86efac}
+    .steward-header.edited{background:#1e3a8a}
+    .steward-header.edited .sr-kicker{color:#bfdbfe}
+    .steward-header.bad{background:#7f1d1d}
+    .steward-header.bad .sr-kicker{color:#fecaca}
+    .steward-header.warn{background:#9a3412}
+    .steward-header.warn .sr-kicker{color:#fed7aa}
+    .steward-header h2{margin:0;font-size:15px;font-weight:700;letter-spacing:.01em;line-height:1.35;overflow-wrap:break-word;word-break:normal;max-width:min(72ch,100%)}
     .steward-header .sr-kicker{display:block;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#93c5fd;margin-bottom:4px}
     .steward-header .sr-sub{color:#94a3b8;font-size:12px;margin-top:4px}
     .steward-header .sr-head-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
     .steward-header .sr-progress{font-size:12px;color:#cbd5e1;background:#0f172a;border:1px solid #334155;border-radius:999px;padding:4px 10px}
+    .steward-header.ok .sr-progress{background:#052e16;border-color:#166534;color:#bbf7d0}
     .steward-header button{background:#334155;color:#f8fafc;border-color:#475569}
     .steward-header button:hover{background:#475569}
     .steward-header .btn-primary{background:#3b82f6;border-color:#3b82f6}
-    .steward-rail{border:0;border-right:1px solid #d4dee9;background:#e8eef6;padding:12px;overflow:auto}
+    .steward-rail{border:0;border-right:1px solid #d4dee9;background:#e8eef6;padding:12px;overflow:auto;min-width:0}
     .steward-rail h4{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin:12px 0 6px}
-    .steward-rail .item{padding:7px 8px;border-radius:8px;cursor:pointer;font-size:13px;line-height:1.4;overflow-wrap:anywhere;word-break:break-word;white-space:normal}
+    .steward-rail .item{padding:7px 8px;border-radius:8px;cursor:pointer;font-size:13px;line-height:1.4;overflow-wrap:break-word;word-break:normal;white-space:normal}
     .steward-rail .item:hover{background:#dbe7f6}
     .steward-rail .item.active{background:#1e3a5f;color:#eff6ff}
     .steward-main{min-width:0;background:#f7f9fc;padding:14px 16px;overflow:auto}
     .sr-card{background:#fff;border:1px solid #dbe3ee;border-radius:12px;overflow:hidden;margin-bottom:12px;box-shadow:0 1px 0 rgba(15,23,42,.04)}
-    .sr-card-head{background:#f1f5f9;border-bottom:1px solid #e2e8f0;padding:10px 14px}
+    .sr-card-head{background:#f1f5f9;border-bottom:1px solid #e2e8f0;padding:10px 14px;display:flex;flex-wrap:wrap;align-items:center;gap:10px}
     .sr-card-head h3{margin:0;font-size:13px;text-transform:none;letter-spacing:0;color:#0f172a;font-weight:700}
-    .sr-card-head p{margin:4px 0 0;color:#64748b;font-size:12px}
+    .sr-card-head p{margin:4px 0 0;color:#64748b;font-size:12px;width:100%}
     .sr-card-body{padding:14px}
     .steward-btns{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+    .btn-accept.ready{background:#dcfce7;border-color:#16a34a;color:#14532d}
+    .sr-pii-icon{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.04em}
+    .sr-pii-icon.on{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+    .sr-pii-icon.off{background:#dcfce7;color:#166534;border:1px solid #86efac}
+    .sr-pii-icon svg{display:block;flex:0 0 auto}
+    .sr-choice{font-size:11px;color:#475569;margin:4px 0 8px}
     .steward-tile{border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;cursor:pointer;background:#fff}
     .steward-tile strong{display:block;font-size:18px}
     .steward-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin:12px 0}
@@ -215,9 +254,14 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     state.edit.entityType = cur.entity_type || "";
     state.edit.classification = cur.classification || "";
     state.edit.definition = cur.definition || "";
-    state.edit.definitionSource = "human";
-    state.edit.tags = (cur.tags || []).join(", ");
+    state.chosen = { pii: "", definition: "", tags: "", classification: "" };
     const review = (c.review && c.review.verdicts) || {};
+    MIX_FIELDS.forEach((f) => {
+      const v = review[f];
+      if (v && v.chosen_source) state.chosen[f] = v.chosen_source;
+    });
+    state.edit.definitionSource = state.chosen.definition || "human";
+    state.edit.tags = (cur.tags || []).join(", ");
     EDIT_FIELDS.forEach((f) => {
       const v = review[f];
       state.reasons[f] = {
@@ -242,11 +286,24 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     });
   }
 
+  function headerTone() {
+    const flash = state.flashStatus;
+    const st = flash || (state.step === "column" && state.column && state.column.review && state.column.review.status) || "";
+    if (st === "approved") return "ok";
+    if (st === "edited") return "edited";
+    if (st === "rejected") return "bad";
+    if (st === "needs_review") return "warn";
+    const g = (state.overview && state.overview.guarantee) || {};
+    if (g.guaranteed) return "ok";
+    return "";
+  }
+
   function renderHeader() {
     const ov = state.overview || {};
     const g = ov.guarantee || {};
     const t = ov.table_section || {};
     const blocked = g.guaranteed === false;
+    const tone = headerTone();
     const stepLabel = state.step === "column"
       ? `Column ${(state.column && state.column.column) || ""}`
       : (state.step === "overview" ? "Overview" : "Table");
@@ -257,11 +314,15 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
       b.pending && b.pending.length ? `${b.pending.length} pending` : "",
       b.table && b.table.length ? `${b.table.length} table items` : "",
     ].filter(Boolean).join(" · ");
+    const statusLabel = (state.step === "column" && state.column && state.column.review && state.column.review.status)
+      || state.flashStatus
+      || "";
+    head.className = `steward-header ${tone}`.trim();
     head.innerHTML = `
       <div>
-        <span class="sr-kicker">Steward review</span>
-        <h2 class="iso">${esc(t.name || table)}</h2>
-        <div class="sr-sub">${esc(stepLabel)} · ${esc(table)}</div>
+        <span class="sr-kicker">Steward review${statusLabel ? ` · ${esc(statusLabel)}` : ""}</span>
+        <h2 class="iso">${wrapIdent(t.name || table)}</h2>
+        <div class="sr-sub">${esc(stepLabel)} · ${wrapIdent(table)}</div>
       </div>
       <div class="sr-head-actions">
         <span class="sr-progress">reviewed ${g.reviewed||0}/${g.total||0}${why ? ` · ${esc(why)}` : ""}</span>
@@ -283,7 +344,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
       <div class="item ${state.step==="overview"?"active":""}" data-step="overview">Overview</div>
       <h4>columns</h4>
       ${cols.map((c,i)=>`<div class="item ${state.step==="column"&&state.colIndex===i?"active":""}" data-col="${esc(c.column)}" data-i="${i}">
-        ${STATUS_MARK[c.status]||"·"} ${AGREEMENT_MARK[c.agreement]||""} ${esc(c.column)}
+        ${STATUS_MARK[c.status]||"·"} ${AGREEMENT_MARK[c.agreement]||""} ${piiIcon(c.pii)} ${wrapIdent(c.column)}
       </div>`).join("")}
       <p class="hint" style="margin-top:12px"><a href="/review?table=${encodeURIComponent(table)}" target="_blank">Open run explorer</a></p>
     `;
@@ -302,8 +363,9 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
   }
 
   function verdictButtons(scope, extra) {
+    const mixed = scope === "column" && MIX_FIELDS.some((f) => state.chosen[f]);
     return `<div class="steward-btns">${DECISIONS.map((d)=>
-      `<button class="btn-sm" data-dec="${d.id}" data-scope="${scope}">${d.label}</button>`
+      `<button class="btn-sm ${d.id==="accept"?"btn-accept":""} ${d.id==="accept"&&mixed?"ready":""}" data-dec="${d.id}" data-scope="${scope}">${d.label}</button>`
     ).join("")}${extra||""}</div>`;
   }
 
@@ -417,7 +479,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
       return `<div class="gen-row">${gens.map((g) => engineCardFromGen(field, g)).join("")}</div>`;
     }
     return `<div class="gen-row">${list.map((g) => {
-      const on = state.field === field && state.chosenSource === g.source ? "on" : "";
+      const on = state.chosen[field] === g.source ? "on" : "";
       const missing = g.present ? "" : "missing";
       const conf = g.confidence_pct != null ? `<span class="chip conf">${g.confidence_pct}%</span>` : "";
       const pii = g.is_pii == null ? "" : (g.is_pii
@@ -435,7 +497,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
   }
 
   function engineCardFromGen(field, g) {
-    const on = state.field === field && state.chosenSource === g.source ? "on" : "";
+    const on = state.chosen[field] === g.source ? "on" : "";
     const conf = pct(g.confidence);
     return `<label class="gen-opt ${on}">
       <input type="radio" name="gen-${esc(field)}" value="${esc(g.source)}" ${on?"checked":""}/>
@@ -446,7 +508,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
 
   function reasonBox(field) {
     const r = state.reasons[field] || { code: "domain_knowledge", text: "" };
-    const codes = ((state.column && state.column.rationale_codes) || {})[state.chosenSource || "human"]
+    const codes = ((state.column && state.column.rationale_codes) || {})[state.chosen[field] || state.chosenSource || "human"]
       || ["domain_knowledge", "other"];
     return `<div class="reason-box" data-reason="${esc(field)}">
       <label>Reason for ${esc(field)}
@@ -493,11 +555,20 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
       ${sampleBlock}`;
   }
 
+  function fieldPickBar(field) {
+    const src = state.chosen[field];
+    if (!src) {
+      return `<p class="sr-choice">Pick an engine for ${esc(field)}. Accept keeps this field independent of the others.</p>`;
+    }
+    return `<p class="sr-choice">Using <strong>${esc(src)}</strong> for ${esc(field)}
+      <button class="btn-sm btn-accept ready" data-dec="accept" data-scope="column-field" data-field="${esc(field)}">Accept ${esc(field)}</button></p>`;
+  }
+
   function piiEditor(c) {
     const on = state.edit.isPii;
     return `<div>
       <h4>Is this column PII? ${agreementChip((c.agreement||{}).pii)}</h4>
-      <p>Current: <span class="chip ${c.current&&c.current.pii?"pii-on":"pii-off"}">${c.current&&c.current.pii?"PII":"not PII"}</span>
+      <p>Current: ${piiIcon(c.current&&c.current.pii)}
          · entity ${esc((c.current&&c.current.entity_type)||"—")} · ${esc((c.current&&c.current.classification)||"—")}</p>
       ${state.editOpen ? `<div class="pii-toggle">
         <button type="button" class="btn-sm ${on?"on-pii":""}" id="srPiiOn">PII on</button>
@@ -507,6 +578,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
       <label>Classification <input id="srClass" value="${esc(state.edit.classification)}"/></label>
       ${reasonBox("pii")}` : ""}
       ${engineCards("pii")}
+      ${fieldPickBar("pii")}
     </div>`;
   }
 
@@ -535,6 +607,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
       <h4>Definition ${agreementChip((c.agreement||{}).definition)}</h4>
       <p class="iso">${esc((c.current&&c.current.definition)||"—")}</p>
       ${cards || engineCards("definition")}
+      ${fieldPickBar("definition")}
       ${state.editOpen ? `<label>Edit or write a definition<textarea id="srDefCustom" class="iso" placeholder="pick a candidate above, edit it, or write your own">${esc(state.edit.definition)}</textarea></label>${reasonBox("definition")}` : ""}
     </div>`;
   }
@@ -545,15 +618,18 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     const current = c.current || {};
     main.innerHTML = `${errorBanner()}<div class="sr-card">
       <div class="sr-card-head">
-        <h3>Column ${esc(c.column)}</h3>
-        <p>${c.position} / ${c.of} · ${esc(c.review&&c.review.status||"pending")}</p>
+        ${piiIcon(current.pii)}
+        <div>
+          <h3>Column ${wrapIdent(c.column)}</h3>
+          <p>${c.position} / ${c.of} · ${esc(c.review&&c.review.status||"pending")}</p>
+        </div>
       </div>
       <div class="sr-card-body">
       <div class="grid2">
         <div>${profilePanel(c)}</div>
         <div>
           <h4>Current</h4>
-          <p>pii=${esc(current.pii)} · ${esc(current.entity_type)} · ${esc(current.classification)}</p>
+          <p>${piiIcon(current.pii)} · ${esc(current.entity_type)} · ${esc(current.classification)}</p>
           <p class="iso">${esc(current.definition)}</p>
           <p>tags: ${esc((current.tags||[]).join(", "))}</p>
         </div>
@@ -562,12 +638,15 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
       ${definitionEditor(c)}
       <div style="margin-top:12px"><strong>tags</strong> ${agreementChip((c.agreement||{}).tags)}
         ${engineCards("tags")}
+        ${fieldPickBar("tags")}
         ${state.editOpen ? `<label>Tags (comma)</label><input id="srTags" value="${esc(state.edit.tags)}"/>${reasonBox("tags")}` : ""}
       </div>
       <div style="margin-top:12px"><strong>classification</strong> ${agreementChip((c.agreement||{}).classification)}
         ${engineCards("classification")}
+        ${fieldPickBar("classification")}
         ${state.editOpen ? reasonBox("classification") : ""}
       </div>
+      <p class="hint">Accept uses the engine you picked on each field separately — tags can come from a deterministic engine while definition comes from an LLM.</p>
       ${state.editOpen
         ? `<button class="btn-primary" id="srEditSave">Save edits</button>
            <button class="btn-sm" id="srEditCancel">Cancel</button>`
@@ -585,6 +664,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
         if (name === "srDefSrc") {
           const src = inp.value === "custom" ? "human" : inp.value;
           state.edit.definitionSource = src;
+          state.chosen.definition = src;
           const cand = ((c.definition_candidates) || []).find((d) => d.source === inp.value && !d.custom);
           if (cand && cand.value) state.edit.definition = cand.value;
           state.chosenSource = src;
@@ -592,13 +672,25 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
           render();
           return;
         }
-        state.field = name.replace("gen-", "");
+        const field = name.replace("gen-", "");
+        state.field = field;
         state.chosenSource = inp.value;
-        const cards = ((c.engines || {})[state.field]) || [];
+        if (MIX_FIELDS.includes(field)) state.chosen[field] = inp.value;
+        const cards = ((c.engines || {})[field]) || [];
         const card = cards.find((x) => x.source === inp.value);
-        if (state.field === "pii" && card && card.is_pii != null) {
+        if (field === "pii" && card && card.is_pii != null) {
           state.edit.isPii = !!card.is_pii;
           if (card.entity_type) state.edit.entityType = card.entity_type;
+        }
+        if (field === "definition" && card && card.value != null) {
+          state.edit.definition = typeof card.value === "string" ? card.value : JSON.stringify(card.value);
+          state.edit.definitionSource = inp.value;
+        }
+        if (field === "tags" && card && card.value != null) {
+          state.edit.tags = Array.isArray(card.value) ? card.value.join(", ") : String(card.value);
+        }
+        if (field === "classification" && card && card.value != null) {
+          state.edit.classification = String(card.value);
         }
         render();
       };
@@ -610,8 +702,8 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     };
     const on = main.querySelector("#srPiiOn");
     const off = main.querySelector("#srPiiOff");
-    if (on) on.onclick = () => { state.edit.isPii = true; state.chosenSource = "human"; state.field = "pii"; render(); };
-    if (off) off.onclick = () => { state.edit.isPii = false; state.chosenSource = "human"; state.field = "pii"; render(); };
+    if (on) on.onclick = () => { state.edit.isPii = true; state.chosen.pii = "human"; state.chosenSource = "human"; state.field = "pii"; render(); };
+    if (off) off.onclick = () => { state.edit.isPii = false; state.chosen.pii = "human"; state.chosenSource = "human"; state.field = "pii"; render(); };
     const ent = main.querySelector("#srEntity");
     if (ent) ent.oninput = () => { state.edit.entityType = ent.value; };
     const cls = main.querySelector("#srClass");
@@ -619,7 +711,11 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     const tags = main.querySelector("#srTags");
     if (tags) tags.oninput = () => { state.edit.tags = tags.value; };
     const custom = main.querySelector("#srDefCustom");
-    if (custom) custom.oninput = () => { state.edit.definition = custom.value; state.edit.definitionSource = "human"; };
+    if (custom) custom.oninput = () => {
+      state.edit.definition = custom.value;
+      state.edit.definitionSource = "human";
+      state.chosen.definition = "human";
+    };
     main.querySelectorAll("[data-reason-code]").forEach((sel) => {
       sel.onchange = () => {
         const f = sel.getAttribute("data-reason-code");
@@ -643,7 +739,11 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
 
   function bindVerdicts() {
     main.querySelectorAll("[data-dec]").forEach((btn) => {
-      btn.onclick = () => onDecision(btn.getAttribute("data-dec"), btn.getAttribute("data-scope"));
+      btn.onclick = () => onDecision(
+        btn.getAttribute("data-dec"),
+        btn.getAttribute("data-scope"),
+        btn.getAttribute("data-field"),
+      );
     });
   }
 
@@ -659,7 +759,53 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     return { rationale_code: code, rationale_text: text };
   }
 
-  async function onDecision(decision, scope) {
+  function chosenFor(field) {
+    if (field === "definition") {
+      const src = state.chosen.definition || state.edit.definitionSource || "";
+      if (!src || src === "custom" || src === "current") return "human";
+      return src;
+    }
+    return state.chosen[field] || "human";
+  }
+
+  function engineCardFor(field, source) {
+    const cards = ((state.column && state.column.engines) || {})[field] || [];
+    return cards.find((x) => x.source === source && (x.present !== false));
+  }
+
+  function valueFromChoice(field, source) {
+    if (!source || source === "human") return undefined;
+    if (field === "definition") {
+      const cand = ((state.column && state.column.definition_candidates) || []).find((d) => d.source === source && !d.custom);
+      if (cand && cand.value != null) return cand.value;
+    }
+    const card = engineCardFor(field, source);
+    if (!card) return undefined;
+    if (field === "pii") {
+      if (card.value && typeof card.value === "object") return card.value;
+      return { is_pii: card.is_pii, entity_type: card.entity_type || null };
+    }
+    return card.value;
+  }
+
+  function verdictForField(field, decision) {
+    const source = chosenFor(field);
+    const reason = fieldReason(field);
+    const body = {
+      field,
+      decision,
+      chosen_source: source,
+      rationale_code: reason.rationale_code || (source === "human" ? "domain_knowledge" : "engine_correct"),
+      rationale_text: reason.rationale_text || "",
+    };
+    const value = valueFromChoice(field, source);
+    if (value !== undefined) body.value = value;
+    if (body.rationale_code !== "other") body.rationale_text = body.rationale_text || "";
+    if (body.rationale_code === "other" && !body.rationale_text) body.rationale_text = "other";
+    return body;
+  }
+
+  async function onDecision(decision, scope, field) {
     state.error = "";
     try {
       if (decision === "edit" && scope === "column") {
@@ -695,8 +841,28 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
         render();
         return;
       }
+      if (decision === "accept") {
+        state.flashStatus = "approved";
+        renderHeader();
+        const col = state.column && state.column.column;
+        if (!col) return;
+        const fields = (scope === "column-field" && field) ? [field] : MIX_FIELDS;
+        const verdicts = fields.map((f) => verdictForField(f, "accept"));
+        await call("POST", `/api/contracts/${encodeURIComponent(table)}/steward/columns/${encodeURIComponent(col)}/verdicts`, { verdicts });
+        await loadOverview();
+        await loadColumn(col);
+        state.flashStatus = "";
+        render();
+        return;
+      }
+      if (decision === "reject") state.flashStatus = "rejected";
+      else if (decision === "needs_review") state.flashStatus = "needs_review";
+      else if (decision === "no_action") state.flashStatus = "approved";
+      renderHeader();
       await sendVerdict(decision);
+      state.flashStatus = "";
     } catch (e) {
+      state.flashStatus = "";
       state.error = e && e.message ? e.message : String(e);
       render();
     }
@@ -761,10 +927,11 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
       const defReason = fieldReason("definition");
       const tagReason = fieldReason("tags");
       const classReason = fieldReason("classification");
-      const defSourceRaw = state.edit.definitionSource || "human";
+      const defSourceRaw = state.chosen.definition || state.edit.definitionSource || "human";
       const defSource = (defSourceRaw === "current" || defSourceRaw === "custom") ? "human" : defSourceRaw;
-      const piiSource = (state.field === "pii" && state.chosenSource && state.chosenSource !== "human")
-        ? state.chosenSource : "human";
+      const piiSource = state.chosen.pii || "human";
+      const tagSource = state.chosen.tags || "human";
+      const classSource = state.chosen.classification || "human";
       const verdicts = [
         {
           field: "pii",
@@ -785,7 +952,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
         {
           field: "tags",
           decision: "edit",
-          chosen_source: "human",
+          chosen_source: tagSource,
           value: tags,
           rationale_code: tagReason.rationale_code,
           rationale_text: tagReason.rationale_text || (tagReason.rationale_code === "other" ? "other" : "steward edit"),
@@ -793,7 +960,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
         {
           field: "classification",
           decision: "edit",
-          chosen_source: "human",
+          chosen_source: classSource,
           value: state.edit.classification,
           rationale_code: classReason.rationale_code,
           rationale_text: classReason.rationale_text || (classReason.rationale_code === "other" ? "other" : "steward edit"),
@@ -804,8 +971,10 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
       }
       await call("POST", `/api/contracts/${encodeURIComponent(table)}/steward/columns/${encodeURIComponent(c.column)}/verdicts`, { verdicts });
       state.editOpen = false;
+      state.flashStatus = "edited";
       await loadOverview();
       await loadColumn(c.column);
+      state.flashStatus = "";
       render();
     } catch (e) {
       state.error = e && e.message ? e.message : String(e);

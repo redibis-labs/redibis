@@ -11,6 +11,10 @@ function esc(s) {
   }[c]));
 }
 
+function wrapIdent(s) {
+  return esc(s).replace(/([._/-])/g, "$1&#8203;");
+}
+
 function qs(params) {
   const u = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
@@ -202,7 +206,7 @@ export async function mountContractWorkspace(opts) {
         <div class="tbl-item ${r.table === state.table ? "active" : ""}" data-table="${esc(r.table)}">
           <input type="checkbox" class="ws-row-cb" data-table="${esc(r.table)}" ${local.selected.has(r.table) ? "checked" : ""}/>
           <span class="ws-row-main">
-            <span class="ws-row-name">${esc(r.table)}</span>
+            <span class="ws-row-name">${wrapIdent(r.table)}</span>
             <span class="ws-row-meta">${esc(r.name || "")} · v${esc(r.version || "∅")} · ${esc((r.updated || "").slice(0, 16))}</span>
             <span class="ws-row-chips">
               <span class="chip chip-muted ws-uuid" title="${esc(r.contract_uuid)}" data-uuid="${esc(r.contract_uuid)}">${esc((r.contract_uuid || "").slice(0, 8))}</span>

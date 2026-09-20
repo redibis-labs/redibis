@@ -32,7 +32,12 @@ def test_steward_module_has_no_scan_fetch():
     assert "Export all artifacts" in MJS
     assert "Write your own" in MJS
     assert "steward/export/verdicts" in MJS
-    assert "overflow-wrap:anywhere" in MJS
+    assert "sr-pii-icon" in MJS
+    assert "column-field" in MJS
+    assert "steward-header.ok" in MJS
+    assert "&#8203;" in WS
+    assert "width:16px !important" in V2
+    assert "overflow-wrap:break-word" in V2
     assert "steward-header" in MJS
     assert "srTableSave" in MJS
     assert "steward/export/artifacts" in MJS
