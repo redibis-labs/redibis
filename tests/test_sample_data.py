@@ -193,6 +193,8 @@ def test_tests_data_is_a_default_root_when_present(tmp_path, monkeypatch, cfg):
     assert found == (tests_data / "realistic_eshop_customer_account.csv").resolve()
     abs_path = str(tests_data / "realistic_eshop_customer_account.csv")
     assert sd.resolve("", abs_path, cfg) == found
+    monkeypatch.chdir(tmp_path)
+    assert sd.resolve("", "tests/data/realistic_eshop_customer_account.csv", cfg) == found
 
 
 def test_absolute_path_outside_roots_names_the_allowed_roots(library, cfg):
@@ -364,6 +366,7 @@ def test_homepage_is_a_csv_path_box_not_a_dropzone():
     ).read_text(encoding="utf-8")
     assert "function csvPathPickerHtml" in js
     assert "function sampleRootEntries" in js
+    assert 'DEFAULT_SAMPLE_CSV="tests/data/realistic_eshop_customer_account.csv"' in js
     assert "function loadTypedCsv" in js
     assert "function isCsvPath" in js
     assert "only .csv files are accepted" in js
