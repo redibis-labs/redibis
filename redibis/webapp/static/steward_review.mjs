@@ -35,19 +35,20 @@ function wrapIdent(s) {
 }
 
 function piiIcon(isPii, extra = "") {
+  const compact = String(extra).includes("compact");
   if (isPii) {
     return `<span class="sr-pii-icon on ${extra}" title="PII detected" aria-label="PII detected">
-      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
         <path fill="currentColor" d="M12 2a5 5 0 00-5 5v3H6a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2v-8a2 2 0 00-2-2h-1V7a5 5 0 00-5-5zm-3 8V7a3 3 0 016 0v3H9zm3 4a2 2 0 110 4 2 2 0 010-4z"/>
       </svg>
-      <span>PII</span>
+      ${compact ? "" : "<span>PII</span>"}
     </span>`;
   }
   return `<span class="sr-pii-icon off ${extra}" title="Not PII" aria-label="Not PII">
-    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
       <path fill="currentColor" d="M12 2a10 10 0 100 20 10 10 0 000-20zm-1 14.2L6.8 12l1.4-1.4 2.8 2.8 5.6-5.6L18 9.2 11 16.2z"/>
     </svg>
-    <span>not PII</span>
+    ${compact ? "" : "<span>not PII</span>"}
   </span>`;
 }
 
@@ -181,7 +182,8 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     .sr-pii-icon{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.04em}
     .sr-pii-icon.on{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
     .sr-pii-icon.off{background:#dcfce7;color:#166534;border:1px solid #86efac}
-    .sr-pii-icon svg{display:block;flex:0 0 auto}
+    .steward-rail .sr-pii-icon{padding:1px 5px}
+    .steward-rail .sr-pii-icon svg{width:14px;height:14px}
     .sr-choice{font-size:11px;color:#475569;margin:4px 0 8px}
     .steward-tile{border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;cursor:pointer;background:#fff}
     .steward-tile strong{display:block;font-size:18px}
@@ -344,7 +346,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
       <div class="item ${state.step==="overview"?"active":""}" data-step="overview">Overview</div>
       <h4>columns</h4>
       ${cols.map((c,i)=>`<div class="item ${state.step==="column"&&state.colIndex===i?"active":""}" data-col="${esc(c.column)}" data-i="${i}">
-        ${STATUS_MARK[c.status]||"·"} ${AGREEMENT_MARK[c.agreement]||""} ${piiIcon(c.pii)} ${wrapIdent(c.column)}
+        ${STATUS_MARK[c.status]||"·"} ${AGREEMENT_MARK[c.agreement]||""} ${piiIcon(c.pii, "compact")} ${wrapIdent(c.column)}
       </div>`).join("")}
       <p class="hint" style="margin-top:12px"><a href="/review?table=${encodeURIComponent(table)}" target="_blank">Open run explorer</a></p>
     `;
@@ -774,7 +776,14 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
   }
 
   function valueFromChoice(field, source) {
-    if (!source || source === "human") return undefined;
+    const current = (state.column && state.column.current) || {};
+    if (!source || source === "human") {
+      if (field === "pii") return { is_pii: !!current.pii, entity_type: current.entity_type || null };
+      if (field === "definition") return current.definition || "";
+      if (field === "tags") return current.tags || [];
+      if (field === "classification") return current.classification || "";
+      return undefined;
+    }
     if (field === "definition") {
       const cand = ((state.column && state.column.definition_candidates) || []).find((d) => d.source === source && !d.custom);
       if (cand && cand.value != null) return cand.value;
