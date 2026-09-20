@@ -88,10 +88,32 @@ def default_root_path() -> Path | None:
         return None
 
 
+def default_tests_data_path() -> Path | None:
+    """Repo fixtures: ``tests/data`` at the package checkout root, when present.
+
+    Editable installs and a source checkout can load tutorial CSVs without
+    extra config. A wheel install under site-packages has no such folder, so
+    this returns None and the default stays ``webapp/samples`` only.
+    """
+    try:
+        path = (Path(__file__).resolve().parents[2] / "tests" / "data").expanduser().resolve()
+    except (OSError, RuntimeError, IndexError):
+        return None
+    return path if path.is_dir() else None
+
+
 def _default_root() -> str | None:
     """``webapp/samples`` — used when nothing is configured."""
     path = default_root_path()
     return str(path) if path is not None else None
+
+
+def _outside_root_message(cfg: Any) -> str:
+    roots = list_roots(cfg)
+    if not roots:
+        return "path is outside the sample data root"
+    listed = ", ".join(str(root.path) for root in roots)
+    return f"path is outside the sample data root ({listed})"
 
 
 def _is_absolute_user_path(raw: str) -> bool:
@@ -105,7 +127,8 @@ def list_roots(cfg: Any = None) -> list[SampleRoot]:
     """Configured roots, resolved. Env entries come first and are named env1…N.
 
     When neither ``REDIBIS_SAMPLE_DATA_DIR`` nor ``sample_data.roots`` is set,
-    the web app ``samples/`` folder is the root.
+    the web app ``samples/`` folder is the root, plus ``tests/data`` when that
+    directory exists next to the checkout (tutorial fixtures).
     """
     cfg = cfg if cfg is not None else _config()
     entries: list[tuple[str, str, str]] = []
@@ -122,6 +145,9 @@ def list_roots(cfg: Any = None) -> list[SampleRoot]:
         samples = _default_root()
         if samples:
             entries.append(("samples", "samples", samples))
+        tests_data = default_tests_data_path()
+        if tests_data is not None:
+            entries.append(("tests-data", "tests/data", str(tests_data)))
 
     out: list[SampleRoot] = []
     seen: set[str] = set()
@@ -297,15 +323,27 @@ def resolve(root_name: str, rel_path: str, cfg: Any = None) -> Path:
             if any(p.startswith(".") for p in parts):
                 raise SampleDataError("path may not contain dot entries")
             return _resolve_inside_root(root, parts, cfg)
-        raise SampleDataError("path is outside the sample data root")
+        raise SampleDataError(_outside_root_message(cfg))
 
-    root = get_root(root_name, cfg)
     parts = [p for p in raw.lstrip("/").split("/") if p not in ("", ".")]
     if not parts:
         raise SampleDataError("path is required")
     if any(p.startswith(".") for p in parts):
         raise SampleDataError("path may not contain dot entries")
-    return _resolve_inside_root(root, parts, cfg)
+    if root_name:
+        return _resolve_inside_root(get_root(root_name, cfg), parts, cfg)
+    last_missing: SampleDataError | None = None
+    for root in list_roots(cfg):
+        try:
+            return _resolve_inside_root(root, parts, cfg)
+        except SampleDataError as exc:
+            if str(exc).startswith("not a file:"):
+                last_missing = exc
+                continue
+            raise
+    if last_missing is not None:
+        raise last_missing
+    raise SampleDataError(_outside_root_message(cfg))
 
 
 def read_bytes(root_name: str, rel_path: str, cfg: Any = None) -> tuple[str, bytes]:
@@ -322,7 +360,7 @@ def _containing_root(path: Path, cfg: Any, root_name: str = "") -> SampleRoot:
             return root
         except ValueError:
             continue
-    raise SampleDataError("path is outside the sample data root")
+    raise SampleDataError(_outside_root_message(cfg))
 
 
 def preview(

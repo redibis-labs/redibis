@@ -151,6 +151,7 @@ def test_webapp_samples_is_the_root_when_nothing_is_configured(tmp_path, monkeyp
     samples.mkdir(parents=True)
     (samples / "demo.csv").write_text("a\n1\n", encoding="utf-8")
     monkeypatch.setattr(sd, "default_root_path", lambda: samples.resolve())
+    monkeypatch.setattr(sd, "default_tests_data_path", lambda: None)
     assert sd.is_enabled(cfg) is True
     roots = sd.list_roots(cfg)
     assert len(roots) == 1
@@ -163,6 +164,44 @@ def test_default_root_path_is_webapp_samples():
     path = sd.default_root_path()
     assert path is not None
     assert path.as_posix().endswith("redibis/webapp/samples")
+
+
+def test_default_tests_data_path_is_repo_fixtures_when_present():
+    path = sd.default_tests_data_path()
+    if path is None:
+        pytest.skip("tests/data is not next to this install")
+    assert path.as_posix().endswith("tests/data")
+    assert (path / "realistic_eshop_customer_account.csv").is_file()
+
+
+def test_tests_data_is_a_default_root_when_present(tmp_path, monkeypatch, cfg):
+    monkeypatch.delenv(sd.ENV_ROOT, raising=False)
+    monkeypatch.delenv("REDIBIS_CONFIG", raising=False)
+    samples = tmp_path / "webapp" / "samples"
+    samples.mkdir(parents=True)
+    tests_data = tmp_path / "tests" / "data"
+    tests_data.mkdir(parents=True)
+    (tests_data / "realistic_eshop_customer_account.csv").write_text(
+        "id,email\n1,a@b.com\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(sd, "default_root_path", lambda: samples.resolve())
+    monkeypatch.setattr(sd, "default_tests_data_path", lambda: tests_data.resolve())
+    roots = sd.list_roots(cfg)
+    assert [r.name for r in roots] == ["samples", "tests-data"]
+    assert roots[1].path == tests_data.resolve()
+    found = sd.resolve("", "realistic_eshop_customer_account.csv", cfg)
+    assert found == (tests_data / "realistic_eshop_customer_account.csv").resolve()
+    abs_path = str(tests_data / "realistic_eshop_customer_account.csv")
+    assert sd.resolve("", abs_path, cfg) == found
+
+
+def test_absolute_path_outside_roots_names_the_allowed_roots(library, cfg):
+    outside = str(library.outside / "passwords.csv")
+    with pytest.raises(sd.SampleDataError) as caught:
+        sd.resolve("", outside, cfg)
+    message = str(caught.value)
+    assert "outside the sample data root" in message
+    assert str(library.root.resolve()) in message
 
 
 def test_config_roots_support_named_mappings(tmp_path, monkeypatch):
@@ -226,6 +265,7 @@ def test_index_falls_back_to_webapp_samples_when_env_unset(client, tmp_path, mon
     samples.mkdir(parents=True)
     (samples / "boot.csv").write_text("x\n1\n", encoding="utf-8")
     monkeypatch.setattr(sd, "default_root_path", lambda: samples.resolve())
+    monkeypatch.setattr(sd, "default_tests_data_path", lambda: None)
     body = client.get("/api/sample-data").json()
     assert body["enabled"] is True
     assert body["root"] == "samples"
@@ -323,8 +363,13 @@ def test_homepage_is_a_csv_path_box_not_a_dropzone():
         / "app.js"
     ).read_text(encoding="utf-8")
     assert "function csvPathPickerHtml" in js
+    assert "function sampleRootEntries" in js
     assert "function loadTypedCsv" in js
     assert "function isCsvPath" in js
     assert "only .csv files are accepted" in js
+    assert "getElementById('fi')" in js
+    assert "Upload a CSV from this computer" in js
+    assert "csv-root-print" in js
+    assert ">upload</button>" in js
     assert "drop your CSV here" not in js
     assert "function uploadDropzoneHtml" not in js

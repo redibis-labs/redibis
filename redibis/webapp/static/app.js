@@ -154,7 +154,7 @@ async function createSessionFromCurrentSource(){
   if(S.sampleRef){
     sess=await POST("/api/sessions/from-sample",buildSampleSessionBody());
   }else{
-    if(!S.file) throw new Error("No file selected — enter a CSV path or browse the server samples folder.");
+    if(!S.file) throw new Error("No file selected — upload a CSV, enter a path, or browse the server samples folder.");
     sess=await POST("/api/sessions",buildSessionFormData());
   }
   S.sid=sess.session_id;
@@ -340,11 +340,17 @@ async function restoreSessionOnBoot(){
 // ── File ──
 function onFile(f){
   if(!f)return;
+  if(!isCsvPath(f.name)){
+    S.samplePathErr="only .csv files are accepted";
+    render();
+    return;
+  }
   if(S.view==="homepage"||!S.file){
     S.sid=null;S.result=null;S.scanDone=false;S.table=null;S.restoredSession=false;
     clearLastSession();
   }
   S.file=f;S.fname=f.name;S.restoredSession=false;S.sampleRef=null;
+  S.samplePathDraft=f.name;S.samplePathErr="";
   var rd=new FileReader();
   rd.onload=function(e){
     var lines=e.target.result.split("\n").filter(function(l){return l.trim()});
@@ -2632,20 +2638,46 @@ function renderInner(){
 }
 
 // ── Views ──
+function sampleRootEntries(){
+  var lib=S.sampleLib;
+  if(!lib) return [];
+  var roots=lib.roots||[];
+  if(roots.length){
+    return roots.filter(function(r){return r&&r.path;}).map(function(r){
+      return {name:r.name||"",label:r.label||r.name||"",path:r.path};
+    });
+  }
+  if(lib.root_path) return [{name:lib.root||"samples",label:lib.label||"samples",path:lib.root_path}];
+  return [];
+}
+
 function csvPathPickerHtml(){
   var val=S.samplePathDraft||(S.sampleRef&&S.sampleRef.path)||"";
   var err=S.samplePathErr||"";
-  var base=(S.sampleLib&&S.sampleLib.root_path)||"webapp/samples";
+  var roots=sampleRootEntries();
+  var base=(roots[0]&&roots[0].path)||"webapp/samples";
+  var rootPrint=roots.length
+    ? "<div class=\"csv-root-print\">sample root"+(roots.length>1?"s":"")+": "+
+      roots.map(function(r){
+        var label=r.label&&r.label!==r.path?" ("+E(r.label)+")":"";
+        return "<code title=\""+E(r.label||r.name)+"\">"+E(r.path)+"</code>"+label;
+      }).join(" · ")+
+      "</div>"
+    : "";
   return "<div class=\"csv-path-row\">"+
     "<input id=\"csvPath\" class=\"csv-path-input\" type=\"text\" spellcheck=\"false\" autocomplete=\"off\" "+
       "placeholder=\"customers.csv or "+E(base)+"/file.csv\" "+
       "value=\""+E(val)+"\" "+
       "onkeydown=\"if(event.key==='Enter'){event.preventDefault();loadTypedCsv()}\"/>"+
+    "<input id=\"fi\" type=\"file\" accept=\".csv,text/csv\" style=\"display:none\"/>"+
+    "<button class=\"btn btn-ghost btn-sm\" type=\"button\" title=\"Upload a CSV from this computer\" "+
+      "onclick=\"event.preventDefault();var el=document.getElementById('fi');if(el)el.click()\">upload</button>"+
     "<button class=\"btn btn-ghost btn-sm\" type=\"button\" title=\"Browse server CSVs\" "+
       "onclick=\"event.preventDefault();openSampleLib()\">browse</button>"+
     "<button class=\"btn btn-red btn-sm\" type=\"button\" onclick=\"loadTypedCsv()\">use →</button>"+
   "</div>"+
-  "<div class=\"dz-hint\">CSV only · a name resolves under <code>"+E(base)+"</code>, or paste a full path</div>"+
+  rootPrint+
+  "<div class=\"dz-hint\">CSV only · upload from this computer, a name under a sample root, a full path inside a root, or browse</div>"+
   (err?"<div class=\"hint\" style=\"color:var(--red);margin-top:8px\">"+E(err)+"</div>":"");
 }
 
@@ -2669,7 +2701,7 @@ function vHome(){
     restoredBanner+
     (showUploadHome?
       "<div class=\"home-title\">start with a CSV</div>"+
-      "<div class=\"home-sub\">enter a name under the web app samples/ folder, a full path, or browse the server</div>"+
+      "<div class=\"home-sub\">upload from this computer, enter a name under a sample root, paste a full path, or browse the server</div>"+
       csvPathPickerHtml()
       :"")+
     (S.scanDone?"<div class=\"stitle\" style=\"margin-top:24px\">scan results</div>"+

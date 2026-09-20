@@ -609,7 +609,8 @@ class SampleDataConfig:
 
     Lets an operator start a scan from a file that already sits on the machine
     hosting redibis, instead of uploading one. When ``roots`` is empty and
-    ``REDIBIS_SAMPLE_DATA_DIR`` is unset, ``redibis/webapp/samples`` is used.
+    ``REDIBIS_SAMPLE_DATA_DIR`` is unset, ``redibis/webapp/samples`` is used,
+    plus ``tests/data`` when that folder exists in a source checkout.
     Every configured root is readable to every signed-in user of the web app.
 
     ``roots`` entries are either a plain path string or a mapping
