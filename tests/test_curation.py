@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -39,6 +40,33 @@ def test_apply_curation_reject_removes_only_that_span():
     out = apply_curation(dets, rec, text=text)
     assert [(d.start, d.end, d.entity_type) for d in out] == [(10, 13, "PERSON")]
     assert dets[0].entity_type == "PERSON"  # original untouched
+
+
+def test_apply_curation_accept_clears_proposal_and_matches_llm_key():
+    text = "Alice met Bob"
+    dets = [replace(_det(0, 5, "PERSON", text), is_proposal=True)]
+    rec = Curation(
+        entries=(CurationEntry(
+            key=SpanKey(0, 5, "PERSON", "llm_verdict"),
+            decision="accept",
+        ),),
+    )
+    out = apply_curation(dets, rec, text=text)
+    assert len(out) == 1
+    assert out[0].is_proposal is False
+
+
+def test_apply_curation_reject_llm_key_drops_engine_span():
+    text = "Alice met Bob"
+    dets = [_det(0, 5, "PERSON", text), _det(10, 13, "PERSON", text)]
+    rec = Curation(
+        entries=(CurationEntry(
+            key=SpanKey(0, 5, "PERSON", "llm_verdict"),
+            decision="reject",
+        ),),
+    )
+    out = apply_curation(dets, rec, text=text)
+    assert [(d.start, d.end) for d in out] == [(10, 13)]
 
 
 def test_apply_curation_modify_preserves_slice_integrity():

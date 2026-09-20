@@ -252,6 +252,25 @@ def _span_identity(det: Detection) -> tuple[int, int, str, str]:
     return (int(det.start or 0), int(det.end or 0), str(det.entity_type or ""), src)
 
 
+def _entry_for(
+    by_key: Mapping[tuple[int, int, str, str], CurationEntry],
+    identity: tuple[int, int, str, str],
+) -> CurationEntry | None:
+    """Match a curation row even when the operator keyed a different source."""
+    hit = by_key.get(identity)
+    if hit is not None:
+        return hit
+    start, end, et, _src = identity
+    for src in ("engine", "llm_verdict", "manual"):
+        hit = by_key.get((start, end, et, src))
+        if hit is not None:
+            return hit
+    for key, entry in by_key.items():
+        if key[0] == start and key[1] == end and key[2] == et:
+            return entry
+    return None
+
+
 def apply_curation(
     detections: Iterable[Any],
     curation: Curation | Mapping[str, Any] | None,
@@ -274,10 +293,7 @@ def apply_curation(
 
     for det in source_dets:
         identity = _span_identity(det)
-        entry = by_key.get(identity)
-        if entry is None:
-            # Also match engine spans that the operator keyed without source.
-            entry = by_key.get((identity[0], identity[1], identity[2], "engine"))
+        entry = _entry_for(by_key, identity)
         if entry is None:
             if 0 <= int(det.start or 0) <= int(det.end or 0) <= len(text):
                 slice_text = text[int(det.start or 0): int(det.end or 0)]
@@ -289,6 +305,8 @@ def apply_curation(
         if entry.decision == "reject":
             continue
         if entry.decision == "accept":
+            if det.is_proposal:
+                det = replace(det, is_proposal=False)
             out.append(det)
             seen.add((int(det.start or 0), int(det.end or 0), str(det.entity_type or "")))
             continue
@@ -344,6 +362,7 @@ def apply_curation(
             text=slice_text,
             recognizer=entry.key.source,
             source=entry.key.source,
+            is_proposal=False,
         ))
         seen.add(ident)
 

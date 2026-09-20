@@ -11,6 +11,7 @@ const {
   applyCuration,
   emptyCuration,
   entityCounts,
+  isAccepted,
   isRejected,
   persistable,
   spanKey,
@@ -401,13 +402,26 @@ async function decide(span, decision, extra) {
 async function promoteToRule(span) {
   if (!rulesEditor) return;
   const term = span.text || sourceText.slice(span.start, span.end);
+  if (rulesEditor.expand) rulesEditor.expand();
+  const card = $("gwRulesCard");
+  if (card && typeof card.scrollIntoView === "function") {
+    card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
   const result = await rulesEditor.addTermChecked(term, {
     preferred: "exclude_terms",
+    entityType: span.entity_type || "",
     spans: curatedSpans(),
     onReject: () => decide(span, "reject", { reason: "rejected instead of a rule" }),
   });
   if (result && (result.action === "forbidden_span" || result.target === "forbidden_span")) {
     decide(span, "reject", { reason: "forbidden_span" });
+  }
+  if (result && result.action === "add_category") {
+    paintBanners(bannerEl, [{
+      kind: "ok",
+      text: "Added PII category " + ((result.patch && result.patch.entity_type) || "") +
+        ". Apply to this run is already staged — scan again to detect it.",
+    }]);
   }
 }
 
@@ -492,13 +506,19 @@ function renderSummary(env) {
       }
       listed.slice(0, 24).forEach((span) => {
         const line = document.createElement("div");
-        line.className = "gw-sum-row" + (isRejected(span, curation) ? " gw-rejected" : "");
+        line.className = "gw-sum-row" + (isRejected(span, curation) ? " gw-rejected" : "")
+          + (isAccepted(span, curation) ? " gw-accepted-row" : "");
         line.appendChild(document.createTextNode((span.entity_type || "") + " · "));
         const surface = document.createElement("span");
         surface.dir = "auto";
         surface.style.unicodeBidi = "isolate";
         surface.appendChild(document.createTextNode(span.text || sourceText.slice(span.start, span.end) || ""));
         line.appendChild(surface);
+        if (isRejected(span, curation)) {
+          line.appendChild(document.createTextNode(" · rejected"));
+        } else if (isAccepted(span, curation)) {
+          line.appendChild(document.createTextNode(" · accepted"));
+        }
         line.appendChild(curationButtons(span));
         summaryEl.appendChild(line);
       });
@@ -830,13 +850,14 @@ function paintResultPane() {
   if (!lastEnvelope) return;
   const pii = lastEnvelope.analysers.pii;
   const text = maskPreviewOn ? maskedText : sourceText;
-  let spans = maskPreviewOn ? maskedSpans : visibleSpans();
+  // Rejected spans drop out so the word paints as ordinary text.
+  let spans = maskPreviewOn ? maskedSpans : curatedSpans();
   resultEl.dir = (lastEnvelope.text_meta.language || "").startsWith("ar") ? "rtl" : "ltr";
   renderHighlights(resultEl, text, spans);
   resultEl.querySelectorAll("mark.gw-hl").forEach((mark) => {
     try {
       const items = JSON.parse(mark.dataset.spans || "[]");
-      if (items.some((s) => isRejected(s, curation))) mark.classList.add("gw-rejected");
+      if (items.some((s) => s.accepted || isAccepted(s, curation))) mark.classList.add("gw-accepted");
     } catch { /* ignore */ }
   });
   bindMarks(resultEl);
@@ -1116,6 +1137,8 @@ function downloadJson() {
   payload.analysers.pii = payload.analysers.pii || {};
   payload.analysers.pii.spans = curatedSpans();
   payload.analysers.pii.entity_counts = entityCounts(payload.analysers.pii.spans);
+  payload.analysers.pii.rejected_spans = applyCuration(rawSpans(), curation, sourceText, { keepRejected: true })
+    .filter((s) => s.rejected);
   if (lastEnvelope.analysers && lastEnvelope.analysers.llm_verdict) {
     payload.llm_verdict = lastEnvelope.analysers.llm_verdict;
   }
@@ -1177,7 +1200,9 @@ function renderVerdictPane() {
     list.textContent = "";
     spans.forEach((span) => {
       const row = document.createElement("div");
-      row.className = "gw-sum-row";
+      row.className = "gw-sum-row"
+        + (isRejected(Object.assign({}, span, { source: "llm_verdict" }), curation) ? " gw-rejected" : "")
+        + (isAccepted(Object.assign({}, span, { source: "llm_verdict" }), curation) ? " gw-accepted-row" : "");
       const label = document.createElement("span");
       label.dir = "auto";
       label.style.unicodeBidi = "isolate";
@@ -1189,6 +1214,7 @@ function renderVerdictPane() {
       acc.appendChild(document.createTextNode("✓ accept"));
       acc.addEventListener("click", () => {
         decide(Object.assign({}, span, { source: "llm_verdict" }), "accept");
+        paintBanners(bannerEl, [{ kind: "ok", text: "Accepted — the span is now in the result and in Download JSON." }]);
       });
       const ed = document.createElement("button");
       ed.type = "button";

@@ -36,8 +36,77 @@ function emptyDraft() {
   };
 }
 
+export function normalizeEntityType(name) {
+  return String(name || "").trim().toUpperCase().replace(/\s+/g, "_");
+}
+
+export function splitTriggers(raw) {
+  if (Array.isArray(raw)) return raw.map((s) => String(s).trim()).filter(Boolean);
+  return String(raw || "").split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean);
+}
+
+export function escapeRegexLiteral(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function triggerPattern(trigger) {
+  const escaped = escapeRegexLiteral(trigger);
+  if (/[./:@?#]/.test(trigger)) return escaped;
+  return "\\b" + escaped + "\\b";
+}
+
+export function patternName(entityType, trigger) {
+  const et = normalizeEntityType(entityType).toLowerCase() || "custom";
+  const slug = String(trigger || "custom")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "")
+    .slice(0, 40);
+  return (et + "_" + (slug || "custom")).slice(0, 60);
+}
+
+export function buildCategoryPatch(entityType, triggers, extraPattern) {
+  const et = normalizeEntityType(entityType);
+  const trigs = splitTriggers(triggers);
+  const add = {};
+  if (!et) return { entity_type: "", triggers: [], patternsAdd: add };
+  trigs.forEach((t) => {
+    add[patternName(et, t)] = {
+      pattern: triggerPattern(t),
+      entity_type: et,
+      recognizer_group: "free_text",
+      presidio_score: 0.86,
+      context_hints: trigs.slice(0, 8),
+      unvalidated_reason: "operator-authored trigger for " + et,
+    };
+  });
+  const extra = String(extraPattern || "").trim();
+  if (extra) {
+    add[patternName(et, "custom")] = {
+      pattern: extra,
+      entity_type: et,
+      recognizer_group: "free_text",
+      presidio_score: 0.86,
+      unvalidated_reason: "operator-authored pattern for " + et,
+    };
+  }
+  return { entity_type: et, triggers: trigs, patternsAdd: add };
+}
+
 function clone(obj) {
   return JSON.parse(JSON.stringify(obj || emptyDraft()));
+}
+
+function ensureDraftShape(raw) {
+  const draft = { ...emptyDraft(), ...(raw || {}) };
+  if (!draft.ner_stoplist) draft.ner_stoplist = { "*": [] };
+  if (!draft.context_cues) draft.context_cues = {};
+  if (!draft.patterns || typeof draft.patterns !== "object") {
+    draft.patterns = { add: {}, remove: [], replace_all: false };
+  }
+  if (!draft.patterns.add) draft.patterns.add = {};
+  if (!draft.patterns.remove) draft.patterns.remove = [];
+  return draft;
 }
 
 export function createRulesEditor(host, options) {
@@ -50,6 +119,7 @@ export function createRulesEditor(host, options) {
     dirty: false,
     applyToRun: false,
     lastDiff: null,
+    collapsed: true,
   };
   const listeners = [];
 
@@ -127,13 +197,13 @@ export function createRulesEditor(host, options) {
 
   function render() {
     host.textContent = "";
-    const head = el("button", { type: "button", className: "gw-rules-toggle" });
+    const head = el("button", { type: "button", className: "btn gw-rules-toggle" });
     const ineffectiveN = (state.ineffective || []).length;
-    const stagedN = (state.applyToRun || state.dirty) ? 1 : 0;
     let title = state.dirty ? "Detection rules · unsaved draft" : "Detection rules";
     if (state.applyToRun) title += " · staged";
     if (ineffectiveN) title += " · " + ineffectiveN + " ineffective";
-    head.appendChild(document.createTextNode(title));
+    head.appendChild(document.createTextNode((state.collapsed ? "▸ " : "▾ ") + title));
+    head.setAttribute("aria-expanded", state.collapsed ? "false" : "true");
     if (ineffectiveN) head.style.color = "#991b1b";
     const body = el("div", { className: "gw-rules-body" });
     body.hidden = !!state.collapsed;
@@ -198,6 +268,58 @@ export function createRulesEditor(host, options) {
       }));
       body.appendChild(row);
     });
+    body.appendChild(addRow("New category for a cue (e.g. SOCIAL_URL)", (v) => {
+      const et = normalizeEntityType(v);
+      if (!et) return;
+      if (!state.draft.context_cues[et]) {
+        state.draft.context_cues[et] = { triggers: [], extend: "sentence" };
+        markDirty();
+      }
+    }));
+
+    body.appendChild(el("h3", { className: "gw-rules-h", text: "Add PII category" }));
+    body.appendChild(el("p", {
+      className: "gw-hint",
+      text: "Name a type such as SOCIAL_URL and the wording that starts it (instagram, linkedin.com, profile:).",
+    }));
+    const catForm = el("div", { className: "gw-cat-form" });
+    const catName = isolate(el("input", { type: "text", placeholder: "Category name (e.g. SOCIAL_URL)" }));
+    const catTrig = isolate(el("input", { type: "text", placeholder: "Trigger wording, comma-separated" }));
+    const catPat = isolate(el("input", { type: "text", placeholder: "Optional regex" }));
+    const catBtn = el("button", { type: "button", className: "btn btn-sm", text: "Add category" });
+    catBtn.addEventListener("click", () => {
+      if (!addCategory(catName.value, catTrig.value, catPat.value)) return;
+      catName.value = "";
+      catTrig.value = "";
+      catPat.value = "";
+    });
+    catForm.appendChild(catName);
+    catForm.appendChild(catTrig);
+    catForm.appendChild(catPat);
+    catForm.appendChild(catBtn);
+    body.appendChild(catForm);
+
+    const customAdd = (state.draft.patterns && state.draft.patterns.add) || {};
+    const customNames = Object.keys(customAdd);
+    if (customNames.length) {
+      body.appendChild(el("h3", { className: "gw-rules-h", text: "Custom patterns" }));
+      customNames.forEach((name) => {
+        const entry = customAdd[name] || {};
+        const row = el("div", { className: "gw-sum-row" });
+        const label = isolate(el("span"));
+        label.appendChild(document.createTextNode(
+          name + " · " + (entry.entity_type || "") + " · " + (entry.pattern || "")
+        ));
+        const rm = el("button", { type: "button", className: "btn btn-ghost btn-sm", text: "×" });
+        rm.addEventListener("click", () => {
+          delete state.draft.patterns.add[name];
+          markDirty();
+        });
+        row.appendChild(label);
+        row.appendChild(rm);
+        body.appendChild(row);
+      });
+    }
 
     const actions = el("div", { className: "gw-pol-actions" });
     const previewBtn = el("button", { type: "button", className: "btn btn-ghost btn-sm", text: "Preview" });
@@ -233,7 +355,7 @@ export function createRulesEditor(host, options) {
       if (!f) return;
       try {
         const parsed = JSON.parse(await f.text());
-        state.draft = { ...emptyDraft(), ...(parsed.rules || parsed) };
+        state.draft = ensureDraftShape(parsed.rules || parsed);
         markDirty();
       } catch (err) {
         if (opts.onError) opts.onError(err);
@@ -257,8 +379,7 @@ export function createRulesEditor(host, options) {
     state.defaults = body.defaults || emptyDraft();
     state.stored = body.stored || {};
     state.sources = body.sources || [];
-    state.draft = clone(body.rules || emptyDraft());
-    if (!state.draft.ner_stoplist) state.draft.ner_stoplist = { "*": [] };
+    state.draft = ensureDraftShape(clone(body.rules || emptyDraft()));
     state.dirty = false;
     render();
     notify();
@@ -305,13 +426,14 @@ export function createRulesEditor(host, options) {
     if (opts.onSaved) opts.onSaved();
   }
 
-  function addTerm(field, value) {
+  function addTerm(field, value, extra) {
+    extra = extra || {};
     if (field === "ner_stoplist") {
-      const et = "*";
+      const et = extra.entity_type || "*";
       state.draft.ner_stoplist = state.draft.ner_stoplist || {};
       state.draft.ner_stoplist[et] = uniquePush(state.draft.ner_stoplist[et] || [], value);
     } else if (field === "context_cues") {
-      const et = (arguments[2] || "LOCATION").toUpperCase();
+      const et = normalizeEntityType(extra.entity_type || "LOCATION");
       const cue = state.draft.context_cues[et] || { triggers: [], extend: "sentence" };
       state.draft.context_cues[et] = { ...cue, triggers: uniquePush(cue.triggers || [], value) };
     } else if (field === "forbidden_span") {
@@ -321,6 +443,80 @@ export function createRulesEditor(host, options) {
     }
     state.applyToRun = true;
     markDirty();
+  }
+
+  function addCategory(entityType, triggers, extraPattern) {
+    const patch = buildCategoryPatch(entityType, triggers, extraPattern);
+    if (!patch.entity_type || (!patch.triggers.length && !Object.keys(patch.patternsAdd).length)) {
+      return null;
+    }
+    state.draft = ensureDraftShape(state.draft);
+    const cue = state.draft.context_cues[patch.entity_type] || { triggers: [], extend: "sentence" };
+    let next = cue.triggers || [];
+    patch.triggers.forEach((t) => { next = uniquePush(next, t); });
+    state.draft.context_cues[patch.entity_type] = {
+      ...cue,
+      triggers: next,
+      extend: cue.extend || "sentence",
+    };
+    state.draft.patterns.add = Object.assign({}, state.draft.patterns.add || {}, patch.patternsAdd);
+    state.applyToRun = true;
+    state.collapsed = false;
+    markDirty();
+    return patch;
+  }
+
+  function expand() {
+    if (state.collapsed) {
+      state.collapsed = false;
+      render();
+    }
+  }
+
+  function chooserHost() {
+    return opts.chooserHost
+      || (typeof document !== "undefined" && document.getElementById("gwInlineForm"))
+      || (typeof document !== "undefined" && document.getElementById("evInlineForm"));
+  }
+
+  function revealHost(node) {
+    if (!node) return;
+    node.hidden = false;
+    if (typeof node.scrollIntoView === "function") {
+      node.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }
+
+  function fillCategoryForm(host, { entityType, trigger, advice, onDone }) {
+    host.textContent = "";
+    host.appendChild(el("div", {
+      className: "gw-hint",
+      text: "Add a PII category. Trigger wording is what starts the span (e.g. instagram, linkedin.com).",
+    }));
+    const nameInp = isolate(el("input", { type: "text", placeholder: "Category name (e.g. SOCIAL_URL)" }));
+    nameInp.value = entityType || "";
+    const trigInp = isolate(el("input", { type: "text", placeholder: "Trigger wording" }));
+    trigInp.value = trigger || "";
+    const row = el("div", { className: "gw-pol-actions" });
+    const ok = el("button", { type: "button", className: "btn btn-sm", text: "Add category" });
+    const cancel = el("button", { type: "button", className: "btn btn-ghost btn-sm", text: "Cancel" });
+    ok.addEventListener("click", () => {
+      const patch = addCategory(nameInp.value, trigInp.value);
+      host.hidden = true;
+      host.textContent = "";
+      onDone(patch ? { action: "add_category", patch, advice } : null);
+    });
+    cancel.addEventListener("click", () => {
+      host.hidden = true;
+      host.textContent = "";
+      onDone(null);
+    });
+    host.appendChild(nameInp);
+    host.appendChild(trigInp);
+    row.appendChild(ok);
+    row.appendChild(cancel);
+    host.appendChild(row);
+    nameInp.focus();
   }
 
   async function addTermChecked(value, options) {
@@ -346,59 +542,49 @@ export function createRulesEditor(host, options) {
     const body = await res.json();
     const advice = body.advice || [];
     const viable = advice.filter((a) => (a.would_remove || []).length);
-    if (!viable.length) {
-      const reason = (advice.find((a) => a.reason) || {}).reason || ("No rule field can remove " + term);
-      const hostRefuse = opts.chooserHost || (typeof document !== "undefined" && document.getElementById("gwInlineForm"))
-        || (typeof document !== "undefined" && document.getElementById("evInlineForm"));
-      if (hostRefuse && (optsLocal.onReject || opts.onRefuse)) {
-        return new Promise((resolve) => {
-          hostRefuse.hidden = false;
-          hostRefuse.textContent = "";
-          hostRefuse.appendChild(el("div", { className: "gw-hint", text: reason }));
-          if (optsLocal.onReject) {
-            const rej = el("button", { type: "button", className: "btn btn-ghost btn-sm", text: "Reject this span" });
-            rej.addEventListener("click", () => {
-              hostRefuse.hidden = true;
-              hostRefuse.textContent = "";
-              optsLocal.onReject();
-              resolve({ refused: true, reason, advice, action: "reject_span" });
-            });
-            hostRefuse.appendChild(rej);
-          }
-          const cancel = el("button", { type: "button", className: "btn btn-ghost btn-sm", text: "Cancel" });
-          cancel.addEventListener("click", () => {
-            hostRefuse.hidden = true;
-            hostRefuse.textContent = "";
-            resolve({ refused: true, reason, advice });
-          });
-          hostRefuse.appendChild(cancel);
-        });
-      }
-      if (opts.onError) opts.onError(new Error(reason));
-      else if (opts.onRefuse) opts.onRefuse(reason, advice);
-      state.lastAdvice = advice;
-      render();
-      return { refused: true, reason, advice };
-    }
     const preferred = optsLocal.preferred;
     const pick = viable.find((a) => a.target === preferred && a.would_remove && a.would_remove.length)
       || viable.find((a) => a.default)
       || viable[0];
     if (optsLocal.skipChooser) {
+      if (!pick) return { refused: true, reason: (advice.find((a) => a.reason) || {}).reason || "", advice };
       addTerm(pick.target, term);
       return pick;
     }
     return new Promise((resolve) => {
-      const host = opts.chooserHost || (typeof document !== "undefined" && document.getElementById("gwInlineForm"))
-        || (typeof document !== "undefined" && document.getElementById("evInlineForm"));
+      const host = chooserHost();
       if (!host || typeof window === "undefined") {
-        addTerm(pick.target, term);
-        resolve(pick);
+        if (pick) {
+          addTerm(pick.target, term);
+          resolve(pick);
+        } else {
+          resolve({ refused: true, advice });
+        }
         return;
       }
-      host.hidden = false;
+      revealHost(host);
       host.textContent = "";
-      host.appendChild(el("div", { className: "gw-hint", text: "Which field should receive “" + term + "”?" }));
+      const reason = (advice.find((a) => a.reason) || {}).reason || "";
+      host.appendChild(el("div", {
+        className: "gw-hint",
+        text: viable.length
+          ? ("Which rule should receive “" + term + "”?")
+          : (reason || ("No suppression field removes “" + term + "”. Add it as a PII category instead.")),
+      }));
+      const cat = el("button", {
+        type: "button",
+        className: "btn btn-sm",
+        text: "Add as PII category…",
+      });
+      cat.addEventListener("click", () => {
+        fillCategoryForm(host, {
+          entityType: optsLocal.entityType || "",
+          trigger: term,
+          advice,
+          onDone: resolve,
+        });
+      });
+      host.appendChild(cat);
       advice.forEach((row) => {
         const btn = el("button", {
           type: "button",
@@ -421,6 +607,16 @@ export function createRulesEditor(host, options) {
         });
         host.appendChild(btn);
       });
+      if (optsLocal.onReject) {
+        const rej = el("button", { type: "button", className: "btn btn-ghost btn-sm", text: "Reject this span" });
+        rej.addEventListener("click", () => {
+          host.hidden = true;
+          host.textContent = "";
+          optsLocal.onReject();
+          resolve({ refused: true, reason, advice, action: "reject_span" });
+        });
+        host.appendChild(rej);
+      }
       const cancel = el("button", { type: "button", className: "btn btn-ghost btn-sm", text: "Cancel" });
       cancel.addEventListener("click", () => {
         host.hidden = true;
@@ -431,19 +627,25 @@ export function createRulesEditor(host, options) {
     });
   }
 
-  host && load();
+  if (host) {
+    render();
+    load();
+  }
 
   return {
     getDraft: () => (state.applyToRun || state.dirty ? clone(state.draft) : null),
     getDraftAlways: () => clone(state.draft),
     addTerm,
     addTermChecked,
+    addCategory,
+    expand,
     preview,
     save,
     load,
     onChange: (fn) => listeners.push(fn),
     applyToRun: () => { state.applyToRun = true; notify(); },
     isDirty: () => state.dirty,
+    isCollapsed: () => !!state.collapsed,
   };
 }
 

@@ -56,6 +56,7 @@ def test_download_json_includes_curation_and_verdict():
     assert "payload.curation" in blob
     assert "llm_verdict" in blob
     assert "curatedSpans()" in blob
+    assert "rejected_spans" in blob
 
 
 def test_scan_reloads_saved_curation():

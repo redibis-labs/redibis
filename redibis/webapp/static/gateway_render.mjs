@@ -4,7 +4,7 @@ export const DIRECT = new Set([
 ]);
 export const CONTACT = new Set([
   "EMAIL_ADDRESS", "PHONE_NUMBER", "ADDRESS", "LOCATION",
-  "URL", "IP_ADDRESS", "MSISDN",
+  "URL", "IP_ADDRESS", "MSISDN", "SOCIAL_URL",
 ]);
 export const IDENT = new Set([
   "PERSON", "DATE_OF_BIRTH", "DATE_TIME", "NRP", "AGE",
@@ -33,7 +33,7 @@ export function classOf(entityType, evalKind) {
   if (evalKind) return evalKind;
   const t = String(entityType || "");
   if (DIRECT.has(t)) return "direct";
-  if (CONTACT.has(t)) return "contact";
+  if (CONTACT.has(t) || t.indexOf("URL") >= 0) return "contact";
   if (IDENT.has(t)) return "identity";
   return "other";
 }

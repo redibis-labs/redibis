@@ -313,3 +313,24 @@ def test_usecase_pages_linked_from_gateway_nav():
     assert 'id="ucOverlay"' in uc
     assert 'dir="auto"' in uc
     assert "unicode-bidi: isolate" in (STATIC / "gateway.css").read_text(encoding="utf-8")
+
+
+def test_gateway_rules_folded_with_category_and_review_json():
+    rules = (STATIC / "gateway_rules.mjs").read_text(encoding="utf-8")
+    js = (STATIC / "gateway.js").read_text(encoding="utf-8")
+    css = (STATIC / "gateway.css").read_text(encoding="utf-8")
+    html = (TEMPLATES / "gateway.html").read_text(encoding="utf-8")
+    assert "collapsed: true" in rules
+    assert "Add PII category" in rules
+    assert "Add as PII category" in rules
+    assert "buildCategoryPatch" in rules
+    assert 'className: "btn gw-rules-toggle"' in rules
+    assert "aria-expanded" in rules
+    assert "gw-rules-toggle" in css
+    assert 'id="gwRules"' in html
+    paint = js[js.find("function paintResultPane("): js.find("function showResultMode(")]
+    assert "curatedSpans()" in paint
+    assert "gw-rejected" not in paint
+    assert "isAccepted" in js
+    assert "rejected_spans" in js
+    assert "rulesEditor.expand" in js

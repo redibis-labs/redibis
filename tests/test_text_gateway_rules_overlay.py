@@ -97,6 +97,34 @@ def test_operator_pattern_compiles_into_ruleset():
     assert any(d.text == "OPS-9911" for d in tickets)
 
 
+def test_operator_social_url_category_detects_trigger():
+    overlay = TextRuleOverlay.from_dict({
+        "context_cues": {
+            "SOCIAL_URL": {"triggers": ["instagram", "linkedin.com"], "extend": "sentence"},
+        },
+        "patterns": {
+            "add": {
+                "social_url_instagram": {
+                    "pattern": r"instagram(?:\.com)?",
+                    "entity_type": "SOCIAL_URL",
+                    "recognizer_group": "free_text",
+                    "presidio_score": 0.86,
+                    "unvalidated_reason": "operator-authored trigger for SOCIAL_URL",
+                }
+            }
+        },
+    })
+    rs = RuleSetCompiler.default(text_rules=overlay)
+    assert "social_url_instagram" in rs.patterns
+    scanner = TextScanner(ruleset=rs)
+    result = scanner.scan(
+        "follow me on instagram tonight",
+        TextScanConfig(engines="regex", min_score=0.2),
+    )
+    hits = [d for d in result.detections if d.entity_type == "SOCIAL_URL"]
+    assert any("instagram" in (d.text or "").lower() for d in hits)
+
+
 def test_llm_prompt_includes_overlay_cues():
     from redibis.pii.scan.result import TextScanConfig
     from redibis.pii.text_llm import LlmTextRefiner
