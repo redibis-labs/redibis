@@ -24,6 +24,13 @@ def test_steward_module_has_no_scan_fetch():
         assert key in MJS
     assert "no_evidence" in MJS
     assert "no engine has scanned this field" in MJS
+    assert "PII on" in MJS
+    assert "PII off" in MJS
+    assert "Save edits" in MJS
+    assert "/verdicts" in MJS
+    assert "Export verdicts" in MJS
+    assert "Write your own" in MJS
+    assert "steward/export/verdicts" in MJS
 
 
 def test_workspace_module_has_no_scan_fetch():

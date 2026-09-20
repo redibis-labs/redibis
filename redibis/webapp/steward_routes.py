@@ -26,7 +26,8 @@ class FieldVerdictBody(BaseModel):
     evidence_refs: Optional[list[str]] = None
 
 
-class TableVerdictBody(BaseModel):
+class FieldVerdictsBody(BaseModel):
+    verdicts: list[FieldVerdictBody]
     item: str
     decision: str
     chosen_source: str = ""
@@ -98,6 +99,18 @@ def register_steward_routes(app: Any, store_getter: StoreGetter) -> None:
         _touch_index(table)
         return result
 
+    @app.post("/api/contracts/{table}/steward/columns/{column}/verdicts")
+    def steward_verdicts(request: Request, table: str, column: str, body: FieldVerdictsBody) -> dict:
+        actor = _actor_from_request(request)
+        payloads = []
+        for item in body.verdicts:
+            payload = item.model_dump()
+            payload["evidence_refs"] = payload.get("evidence_refs") or []
+            payloads.append(payload)
+        result = _call(_svc().decide_many, table, column, payloads, actor=actor)
+        _touch_index(table)
+        return result
+
     @app.post("/api/contracts/{table}/steward/table/verdict")
     def steward_table_verdict(request: Request, table: str, body: TableVerdictBody) -> dict:
         actor = _actor_from_request(request)
@@ -118,6 +131,11 @@ def register_steward_routes(app: Any, store_getter: StoreGetter) -> None:
     @app.get("/api/contracts/{table}/steward/artifacts")
     def steward_artifacts(table: str) -> dict:
         return _call(_svc().list_artifacts, table)
+
+    @app.get("/api/contracts/{table}/steward/export/verdicts")
+    def steward_export_verdicts(request: Request, table: str) -> dict:
+        actor = _actor_from_request(request)
+        return _call(_svc().export_verdicts, table, actor=actor)
 
     @app.get("/api/contracts/{table}/steward/artifacts/{name}")
     def steward_artifact_download(table: str, name: str):

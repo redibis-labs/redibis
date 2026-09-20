@@ -729,6 +729,7 @@ class EnrichmentService:
         meta["version_after"] = version_after
         meta["det_version"] = c_det.get("version")
         meta["prior_version"] = upsert.version_before
+        self._append_enrichment_generations(table, candidate, effective_run_id)
         if context_bundle:
             from redibis.enrich.context import clear_context_draft
 
@@ -1265,6 +1266,30 @@ class EnrichmentService:
             deferred_context=deferred_context,
         )
 
+    def _append_enrichment_generations(self, table: str, candidate: dict, run_id: str) -> None:
+        """Record LLM enrich opinions so steward review can show them beside synthesis."""
+        ledger = getattr(self.store, "generation_ledger", None)
+        if ledger is None:
+            return
+        from redibis.review.fingerprint import fingerprint_from_contract_prop
+        from redibis.store.generation_ledger import generations_from_contract_column
+
+        for schema_obj in candidate.get("schema") or []:
+            for prop in schema_obj.get("properties") or []:
+                if not isinstance(prop, dict) or not prop.get("name"):
+                    continue
+                name = str(prop["name"])
+                fp = fingerprint_from_contract_prop(name, prop)
+                gens = generations_from_contract_column(
+                    name, prop, source="llm", run_id=run_id or "enrich",
+                    fingerprint_key=fp.fingerprint_key,
+                )
+                if gens:
+                    try:
+                        ledger.append(table, name, gens)
+                    except Exception:
+                        pass
+
     # ── Candidate storage ──────────────────────────────────────────────────
 
     def _write_candidate(self, table: str, candidate: dict) -> str:
@@ -1321,6 +1346,7 @@ class EnrichmentService:
         upsert = self.store.upsert(partial, table=table, workflow="business",
                                    run_id=f"enrich_{_utc_now_iso()}", validate=False,
                                    strip_pii_quality=True)
+        self._append_enrichment_generations(table, partial, f"enrich_{meta.get('enriched_at', '')}")
         from redibis.contracts.lifecycle import (
             apply_llm_classification_decisions,
             resolve_enrichment_overlay_changes,

@@ -272,10 +272,11 @@ def _stats_from_profile(profile_result: Any) -> dict[str, dict]:
             out[str(name)] = dict(cp)
             continue
         out[str(name)] = {
-            "logical_type": getattr(cp, "logical_type", None),
-            "physical_type": getattr(cp, "physical_type", None),
+            "logical_type": getattr(cp, "logical_type", None) or getattr(cp, "dtype", None),
+            "physical_type": getattr(cp, "physical_type", None) or getattr(cp, "dtype", None),
             "null_rate": getattr(cp, "null_rate", None),
             "ndv_ratio": getattr(cp, "cardinality_ratio", None),
+            "ndv": getattr(cp, "nunique", None),
             "avg_value_length": getattr(cp, "avg_value_length", None),
             "arabic_fraction": getattr(cp, "arabic_fraction", None),
             "constant": getattr(cp, "constant", False),

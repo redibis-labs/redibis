@@ -232,7 +232,10 @@ def _stage_schema_fields(candidate: dict, bundle: EvidenceBundle, ctx: dict) -> 
         table = ctx.get("table")
         if ledger and table and name:
             try:
-                from redibis.store.generation_ledger import Generation
+                from redibis.store.generation_ledger import (
+                    Generation,
+                    generations_from_contract_column,
+                )
                 gens = []
                 if payload.get("classification"):
                     gens.append(Generation(
@@ -253,6 +256,15 @@ def _stage_schema_fields(candidate: dict, bundle: EvidenceBundle, ctx: dict) -> 
                         run_id=str(ctx.get("run_id") or "synthesis"),
                         ts="",
                     ))
+                extra = generations_from_contract_column(
+                    str(name), prop, source="llm_synthesis",
+                    run_id=str(ctx.get("run_id") or "synthesis"),
+                    confidence=rec.confidence,
+                )
+                have = {(g.field, g.source) for g in gens}
+                for g in extra:
+                    if (g.field, g.source) not in have:
+                        gens.append(g)
                 if gens:
                     ledger.append(table, str(name), gens)
             except Exception:

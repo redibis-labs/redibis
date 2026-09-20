@@ -160,3 +160,19 @@ def _pii(g: Generation):
     if isinstance(v, dict):
         return v.get("is_pii")
     return v
+
+
+def test_generations_from_contract_column_records_definition():
+    from redibis.store.generation_ledger import generations_from_contract_column
+
+    gens = generations_from_contract_column(
+        "email",
+        {"name": "email", "description": "customer email", "classification": "pii_personal",
+         "entity_type": "EMAIL_ADDRESS", "tags": ["pii"]},
+        source="llm", run_id="enrich-1",
+    )
+    fields = {g.field: g for g in gens}
+    assert fields["definition"].value == "customer email"
+    assert fields["definition"].source == "llm"
+    assert fields["pii"].value["is_pii"] is True
+

@@ -7,6 +7,7 @@ FieldDecisionStore. Finalize stamps A0–A5 under one review_digest.
 
 from __future__ import annotations
 
+import json
 import statistics
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -17,7 +18,15 @@ from redibis.services.evidence_review_service import EvidenceReviewService
 from redibis.services.review_service import ReviewInputError, ReviewService, _iter_props
 from redibis.store.contract_store import ContractStore
 from redibis.store.field_decisions import FieldDecision, fingerprint_kwargs_from_prop
-from redibis.store.generation_ledger import FIELDS, Generation, GenerationLedger
+from redibis.store.generation_ledger import (
+    DEFINITION_SOURCE_ORDER,
+    FIELDS,
+    PII_ENGINE_ORDER,
+    SOURCE_LABELS,
+    Generation,
+    GenerationLedger,
+    generations_from_telemetry,
+)
 from redibis.store.profile_store import ProfileStore
 from redibis.store.review_store import (
     BLOCKING_DECISIONS,
@@ -51,23 +60,64 @@ def _pii_value(gen: Generation) -> Optional[bool]:
 AGREEMENT = ("no_evidence", "unanimous", "majority", "contested")
 
 
+def _vote_value(gen: Generation) -> Any:
+    """Comparable engine vote: PII bool when present, else a stable scalar."""
+    pii = _pii_value(gen)
+    if pii is not None:
+        return pii
+    val = gen.value
+    if val is None or val == "" or val == []:
+        return None
+    if isinstance(val, dict):
+        return json.dumps(val, sort_keys=True, default=str)
+    return str(val).strip()
+
+
 def _agreement(gens: list[Generation]) -> str:
     votes = []
     for g in gens:
         if g.source in ("human", "supplied"):
             continue
-        v = _pii_value(g)
+        v = _vote_value(g)
         if v is not None:
             votes.append(v)
     if not votes:
         return "no_evidence"
-    if len(set(votes)) == 1:
+    distinct = set(votes)
+    if len(distinct) == 1:
         return "unanimous"
-    yes = sum(1 for v in votes if v)
-    no = len(votes) - yes
-    if yes == no:
-        return "contested"
-    return "majority" if max(yes, no) > 1 else "contested"
+    if all(isinstance(v, bool) for v in votes):
+        yes = sum(1 for v in votes if v)
+        no = len(votes) - yes
+        if yes == no:
+            return "contested"
+        return "majority" if max(yes, no) > 1 else "contested"
+    counts: dict[Any, int] = {}
+    for v in votes:
+        counts[v] = counts.get(v, 0) + 1
+    top = max(counts.values())
+    if top > len(votes) / 2 and top > 1:
+        return "majority"
+    return "contested"
+
+
+def _confidence_pct(conf: Any) -> Optional[int]:
+    if conf is None:
+        return None
+    try:
+        f = float(conf)
+    except (TypeError, ValueError):
+        return None
+    if 0 <= f <= 1:
+        return int(round(f * 100))
+    return int(round(f))
+
+
+def _has_profile_stats(stats: dict) -> bool:
+    return any(
+        stats.get(k) is not None
+        for k in ("null_rate", "ndv", "ndv_ratio", "nunique", "cardinality_ratio", "logical_type")
+    )
 
 
 def _table_quality_item_ids(active: dict) -> list[str]:
@@ -298,9 +348,10 @@ class StewardReviewService:
             if not self.profiles.manifest(table, run_id):
                 profile["samples_withheld"] = profile.get("samples_withheld") or "no profile for this run"
 
+        self._hydrate_engines_from_telemetry(table, column, found)
+        self._hydrate_definition_from_contract(table, column, found)
         gens_all = self.ledger.get(table, column)
         by_field: dict[str, list[dict]] = {f: [] for f in FIELDS}
-        latest_pii = []
         for g in gens_all:
             by_field.setdefault(g.field, []).append(g.to_dict())
         latest_map = {f: self.ledger.latest_by_source(table, column, f) for f in FIELDS}
@@ -308,6 +359,7 @@ class StewardReviewService:
             f: [g.to_dict() for g in srcs.values()] for f, srcs in latest_map.items()
         }
         agreement = {f: _agreement(list(latest_map.get(f, {}).values())) for f in FIELDS}
+        profile = self._enrich_profile(table, column, found, profile)
 
         privacy = found.get("privacy") if isinstance(found.get("privacy"), dict) else {}
         pii_decisions = self.store.get_pii_decisions(table)
@@ -328,6 +380,13 @@ class StewardReviewService:
                 drift = "stale"
 
         glossary_candidates = _glossary_candidates(found, column)
+        engines = {
+            field: _engine_cards(field, latest_map.get(field) or {})
+            for field in FIELDS
+        }
+        definition_candidates = _definition_candidates(
+            latest_map.get("definition") or {}, _definition(found),
+        )
         return {
             "column": column,
             "logical_type": str(found.get("logicalType") or found.get("physicalType") or "string"),
@@ -344,6 +403,9 @@ class StewardReviewService:
             },
             "generations": latest_payload,
             "generations_history": by_field,
+            "engines": engines,
+            "definition_candidates": definition_candidates,
+            "source_labels": dict(SOURCE_LABELS),
             "agreement": agreement,
             "profile": profile,
             "glossary_candidates": glossary_candidates,
@@ -353,7 +415,7 @@ class StewardReviewService:
             "drift": drift,
             "rationale_codes": {
                 src: codes_for_choice(src, agreement=agreement.get("pii") or "")
-                for src in ("regex", "ner", "llm", "llm_synthesis", "human", "custom_rule")
+                for src in ("regex", "ner", "phone", "custom_rule", "llm", "llm_synthesis", "human")
             },
         }
 
@@ -407,6 +469,23 @@ class StewardReviewService:
             note=fv.rationale_text, verdicts={fv.field: fv},
         )
         return self.column(table, column, actor=who)
+
+    def decide_many(
+        self,
+        table: str,
+        column: str,
+        verdicts: list[FieldVerdict | dict],
+        *,
+        actor: str,
+    ) -> dict:
+        """Save several field verdicts in one request (PII + definition + tags, …)."""
+        if not verdicts:
+            raise ReviewInputError("at least one field verdict is required")
+        last = None
+        for item in verdicts:
+            field = item.field if isinstance(item, FieldVerdict) else str(item.get("field") or "")
+            last = self.decide(table, column, field, item, actor=actor)
+        return last or self.column(table, column, actor=actor)
 
     def decide_table(self, table: str, item: str, verdict: FieldVerdict | dict, *, actor: str) -> dict:
         who = (actor or "").strip()
@@ -492,13 +571,115 @@ class StewardReviewService:
         from redibis.review.artifacts import get_artifact
         return get_artifact(self.store, table, name)
 
+    def export_verdicts(self, table: str, *, actor: str = "") -> dict:
+        """A1-shaped verdict memory from the current checkpoint — no finalize required.
+
+        Next-scan memory is already written per edit via PiiDecisionStore /
+        FieldDecisionStore; this JSON is the portable artifact of those edits.
+        """
+        active = self.store.get_active(table)
+        if active is None:
+            raise ValueError(f"No active contract for {table!r}")
+        state = self.reviews.get(table)
+        from redibis.review.artifacts import (
+            _build_verdict_memory,
+            _utc_now_iso,
+            _verdict_ids,
+            review_digest,
+        )
+        ts = _utc_now_iso()
+        digest = review_digest(
+            str(active.get("contract_uuid") or state.contract_uuid or ""),
+            _verdict_ids(state),
+            ts,
+        )
+        return _build_verdict_memory(self, table, state, digest, ts, actor or "steward")
+
+    def _hydrate_engines_from_telemetry(self, table: str, column: str, prop: dict) -> None:
+        """If the ledger missed a scan, backfill latest engine scores from telemetry."""
+        latest = self.ledger.latest_by_source(table, column, "pii")
+        tel = {}
+        try:
+            tel = self.store.metadata.get_column_evidence(table, column) or {}
+        except Exception:
+            tel = {}
+        if not tel:
+            return
+        from redibis.review.fingerprint import fingerprint_from_contract_prop
+        fp = fingerprint_from_contract_prop(column, prop)
+        gens = generations_from_telemetry(
+            column, tel,
+            run_id=str(tel.get("run_id") or "telemetry"),
+            fingerprint_key=fp.fingerprint_key,
+        )
+        to_add = [g for g in gens if g.source not in latest]
+        if to_add:
+            self.ledger.append(table, column, to_add)
+
+    def _hydrate_definition_from_contract(self, table: str, column: str, prop: dict) -> None:
+        """Surface the contract's current definition as a candidate when the ledger has none."""
+        latest = self.ledger.latest_by_source(table, column, "definition")
+        if latest:
+            return
+        text = _definition(prop)
+        if not text:
+            return
+        from redibis.review.fingerprint import fingerprint_from_contract_prop
+        from redibis.store.generation_ledger import generations_from_contract_column
+        fp = fingerprint_from_contract_prop(column, prop)
+        # Unknown producer — record as supplied so the steward can still pick or edit it.
+        gens = generations_from_contract_column(
+            column, prop, source="supplied", run_id="contract",
+            fingerprint_key=fp.fingerprint_key,
+        )
+        defn = [g for g in gens if g.field == "definition"]
+        if defn:
+            self.ledger.append(table, column, defn)
+
+    def _enrich_profile(self, table: str, column: str, prop: dict, profile: dict) -> dict:
+        stats = dict(profile.get("stats") or {})
+        quality = list(profile.get("quality") or [])
+        if not _has_profile_stats(stats):
+            latest = self.ledger.latest_by_source(table, column, "logical_type")
+            prof = latest.get("profile")
+            if prof is not None:
+                stats.update(dict(prof.detail or {}))
+                if prof.value and not stats.get("logical_type"):
+                    stats["logical_type"] = prof.value
+        if not quality:
+            quality = list(prop.get("quality") or [])
+        if not stats.get("logical_type"):
+            stats["logical_type"] = str(prop.get("logicalType") or prop.get("physicalType") or "")
+        if not stats.get("format_signature"):
+            stats["format_signature"] = profile.get("format_signature") or ""
+        profile = dict(profile)
+        profile["stats"] = stats
+        profile["quality"] = quality
+        profile["format_signature"] = stats.get("format_signature") or profile.get("format_signature") or ""
+        if _has_profile_stats(stats) and profile.get("samples_withheld") == "no profile for this run":
+            profile["samples_withheld"] = ""
+        if not _has_profile_stats(stats) and not quality:
+            profile["samples_withheld"] = profile.get("samples_withheld") or "no profile for this run"
+        elif not profile.get("samples_withheld") and profile.get("samples") is None:
+            profile["samples_withheld"] = profile.get("samples_withheld") or ""
+        return profile
+
     def _route_write(self, table: str, column: str, fv: FieldVerdict, who: str) -> None:
         if fv.decision in ("needs_review", "no_action", "reject"):
             if fv.decision == "reject":
                 self.review.reject_column(table, column, reviewer=who, note=fv.rationale_text)
             return
         if fv.field == "pii":
-            is_pii = _coerce_pii(fv.value)
+            if fv.value is None:
+                active = self.store.get_active(table) or {}
+                prop = {}
+                for name, p in _iter_props(active):
+                    if name == column:
+                        prop = p
+                        break
+                is_pii = column_is_pii(prop)
+            else:
+                is_pii = _coerce_pii(fv.value)
             if fv.decision == "edit" or fv.decision == "accept":
                 status = "pii" if is_pii else "not_pii"
                 entity = None
@@ -629,6 +810,79 @@ def _glossary_candidates(prop: dict, column: str) -> list[dict]:
             out.append({"term": g, "uri": ""})
     if not out and column:
         out.append({"term": column.replace("_", " "), "uri": ""})
+    return out
+
+
+def _engine_cards(field: str, latest: dict[str, Generation]) -> list[dict]:
+    order = PII_ENGINE_ORDER if field == "pii" else (
+        DEFINITION_SOURCE_ORDER if field == "definition" else list(SOURCE_LABELS)
+    )
+    seen = set()
+    cards = []
+    for source in list(order) + [s for s in latest if s not in order]:
+        if source in seen:
+            continue
+        seen.add(source)
+        gen = latest.get(source)
+        card = {
+            "source": source,
+            "label": SOURCE_LABELS.get(source, source),
+            "present": gen is not None,
+            "value": None if gen is None else gen.value,
+            "confidence": None if gen is None else gen.confidence,
+            "confidence_pct": None if gen is None else _confidence_pct(gen.confidence),
+            "run_id": "" if gen is None else gen.run_id,
+            "ts": "" if gen is None else gen.ts,
+            "detail": {} if gen is None else dict(gen.detail or {}),
+            "is_pii": None if gen is None else _pii_value(gen),
+            "id": "" if gen is None else gen.id,
+        }
+        if isinstance(card["value"], dict) and card["value"].get("entity_type"):
+            card["entity_type"] = card["value"].get("entity_type")
+        elif gen is not None and field == "entity_type":
+            card["entity_type"] = gen.value
+        cards.append(card)
+    return cards
+
+
+def _definition_candidates(latest: dict[str, Generation], current: str) -> list[dict]:
+    out = []
+    seen_text = set()
+    for source in DEFINITION_SOURCE_ORDER:
+        gen = latest.get(source)
+        if gen is None:
+            continue
+        text = str(gen.value or "").strip()
+        if not text:
+            continue
+        seen_text.add(text)
+        out.append({
+            "source": source,
+            "label": SOURCE_LABELS.get(source, source),
+            "value": text,
+            "confidence": gen.confidence,
+            "confidence_pct": _confidence_pct(gen.confidence),
+            "run_id": gen.run_id,
+        })
+    current = (current or "").strip()
+    if current and current not in seen_text:
+        out.append({
+            "source": "current",
+            "label": "Current contract",
+            "value": current,
+            "confidence": None,
+            "confidence_pct": None,
+            "run_id": "",
+        })
+    out.append({
+        "source": "human",
+        "label": "Write your own",
+        "value": "",
+        "confidence": 1.0,
+        "confidence_pct": 100,
+        "run_id": "",
+        "custom": True,
+    })
     return out
 
 

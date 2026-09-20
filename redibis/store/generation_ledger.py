@@ -42,6 +42,32 @@ GENERATION_SET = frozenset(GENERATIONS)
 FIELD_SET = frozenset(FIELDS)
 CAP_PER_FIELD_SOURCE = 20
 
+#: Steward-facing labels for the latest verdict from each producer.
+SOURCE_LABELS = {
+    "profile": "Profiler",
+    "regex": "Regex",
+    "ner": "NER",
+    "phone": "Phone number",
+    "custom_rule": "Business rules",
+    "llm": "LLM enrich",
+    "llm_synthesis": "Deep enrich (synthesis)",
+    "supplied": "Supplied verdict",
+    "human": "Data steward",
+}
+
+#: Order the steward sees PII engine cards. Missing engines still appear as "no verdict".
+PII_ENGINE_ORDER = (
+    "regex",
+    "ner",
+    "phone",
+    "custom_rule",
+    "llm",
+    "llm_synthesis",
+    "supplied",
+    "human",
+)
+DEFINITION_SOURCE_ORDER = ("llm", "llm_synthesis", "human", "supplied")
+
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -447,6 +473,72 @@ def generations_from_telemetry(
                     "discovery_engines": engines},
             fingerprint_key=fingerprint_key,
         ))
+    _ = column
+    return gens
+
+
+def generations_from_contract_column(
+    column: str,
+    prop: dict,
+    *,
+    source: str,
+    run_id: str,
+    fingerprint_key: str = "",
+    ts: str = "",
+    confidence: float | None = None,
+) -> list[Generation]:
+    """Persist enrich / synthesis opinions so the steward can pick among them."""
+    ts = ts or _utc_now_iso()
+    gens: list[Generation] = []
+    if source not in GENERATION_SET:
+        return gens
+
+    def _emit(field: str, value: Any, detail: dict | None = None) -> None:
+        if value is None or value == "" or value == []:
+            return
+        gens.append(Generation(
+            field=field,
+            source=source,
+            value=value,
+            confidence=confidence,
+            run_id=run_id,
+            ts=ts,
+            detail=dict(detail or {}),
+            fingerprint_key=fingerprint_key,
+        ))
+
+    business = prop.get("business") if isinstance(prop.get("business"), dict) else {}
+    definition = business.get("definition") or prop.get("description") or ""
+    if isinstance(definition, dict):
+        definition = definition.get("definition") or definition.get("purpose") or ""
+    _emit("definition", str(definition).strip() if definition else "")
+
+    tags = list(prop.get("tags") or [])
+    if tags:
+        _emit("tags", tags)
+
+    classification = str(prop.get("classification") or "")
+    privacy = prop.get("privacy") if isinstance(prop.get("privacy"), dict) else {}
+    if not classification:
+        classification = str(privacy.get("classification") or "")
+    _emit("classification", classification)
+
+    entity = prop.get("entity_type")
+    pii_priv = privacy.get("pii") if isinstance(privacy.get("pii"), dict) else {}
+    if not entity:
+        entity = pii_priv.get("entity_type")
+    if not entity:
+        pii_block = prop.get("pii") if isinstance(prop.get("pii"), dict) else {}
+        entity = pii_block.get("entity_type")
+    _emit("entity_type", entity)
+
+    is_pii = None
+    try:
+        from redibis.contracts.privacy import column_is_pii
+        is_pii = bool(column_is_pii(prop))
+    except Exception:
+        is_pii = bool(entity) or str(classification).lower().startswith("pii")
+    _emit("pii", {"is_pii": is_pii, "entity_type": entity})
     _ = column
     return gens
 
