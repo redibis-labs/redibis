@@ -202,13 +202,15 @@ export async function mountContractWorkspace(opts) {
         <div class="tbl-item ${r.table === state.table ? "active" : ""}" data-table="${esc(r.table)}">
           <input type="checkbox" class="ws-row-cb" data-table="${esc(r.table)}" ${local.selected.has(r.table) ? "checked" : ""}/>
           <span class="ws-row-main">
-            <span class="mono">${esc(r.table)}</span>
+            <span class="ws-row-name">${esc(r.table)}</span>
             <span class="ws-row-meta">${esc(r.name || "")} · v${esc(r.version || "∅")} · ${esc((r.updated || "").slice(0, 16))}</span>
+            <span class="ws-row-chips">
+              <span class="chip chip-muted ws-uuid" title="${esc(r.contract_uuid)}" data-uuid="${esc(r.contract_uuid)}">${esc((r.contract_uuid || "").slice(0, 8))}</span>
+              <span class="chip chip-muted">${r.columns || 0}/${r.pii_columns || 0}</span>
+              ${reviewChip(r.review)}
+              <span class="art-dots">${artifactDots(r.artifacts)}</span>
+            </span>
           </span>
-          <span class="chip chip-muted ws-uuid" title="${esc(r.contract_uuid)}" data-uuid="${esc(r.contract_uuid)}">${esc((r.contract_uuid || "").slice(0, 8))}</span>
-          <span>${r.columns || 0}/${r.pii_columns || 0}</span>
-          ${reviewChip(r.review)}
-          <span class="art-dots">${artifactDots(r.artifacts)}</span>
         </div>`).join("")}
       <div class="ws-batch-bar">
         <details><summary>Batch ▾</summary>

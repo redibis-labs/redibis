@@ -67,7 +67,17 @@ function apiFn(api) {
     const r = await fetch(path, opt);
     const ct = r.headers.get("content-type") || "";
     const data = ct.includes("json") ? await r.json() : await r.text();
-    if (!r.ok) throw new Error((data && data.detail) || r.statusText);
+    if (!r.ok) {
+      const detail = (data && data.detail) || (typeof data === "string" && data) || r.statusText;
+      if (Array.isArray(detail)) {
+        const msgs = detail.map((d) => `${(d.loc || []).slice(1).join(".") || "request"}: ${d.msg || d}`).join("; ");
+        throw new Error(msgs || `HTTP ${r.status}`);
+      }
+      if (detail && typeof detail === "object") {
+        throw new Error(detail.message || detail.hint || JSON.stringify(detail));
+      }
+      throw new Error(String(detail || r.statusText));
+    }
     return data;
   });
 }
@@ -95,6 +105,8 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     rationaleText: "",
     filter: "",
     editOpen: false,
+    tableEditItem: "",
+    tableEdit: { name: "", description: "", owner: "" },
     error: "",
     reasons: emptyReasons(),
     edit: {
@@ -110,18 +122,33 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
   const root = document.createElement("div");
   root.className = "steward-root";
   root.innerHTML = `<style>
-    .steward-root{display:grid;grid-template-columns:220px 1fr;gap:16px;min-height:520px}
-    .steward-rail{border:1px solid var(--border,#e2e8f0);border-radius:12px;background:#fff;padding:12px;overflow:auto}
-    .steward-rail h4{font-size:11px;text-transform:uppercase;color:#64748b;margin:10px 0 6px}
-    .steward-rail .item{padding:6px 8px;border-radius:8px;cursor:pointer;font-size:13px}
-    .steward-rail .item:hover,.steward-rail .item.active{background:#dbeafe;color:#1e40af}
-    .steward-main{min-width:0}
+    .steward-root{display:grid;grid-template-columns:minmax(196px,250px) minmax(0,1fr);grid-template-rows:auto 1fr;gap:0;min-height:620px;background:#eef2f7;border:1px solid #d4dee9;border-radius:14px;overflow:hidden}
+    .steward-header{grid-column:1/-1;background:#1e293b;color:#f8fafc;padding:12px 16px 14px;display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:10px}
+    .steward-header h2{margin:0;font-size:15px;font-weight:700;letter-spacing:.01em;line-height:1.35;overflow-wrap:anywhere;word-break:break-word;max-width:min(72ch,100%)}
+    .steward-header .sr-kicker{display:block;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#93c5fd;margin-bottom:4px}
+    .steward-header .sr-sub{color:#94a3b8;font-size:12px;margin-top:4px}
+    .steward-header .sr-head-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+    .steward-header .sr-progress{font-size:12px;color:#cbd5e1;background:#0f172a;border:1px solid #334155;border-radius:999px;padding:4px 10px}
+    .steward-header button{background:#334155;color:#f8fafc;border-color:#475569}
+    .steward-header button:hover{background:#475569}
+    .steward-header .btn-primary{background:#3b82f6;border-color:#3b82f6}
+    .steward-rail{border:0;border-right:1px solid #d4dee9;background:#e8eef6;padding:12px;overflow:auto}
+    .steward-rail h4{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin:12px 0 6px}
+    .steward-rail .item{padding:7px 8px;border-radius:8px;cursor:pointer;font-size:13px;line-height:1.4;overflow-wrap:anywhere;word-break:break-word;white-space:normal}
+    .steward-rail .item:hover{background:#dbe7f6}
+    .steward-rail .item.active{background:#1e3a5f;color:#eff6ff}
+    .steward-main{min-width:0;background:#f7f9fc;padding:14px 16px;overflow:auto}
+    .sr-card{background:#fff;border:1px solid #dbe3ee;border-radius:12px;overflow:hidden;margin-bottom:12px;box-shadow:0 1px 0 rgba(15,23,42,.04)}
+    .sr-card-head{background:#f1f5f9;border-bottom:1px solid #e2e8f0;padding:10px 14px}
+    .sr-card-head h3{margin:0;font-size:13px;text-transform:none;letter-spacing:0;color:#0f172a;font-weight:700}
+    .sr-card-head p{margin:4px 0 0;color:#64748b;font-size:12px}
+    .sr-card-body{padding:14px}
     .steward-btns{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
     .steward-tile{border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;cursor:pointer;background:#fff}
     .steward-tile strong{display:block;font-size:18px}
     .steward-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin:12px 0}
     .gen-row{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
-    .gen-opt{border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;cursor:pointer;min-width:140px}
+    .gen-opt{border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;cursor:pointer;min-width:140px;background:#fbfdff}
     .gen-opt.on{border-color:#2563eb;background:#dbeafe}
     .gen-opt.missing{opacity:.55}
     .iso{unicode-bidi:isolate;direction:auto}
@@ -132,8 +159,8 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     .chip.pii-off{background:#dcfce7;color:#166534}
     .chip.conf{background:#dbeafe;color:#1e40af;margin-left:4px}
     .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin:8px 0}
-    .stat-cell{border:1px solid #e2e8f0;border-radius:8px;padding:8px}
-    .stat-cell b{display:block;font-size:16px}
+    .stat-cell{border:1px solid #e2e8f0;border-radius:8px;padding:8px;background:#f8fafc}
+    .stat-cell b{display:block;font-size:16px;overflow-wrap:anywhere;word-break:break-word}
     .stat-cell span{font-size:11px;color:#64748b}
     .pii-toggle{display:flex;gap:8px;margin:8px 0}
     .pii-toggle button.on-pii{background:#fee2e2;border-color:#fca5a5;color:#991b1b}
@@ -143,13 +170,20 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     .def-card{border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin:6px 0;cursor:pointer}
     .def-card.on{border-color:#2563eb;background:#dbeafe}
     .sr-error{background:#fee2e2;color:#991b1b;padding:8px 10px;border-radius:8px;margin:8px 0}
+    .sr-meta-row{display:grid;grid-template-columns:110px minmax(0,1fr) 110px;gap:10px;align-items:start;padding:10px 0;border-bottom:1px solid #eef2f7}
+    .sr-meta-row:last-child{border-bottom:0}
+    .sr-meta-row .sr-k{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#64748b;padding-top:6px}
+    .sr-meta-row .iso,.sr-meta-row input,.sr-meta-row textarea{overflow-wrap:anywhere;word-break:break-word}
+    .sr-meta-row .sr-status{font-size:12px;color:#475569;padding-top:6px}
     meter{width:100%}
     button:disabled{opacity:.5;cursor:not-allowed}
   </style>
+  <header class="steward-header" id="srHead"></header>
   <aside class="steward-rail" id="srRail"></aside>
   <div class="steward-main" id="srMain">Loading…</div>`;
   el.innerHTML = "";
   el.appendChild(root);
+  const head = root.querySelector("#srHead");
   const rail = root.querySelector("#srRail");
   const main = root.querySelector("#srMain");
 
@@ -160,6 +194,12 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     } catch {
       state.artifacts = null;
     }
+    const t = (state.overview && state.overview.table_section) || {};
+    state.tableEdit = {
+      name: t.name || "",
+      description: t.description || "",
+      owner: t.owner || "",
+    };
   }
   async function loadColumn(name, samples) {
     const q = samples ? "?samples=1" : "";
@@ -202,21 +242,49 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     });
   }
 
-  function renderRail() {
+  function renderHeader() {
     const ov = state.overview || {};
     const g = ov.guarantee || {};
+    const t = ov.table_section || {};
+    const blocked = g.guaranteed === false;
+    const stepLabel = state.step === "column"
+      ? `Column ${(state.column && state.column.column) || ""}`
+      : (state.step === "overview" ? "Overview" : "Table");
+    const b = g.blockers || {};
+    const why = [
+      b.needs_review && b.needs_review.length ? `${b.needs_review.length} needs review` : "",
+      b.rejected && b.rejected.length ? `${b.rejected.length} rejected` : "",
+      b.pending && b.pending.length ? `${b.pending.length} pending` : "",
+      b.table && b.table.length ? `${b.table.length} table items` : "",
+    ].filter(Boolean).join(" · ");
+    head.innerHTML = `
+      <div>
+        <span class="sr-kicker">Steward review</span>
+        <h2 class="iso">${esc(t.name || table)}</h2>
+        <div class="sr-sub">${esc(stepLabel)} · ${esc(table)}</div>
+      </div>
+      <div class="sr-head-actions">
+        <span class="sr-progress">reviewed ${g.reviewed||0}/${g.total||0}${why ? ` · ${esc(why)}` : ""}</span>
+        <button class="btn-sm" id="srExport">Export verdicts</button>
+        <button class="btn-sm" id="srExportAll">Export all artifacts</button>
+        <button class="btn-primary" id="srFinalize" ${blocked?"disabled":""} title="${esc(blocked ? (why || "Not ready") : "Finalize review")}">Finalize</button>
+      </div>`;
+    const fin = head.querySelector("#srFinalize");
+    fin.disabled = blocked;
+    fin.onclick = finalize;
+    head.querySelector("#srExport").onclick = exportVerdicts;
+    head.querySelector("#srExportAll").onclick = exportAllArtifacts;
+  }
+
+  function renderRail() {
     const cols = columns();
     rail.innerHTML = `
-      <div class="item ${state.step==="table"?"active":""}" data-step="table">● Table</div>
-      <div class="item ${state.step==="overview"?"active":""}" data-step="overview">● Overview</div>
+      <div class="item ${state.step==="table"?"active":""}" data-step="table">Table metadata</div>
+      <div class="item ${state.step==="overview"?"active":""}" data-step="overview">Overview</div>
       <h4>columns</h4>
       ${cols.map((c,i)=>`<div class="item ${state.step==="column"&&state.colIndex===i?"active":""}" data-col="${esc(c.column)}" data-i="${i}">
         ${STATUS_MARK[c.status]||"·"} ${AGREEMENT_MARK[c.agreement]||""} ${esc(c.column)}
       </div>`).join("")}
-      <div class="guarantee-bar">guarantee: ${g.reviewed||0}/${g.total||0}</div>
-      <button class="btn-primary" id="srFinalize" style="width:100%;margin-top:8px">Finalize</button>
-      <button class="btn-sm" id="srExport" style="width:100%;margin-top:6px">Export verdicts (memory)</button>
-      <button class="btn-sm" id="srExportAll" style="width:100%;margin-top:6px">Export all artifacts (zip)</button>
       <p class="hint" style="margin-top:12px"><a href="/review?table=${encodeURIComponent(table)}" target="_blank">Open run explorer</a></p>
     `;
     rail.querySelectorAll("[data-step]").forEach((n) => {
@@ -231,20 +299,6 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
         render();
       };
     });
-    const fin = rail.querySelector("#srFinalize");
-    const blocked = g.guaranteed === false;
-    fin.disabled = blocked;
-    const b = g.blockers || {};
-    const why = [
-      b.needs_review && b.needs_review.length ? `${b.needs_review.length} needs review` : "",
-      b.rejected && b.rejected.length ? `${b.rejected.length} rejected` : "",
-      b.pending && b.pending.length ? `${b.pending.length} pending` : "",
-      b.table && b.table.length ? `${b.table.length} table items` : "",
-    ].filter(Boolean).join(" · ");
-    if (blocked) fin.title = why || "Not ready";
-    fin.onclick = finalize;
-    rail.querySelector("#srExport").onclick = exportVerdicts;
-    rail.querySelector("#srExportAll").onclick = exportAllArtifacts;
   }
 
   function verdictButtons(scope, extra) {
@@ -258,20 +312,53 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     const review = t.review || {};
     const rows = ["name","description","owner"].map((k) => {
       const v = review[k];
-      const val = t[k] || "";
-      return `<tr><td>${k}</td><td class="iso">${esc(val)}</td><td>${v?esc(v.decision):"pending"}</td>
-        <td>${verdictButtons("table:"+k)}</td></tr>`;
+      const val = state.tableEdit[k] != null ? state.tableEdit[k] : (t[k] || "");
+      const open = state.tableEditItem === k;
+      const editor = open
+        ? (k === "description"
+          ? `<textarea id="srTableVal" class="iso">${esc(val)}</textarea>`
+          : `<input id="srTableVal" class="iso" value="${esc(val)}"/>`)
+        : `<div class="iso">${esc(val) || "—"}</div>`;
+      const saveBtns = open
+        ? `<div class="steward-btns">
+            <button class="btn-primary" id="srTableSave">Save ${esc(k)}</button>
+            <button class="btn-sm" id="srTableCancel">Cancel</button>
+          </div>`
+        : verdictButtons("table:"+k);
+      return `<div class="sr-meta-row">
+        <div class="sr-k">${k}</div>
+        <div>${editor}</div>
+        <div class="sr-status">${v?esc(v.decision):"pending"}</div>
+        <div style="grid-column:2 / -1">${saveBtns}</div>
+      </div>`;
     }).join("");
     const qrows = (t.quality_rules||[]).map((q,i)=>{
       const id = "quality:"+(q.meta&&q.meta.redibis_rule_id || i);
       const v = review[id];
-      return `<tr><td>quality</td><td>${esc(q.type||q.rule||"rule")}</td><td>${v?esc(v.decision):"pending"}</td>
-        <td>${verdictButtons("table:"+id)}</td></tr>`;
+      return `<div class="sr-meta-row">
+        <div class="sr-k">quality</div>
+        <div>${esc(q.type||q.rule||"rule")}</div>
+        <div class="sr-status">${v?esc(v.decision):"pending"}</div>
+        <div style="grid-column:2 / -1">${verdictButtons("table:"+id)}</div>
+      </div>`;
     }).join("");
-    main.innerHTML = `${errorBanner()}<div class="card"><h3>Table</h3>
-      <table><thead><tr><th>item</th><th>current</th><th>review</th><th></th></tr></thead>
-      <tbody>${rows}${qrows}</tbody></table></div>`;
+    main.innerHTML = `${errorBanner()}<div class="sr-card">
+      <div class="sr-card-head"><h3>Table metadata</h3>
+        <p>Accept the current value, or Edit to change name, description, or owner.</p></div>
+      <div class="sr-card-body">${rows}${qrows}</div>
+    </div>`;
     bindVerdicts();
+    const inp = main.querySelector("#srTableVal");
+    if (inp) inp.oninput = () => { state.tableEdit[state.tableEditItem] = inp.value; };
+    const save = main.querySelector("#srTableSave");
+    if (save) save.onclick = () => saveTableItem(state.tableEditItem);
+    const cancel = main.querySelector("#srTableCancel");
+    if (cancel) cancel.onclick = () => {
+      state.tableEditItem = "";
+      const cur = (state.overview && state.overview.table_section) || {};
+      state.tableEdit = { name: cur.name || "", description: cur.description || "", owner: cur.owner || "" };
+      render();
+    };
   }
 
   function artifactLinks() {
@@ -298,16 +385,19 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     ].map(([k,l])=>`<div class="steward-tile" data-filter="${k==="needs_review"||k==="pending"?k:""}">
       <strong>${s[k]??0}</strong>${l}</div>`).join("");
     const prof = s.profile || {};
-    main.innerHTML = `${errorBanner()}<div class="card"><h3>Overview</h3>
+    main.innerHTML = `${errorBanner()}<div class="sr-card"><div class="sr-card-head"><h3>Overview</h3>
+      <p>Filter the column rail from a tile. Profile p50 is across scanned columns.</p></div>
+      <div class="sr-card-body">
       <div class="steward-tiles">${tiles}
         <div class="steward-tile" data-filter="contested"><strong>${agr.contested||0}</strong>Contested</div>
         <div class="steward-tile" data-filter="no_evidence"><strong>${agr.no_evidence||0}</strong>No evidence</div>
         <div class="steward-tile" data-filter="pii"><strong>${Object.values(s.pii_columns||{}).reduce((a,b)=>a+b,0)}</strong>PII columns</div>
       </div>
-      <p class="hint">Agreement: no evidence ${agr.no_evidence||0} · contested ${agr.contested||0} · majority ${agr.majority||0} · unanimous ${agr.unanimous||0}. Click a tile to filter the rail.</p>
+      <p class="hint">Agreement: no evidence ${agr.no_evidence||0} · contested ${agr.contested||0} · majority ${agr.majority||0} · unanimous ${agr.unanimous||0}.</p>
       <p class="hint">Profile p50 null ${fmtRate(prof.null_rate_p50)} · ndv ${fmtRate(prof.ndv_ratio_p50)} · columns with samples ${prof.columns_with_samples||0}</p>
       <h4>Artifacts</h4>
       ${artifactLinks()}
+      </div>
     </div>`;
     main.querySelectorAll("[data-filter]").forEach((n)=>{
       n.onclick = () => { state.filter = n.getAttribute("data-filter")||""; renderRail(); };
@@ -392,8 +482,12 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
       ? `<div class="steward-samples iso">${samples.map(esc).join("<br>")}</div>`
       : `<p class="hint">${withheld ? esc(withheld) : "Samples hidden"}
          <button class="btn-sm" id="srShowSamples">Show samples · consented</button></p>`;
+    const empty = cells.includes("—") && !stats.null_rate && stats.ndv == null && stats.nunique == null
+      ? `<p class="hint">No profile stats for this column yet. Stats come from the last scan profile, ledger, or contract type.</p>`
+      : "";
     return `<h4>Profile</h4>
       <div class="stat-grid">${cells}</div>
+      ${empty}
       ${nullBar}
       ${qlist}
       ${sampleBlock}`;
@@ -449,8 +543,12 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     const c = state.column;
     if (!c) { main.innerHTML = "Loading column…"; return; }
     const current = c.current || {};
-    main.innerHTML = `${errorBanner()}<div class="card">
-      <h3>Column ${esc(c.column)} ‹ ${c.position} / ${c.of} › · ${esc(c.review&&c.review.status||"pending")}</h3>
+    main.innerHTML = `${errorBanner()}<div class="sr-card">
+      <div class="sr-card-head">
+        <h3>Column ${esc(c.column)}</h3>
+        <p>${c.position} / ${c.of} · ${esc(c.review&&c.review.status||"pending")}</p>
+      </div>
+      <div class="sr-card-body">
       <div class="grid2">
         <div>${profilePanel(c)}</div>
         <div>
@@ -475,6 +573,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
            <button class="btn-sm" id="srEditCancel">Cancel</button>`
         : ""}
       ${verdictButtons("column")}
+      </div>
     </div>`;
     bindColumnEvents(c);
   }
@@ -571,20 +670,54 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
       }
       if ((scope || "").startsWith("table:")) {
         const item = scope.slice(6);
+        if (decision === "edit" && (item === "name" || item === "description" || item === "owner")) {
+          state.tableEditItem = item;
+          render();
+          return;
+        }
+        const inp = main.querySelector("#srTableVal");
+        if (inp && state.tableEditItem) state.tableEdit[state.tableEditItem] = inp.value;
+        const current = (state.overview && state.overview.table_section) || {};
+        const value = (item in state.tableEdit)
+          ? state.tableEdit[item]
+          : (current[item] || null);
         const body = {
           item, decision,
           rationale_code: state.rationale,
           rationale_text: (main.querySelector("#srRationaleText") || {}).value || "n/a",
-          value: null,
+          value,
         };
         if (body.rationale_code !== "other") body.rationale_text = "";
         else if (!body.rationale_text) body.rationale_text = "other";
         await call("POST", `/api/contracts/${encodeURIComponent(table)}/steward/table/verdict`, body);
+        state.tableEditItem = "";
         await loadOverview();
         render();
         return;
       }
       await sendVerdict(decision);
+    } catch (e) {
+      state.error = e && e.message ? e.message : String(e);
+      render();
+    }
+  }
+
+  async function saveTableItem(item) {
+    state.error = "";
+    try {
+      const inp = main.querySelector("#srTableVal");
+      if (inp) state.tableEdit[item] = inp.value;
+      const body = {
+        item,
+        decision: "edit",
+        value: state.tableEdit[item] || "",
+        rationale_code: "domain_knowledge",
+        rationale_text: "steward edit",
+      };
+      await call("POST", `/api/contracts/${encodeURIComponent(table)}/steward/table/verdict`, body);
+      state.tableEditItem = "";
+      await loadOverview();
+      render();
     } catch (e) {
       state.error = e && e.message ? e.message : String(e);
       render();
@@ -727,6 +860,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
   }
 
   function render() {
+    renderHeader();
     renderRail();
     if (state.step === "table") renderTable();
     else if (state.step === "overview") renderOverview();

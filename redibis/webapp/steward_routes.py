@@ -27,7 +27,12 @@ class FieldVerdictBody(BaseModel):
 
 
 class FieldVerdictsBody(BaseModel):
+    """Batch save for one column. Only ``verdicts`` is required."""
+
     verdicts: list[FieldVerdictBody]
+
+
+class TableVerdictBody(BaseModel):
     item: str
     decision: str
     chosen_source: str = ""
@@ -35,6 +40,7 @@ class FieldVerdictsBody(BaseModel):
     value: Optional[Any] = None
     rationale_code: str = ""
     rationale_text: str = ""
+    evidence_refs: Optional[list[str]] = None
 
 
 def _actor_from_request(request: Request) -> str:

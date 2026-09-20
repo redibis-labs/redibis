@@ -307,3 +307,46 @@ def test_a_single_column_verdict_flips_the_index_row_to_in_progress(api_env):
         if x["table"] == table
     )
     assert chip["review"] == "in_progress"
+
+
+def test_steward_batch_verdicts_does_not_require_item_or_decision(api_env):
+    client, store = api_env
+    table = "db.customers"
+    store.upsert(_contract(table), table=table, workflow="manual")
+    invalidate_stores()
+    r = client.post(
+        f"/api/contracts/{table}/steward/columns/email/verdicts",
+        json={"verdicts": [{
+            "field": "pii",
+            "decision": "no_action",
+            "chosen_source": "human",
+            "rationale_code": "deprecated_column",
+        }]},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["column"] == "email"
+
+
+def test_steward_table_verdict_accepts_item_and_owner_value(api_env):
+    client, store = api_env
+    table = "db.customers"
+    store.upsert(_contract(table), table=table, workflow="manual")
+    invalidate_stores()
+    r = client.post(
+        f"/api/contracts/{table}/steward/table/verdict",
+        json={
+            "item": "owner",
+            "decision": "edit",
+            "value": "steward.ada",
+            "rationale_code": "domain_knowledge",
+            "rationale_text": "steward edit",
+        },
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["table_section"]["owner"] == "steward.ada"
+    missing = client.post(
+        f"/api/contracts/{table}/steward/table/verdict",
+        json={"decision": "accept"},
+    )
+    assert missing.status_code == 422

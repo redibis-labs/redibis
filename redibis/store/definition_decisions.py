@@ -41,6 +41,22 @@ def reconcile_definition_decisions(contract: dict, decisions: dict) -> bool:
             if table_dec.get("description") is not None:
                 schema_obj["description"] = copy.deepcopy(table_dec["description"])
                 changed = True
+            if table_dec.get("businessName") is not None:
+                schema_obj["businessName"] = copy.deepcopy(table_dec["businessName"])
+                changed = True
+            if table_dec.get("owner") is not None:
+                owner = table_dec["owner"]
+                schema_obj["owner"] = copy.deepcopy(owner)
+                contract["owner"] = copy.deepcopy(owner)
+                if isinstance(owner, str) and owner.strip():
+                    team = list(contract.get("team") or schema_obj.get("team") or [])
+                    if team and isinstance(team[0], dict):
+                        team[0] = {**team[0], "name": owner, "username": owner}
+                    else:
+                        team = [{"name": owner, "username": owner, "role": "owner"}]
+                    contract["team"] = team
+                    schema_obj["team"] = team
+                changed = True
         for prop in schema_obj.get("properties", []) or []:
             if not isinstance(prop, dict):
                 continue

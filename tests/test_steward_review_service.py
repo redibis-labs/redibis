@@ -183,6 +183,46 @@ def test_profile_falls_back_to_ledger_and_contract_type():
         assert page["profile"]["format_signature"] == "01XXXXXXXXX"
 
 
+def test_profile_normalizes_alias_keys_from_store_and_telemetry():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = ContractStore(LocalBackend(tmp), "c")
+        store.upsert(_contract(), table="db.customers", workflow="manual", run_id="r1")
+        store.profiles.write(
+            "db.customers", "r1",
+            profile_result={"columns": {"msisdn": {
+                "nulls_fraction": 0.1,
+                "nunique": 42,
+                "cardinality_ratio": 0.4,
+                "dtype": "string",
+                "mean_length": 11,
+            }}},
+        )
+        page = StewardReviewService(store).column("db.customers", "msisdn", actor="ada")
+        stats = page["profile"]["stats"]
+        assert stats["null_rate"] == 0.1
+        assert stats["ndv"] == 42
+        assert stats["ndv_ratio"] == 0.4
+        assert stats["logical_type"] == "string"
+        assert stats["avg_value_length"] == 11
+
+
+def test_table_owner_edit_persists_on_overview():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = ContractStore(LocalBackend(tmp), "c")
+        store.upsert(_contract(), table="db.customers", workflow="manual", run_id="r1")
+        svc = StewardReviewService(store)
+        ov = svc.decide_table(
+            "db.customers", "owner",
+            {"decision": "edit", "value": "ada@example.com",
+             "rationale_code": "domain_knowledge", "rationale_text": "steward edit"},
+            actor="ada",
+        )
+        assert ov["table_section"]["owner"] == "ada@example.com"
+        active = store.get_active("db.customers")
+        assert active["owner"] == "ada@example.com"
+        assert active["schema"][0]["owner"] == "ada@example.com"
+
+
 def test_edit_pii_off_and_batch_save():
     with tempfile.TemporaryDirectory() as tmp:
         store = ContractStore(LocalBackend(tmp), "c")

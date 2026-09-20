@@ -1,12 +1,13 @@
-<p align="center">
-  <img src="redibis/webapp/static/logo.png" alt="redibis — easily govern" width="240">
-</p>
+![redibis — easily govern](redibis/webapp/static/logo.png)
 
-<h1 align="center">redibis</h1>
+# redibis
 
-<p align="center">
-  <strong>Open-source continuous data protection and ODCS data-contract generation</strong>
-</p>
+**modernize , govern and protect your data**  
+support ODCS v3 , auto pii detection , unstructured text gate way for data protection, auto quality rule and code generation .
+
+put redibis at hheart of your [CI/CD- monitoring ] pipelines to contiues protect your data 
+
+---
 
 redibis sits in your data platform and CI/CD so tabular data is profiled,
 classified for PII, quality-gated, reviewed by humans, enriched with business

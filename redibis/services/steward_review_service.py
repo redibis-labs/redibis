@@ -113,11 +113,64 @@ def _confidence_pct(conf: Any) -> Optional[int]:
     return int(round(f))
 
 
+_STAT_ALIASES = {
+    "null_rate": ("null_rate", "nulls_fraction", "null_fraction", "nulls", "missing_rate"),
+    "ndv": ("ndv", "nunique", "unique_count", "distinct_count"),
+    "ndv_ratio": ("ndv_ratio", "cardinality_ratio", "unique_ratio", "distinct_ratio"),
+    "logical_type": ("logical_type", "logicalType", "inferred_class", "dtype", "type"),
+    "avg_value_length": ("avg_value_length", "mean_length", "avg_length", "avg_len", "len_mean"),
+    "format_signature": ("format_signature", "format_mask", "top_format"),
+}
+
+
+def _unwrap_stat(value: Any) -> Any:
+    if isinstance(value, dict) and "value" in value and len(value) <= 6:
+        return value.get("value")
+    return value
+
+
+def _merge_profile_stats(dst: dict, src: Any) -> None:
+    if not isinstance(src, dict):
+        return
+    nested = src.get("stats") if isinstance(src.get("stats"), dict) else None
+    if nested is not None and nested is not src and nested is not dst:
+        _merge_profile_stats(dst, nested)
+    fp = src.get("fingerprint") if isinstance(src.get("fingerprint"), dict) else None
+    if fp is not None and fp is not src and fp is not dst:
+        _merge_profile_stats(dst, fp)
+    for dest_key, aliases in _STAT_ALIASES.items():
+        if dst.get(dest_key) not in (None, ""):
+            continue
+        for alias in aliases:
+            if alias in src and src[alias] not in (None, ""):
+                dst[dest_key] = _unwrap_stat(src[alias])
+                break
+
+
 def _has_profile_stats(stats: dict) -> bool:
     return any(
         stats.get(k) is not None
         for k in ("null_rate", "ndv", "ndv_ratio", "nunique", "cardinality_ratio", "logical_type")
     )
+
+
+def _owner_from_active(active: dict, schema: dict) -> str:
+    for candidate in (schema.get("owner"), active.get("owner")):
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate.strip()
+        if isinstance(candidate, dict):
+            label = str(candidate.get("name") or candidate.get("username") or "").strip()
+            if label:
+                return label
+    team = active.get("team") or schema.get("team") or []
+    if isinstance(team, list) and team:
+        first = team[0]
+        if isinstance(first, dict):
+            return str(first.get("name") or first.get("username") or "").strip()
+        return str(first).strip()
+    if isinstance(team, str):
+        return team.strip()
+    return ""
 
 
 def _table_quality_item_ids(active: dict) -> list[str]:
@@ -217,10 +270,12 @@ class StewardReviewService:
                 try:
                     payload = self.profiles.read(table, run_id, name, include_samples=False)
                     stats = payload.get("stats") or {}
-                    nr = stats.get("null_rate")
+                    merged: dict[str, Any] = {}
+                    _merge_profile_stats(merged, stats)
+                    nr = merged.get("null_rate")
                     if nr is not None:
                         nulls.append(float(nr))
-                    ndv = stats.get("ndv_ratio") or stats.get("ndv")
+                    ndv = merged.get("ndv_ratio") or merged.get("ndv")
                     if ndv is not None:
                         ndvs.append(float(ndv))
                     if self.profiles.has_samples(table, run_id, name):
@@ -254,21 +309,18 @@ class StewardReviewService:
         needs = sum(1 for c in index if c["status"] == "needs_review")
         rejected = sum(1 for c in index if c["status"] == "rejected")
         pending = sum(1 for c in index if c["status"] == "pending")
-        team = active.get("team") or schema.get("team") or []
-        owner = ""
-        if isinstance(team, list) and team:
-            first = team[0]
-            owner = first.get("name") or first.get("username") or str(first) if isinstance(first, dict) else str(first)
-        elif isinstance(team, str):
-            owner = team
-
         return {
             "table": table,
             "contract_uuid": str(active.get("contract_uuid") or ""),
             "table_section": {
-                "name": schema.get("name") or active.get("name") or table,
+                "name": (
+                    schema.get("businessName")
+                    or schema.get("name")
+                    or active.get("name")
+                    or table
+                ),
                 "description": schema.get("description") or active.get("description") or "",
-                "owner": owner,
+                "owner": _owner_from_active(active, schema),
                 "quality_rules": list(schema.get("quality") or []),
                 "review": {
                     k: (state.table_review.items[k].to_dict()
@@ -639,13 +691,27 @@ class StewardReviewService:
     def _enrich_profile(self, table: str, column: str, prop: dict, profile: dict) -> dict:
         stats = dict(profile.get("stats") or {})
         quality = list(profile.get("quality") or [])
-        if not _has_profile_stats(stats):
-            latest = self.ledger.latest_by_source(table, column, "logical_type")
-            prof = latest.get("profile")
-            if prof is not None:
-                stats.update(dict(prof.detail or {}))
-                if prof.value and not stats.get("logical_type"):
-                    stats["logical_type"] = prof.value
+        _merge_profile_stats(stats, stats)
+        sources: list[Any] = [profile, prop.get("profile"), prop.get("statistics")]
+        latest = self.ledger.latest_by_source(table, column, "logical_type")
+        prof = latest.get("profile")
+        if prof is not None:
+            sources.append(dict(prof.detail or {}))
+            if prof.value:
+                sources.append({"logical_type": prof.value})
+        try:
+            tel = self.store.metadata.get_column_evidence(table, column) or {}
+        except Exception:
+            tel = {}
+        sources.append(tel)
+        sources.append(tel.get("profile") if isinstance(tel.get("profile"), dict) else None)
+        sources.append(tel.get("fingerprint") if isinstance(tel.get("fingerprint"), dict) else None)
+        sources.append({
+            "logical_type": prop.get("logicalType") or prop.get("physicalType"),
+            "format_signature": profile.get("format_signature"),
+        })
+        for src in sources:
+            _merge_profile_stats(stats, src)
         if not quality:
             quality = list(prop.get("quality") or [])
         if not stats.get("logical_type"):
@@ -740,6 +806,8 @@ class StewardReviewService:
                 patch["description"] = fv.value
             if item == "name" and fv.value is not None:
                 patch["businessName"] = fv.value
+            if item == "owner" and fv.value is not None:
+                patch["owner"] = fv.value
             if patch:
                 self.store.patch_definitions(table, table_patch=patch, decided_by=who)
         elif item.startswith("quality:"):
