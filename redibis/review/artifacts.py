@@ -10,7 +10,9 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import zipfile
 from datetime import datetime, timezone
+from io import BytesIO
 from typing import Any, Optional
 
 from redibis.store.contract_store import ContractStore
@@ -186,6 +188,57 @@ def get_artifact(store: ContractStore, table: str, name: str) -> tuple[bytes, st
     data = store.backend.get_json(store.bucket, key)
     body = json.dumps(data, indent=2, ensure_ascii=False).encode("utf-8")
     return body, "application/json", rel.split("/")[-1]
+
+
+def export_artifact_bundle(
+    store: ContractStore,
+    table: str,
+    *,
+    current_verdicts: Optional[dict] = None,
+) -> bytes:
+    """Zip current A1 plus every finalized A0–A5 object under the latest digest."""
+    import yaml
+
+    buf = BytesIO()
+    safe = table.replace("/", "_")
+    listing = list_artifacts(store, table)
+    prefix = str(listing.get("prefix") or "")
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        if current_verdicts:
+            zf.writestr(
+                f"{safe}/current/steward_verdicts.json",
+                json.dumps(current_verdicts, indent=2, ensure_ascii=False, default=str),
+            )
+        active = store.get_active(table)
+        if active:
+            zf.writestr(
+                f"{safe}/current/contract.yaml",
+                yaml.safe_dump(active, sort_keys=False, allow_unicode=True),
+            )
+        if listing:
+            zf.writestr(
+                f"{safe}/latest.json",
+                json.dumps(listing, indent=2, ensure_ascii=False, default=str),
+            )
+        if prefix:
+            try:
+                keys = store.backend.list_keys(store.bucket, prefix=prefix)
+            except Exception:
+                keys = []
+            for key in keys:
+                rel = str(key)[len(prefix):].lstrip("/")
+                if not rel:
+                    continue
+                try:
+                    body = store.backend.get_bytes(store.bucket, key)
+                except Exception:
+                    try:
+                        text = store.backend.get_text(store.bucket, key) or ""
+                        body = text.encode("utf-8")
+                    except Exception:
+                        continue
+                zf.writestr(f"{safe}/{rel}", body)
+    return buf.getvalue()
 
 
 def _build_verdict_memory(svc, table: str, state: ReviewState, digest: str, ts: str, actor: str) -> dict:

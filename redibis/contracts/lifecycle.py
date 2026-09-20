@@ -183,12 +183,24 @@ def apply_llm_classification_decisions(
     *,
     enriched_by: str = "",
     run_id: str = "",
+    skip_columns: Optional[set[str] | list[str]] = None,
 ) -> list[str]:
-    """Route every LLM classification change through the PII decision overlay."""
+    """Route every LLM classification change through the PII decision overlay.
+
+    Human-verified steward columns (attached A1 / review overlay) are skipped so
+    deterministic and LLM contracts cannot overwrite them.
+    """
+    skip: set[str] = set(skip_columns or [])
+    if not skip:
+        try:
+            from redibis.review.steward_attach import locked_human_pii_columns
+            skip = locked_human_pii_columns(store, table)
+        except Exception:
+            skip = set()
     applied: list[str] = []
     for ch in merge_pii_overlay_changes(pii_changes):
         col = ch.get("column")
-        if not col:
+        if not col or col in skip:
             continue
         status = ch.get("status")
         if status == "not_pii":

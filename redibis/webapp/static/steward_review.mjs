@@ -216,6 +216,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
       <div class="guarantee-bar">guarantee: ${g.reviewed||0}/${g.total||0}</div>
       <button class="btn-primary" id="srFinalize" style="width:100%;margin-top:8px">Finalize</button>
       <button class="btn-sm" id="srExport" style="width:100%;margin-top:6px">Export verdicts (memory)</button>
+      <button class="btn-sm" id="srExportAll" style="width:100%;margin-top:6px">Export all artifacts (zip)</button>
       <p class="hint" style="margin-top:12px"><a href="/review?table=${encodeURIComponent(table)}" target="_blank">Open run explorer</a></p>
     `;
     rail.querySelectorAll("[data-step]").forEach((n) => {
@@ -243,6 +244,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     if (blocked) fin.title = why || "Not ready";
     fin.onclick = finalize;
     rail.querySelector("#srExport").onclick = exportVerdicts;
+    rail.querySelector("#srExportAll").onclick = exportAllArtifacts;
   }
 
   function verdictButtons(scope, extra) {
@@ -275,8 +277,11 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
   function artifactLinks() {
     const arts = (state.artifacts && (state.artifacts.artifacts || state.artifacts)) || {};
     const entries = Object.entries(arts).filter(([, p]) => typeof p === "string");
-    if (!entries.length) return `<p class="hint">No finalized artifacts yet. Export verdicts any time; finalize writes the full A0–A5 pack for the next scan to memorize.</p>`;
-    return `<div class="doclist">${entries.map(([k]) =>
+    const zip = `<a class="chip chip-blue" href="/api/contracts/${encodeURIComponent(table)}/steward/export/artifacts${wsQ}">all artifacts (zip)</a>`;
+    if (!entries.length) {
+      return `<p class="hint">No finalized artifacts yet. Export verdicts any time; the zip always includes current A1. Finalize writes the full A0–A5 pack.</p><div class="doclist">${zip}</div>`;
+    }
+    return `<div class="doclist">${zip}${entries.map(([k]) =>
       `<a class="chip chip-blue" href="/api/contracts/${encodeURIComponent(table)}/steward/artifacts/${encodeURIComponent(k)}${wsQ}">${esc(k)}</a>`
     ).join("")}</div>`;
   }
@@ -690,7 +695,8 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
         `<div class="card"><h3>${esc(k)}</h3><p class="mono">${esc(p)}</p>
          <a class="btn" href="/api/contracts/${encodeURIComponent(table)}/steward/artifacts/${encodeURIComponent(k)}${wsQ}">Download</a></div>`
       ).join("");
-      main.innerHTML = `<div class="banner valid">Guaranteed · digest ${esc(digest)}</div>${cards}`;
+      const zip = `<p><a class="btn" href="/api/contracts/${encodeURIComponent(table)}/steward/export/artifacts${wsQ}">Download all artifacts (zip)</a></p>`;
+      main.innerHTML = `<div class="banner valid">Guaranteed · digest ${esc(digest)}</div>${zip}${cards}`;
     } catch (e) {
       state.error = e && e.message ? e.message : String(e);
       render();
@@ -711,6 +717,13 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
       state.error = e && e.message ? e.message : String(e);
       render();
     }
+  }
+
+  function exportAllArtifacts() {
+    const a = document.createElement("a");
+    a.href = `/api/contracts/${encodeURIComponent(table)}/steward/export/artifacts${wsQ}`;
+    a.download = `steward_artifacts_${table.replace(/[^\w.-]+/g, "_")}.zip`;
+    a.click();
   }
 
   function render() {

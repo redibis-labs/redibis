@@ -29,8 +29,12 @@ def test_steward_module_has_no_scan_fetch():
     assert "Save edits" in MJS
     assert "/verdicts" in MJS
     assert "Export verdicts" in MJS
+    assert "Export all artifacts" in MJS
     assert "Write your own" in MJS
     assert "steward/export/verdicts" in MJS
+    assert "steward/export/artifacts" in MJS
+    assert "steward artifacts (zip)" in V2
+    assert "exportStewardArtifacts" in V2
 
 
 def test_workspace_module_has_no_scan_fetch():

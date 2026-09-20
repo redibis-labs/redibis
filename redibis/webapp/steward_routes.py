@@ -137,6 +137,22 @@ def register_steward_routes(app: Any, store_getter: StoreGetter) -> None:
         actor = _actor_from_request(request)
         return _call(_svc().export_verdicts, table, actor=actor)
 
+    @app.get("/api/contracts/{table}/steward/export/artifacts")
+    def steward_export_artifact_bundle(request: Request, table: str):
+        from redibis.review.artifacts import export_artifact_bundle
+
+        actor = _actor_from_request(request)
+        current = _call(_svc().export_verdicts, table, actor=actor)
+        body = export_artifact_bundle(_store(), table, current_verdicts=current)
+        safe = table.replace("/", "_").replace("\\", "_")
+        return Response(
+            content=body,
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f'attachment; filename="steward_artifacts_{safe}.zip"',
+            },
+        )
+
     @app.get("/api/contracts/{table}/steward/artifacts/{name}")
     def steward_artifact_download(table: str, name: str):
         try:

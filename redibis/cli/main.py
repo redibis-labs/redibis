@@ -28,6 +28,76 @@ def _build_backend(args):
     return get_backend(cfg)
 
 
+def _steward_verdict_flag(p) -> None:
+    p.add_argument(
+        "--steward-verdict-path",
+        dest="steward_verdict_path",
+        default=None,
+        help=(
+            "A1 / verdict_package JSON, or a directory of them. Matching "
+            "table+schema human-verified PII columns lock the overlay; "
+            "needs_review and columns without a verdict take the engine."
+        ),
+    )
+
+
+def _file_schema_columns(path: str) -> list[str]:
+    p = Path(path)
+    if not p.is_file():
+        return []
+    if p.suffix.lower() == ".parquet":
+        import pandas as pd
+        return [str(c) for c in pd.read_parquet(p).columns]
+    import csv
+    with p.open(newline="", encoding="utf-8") as fh:
+        row = next(csv.reader(fh), [])
+    return [str(c) for c in row]
+
+
+def _print_steward_attach(report) -> None:
+    print(
+        f"  steward verdicts: locked {len(report.applied)}"
+        f" · needs_review {len(report.skipped_needs_review)}"
+        f" · schema skip {len(report.skipped_schema)}"
+        f" · other table {len(report.skipped_other_table)}"
+        f" · stale {len(report.skipped_stale)}"
+        + (f" · overlay applied" if report.overlay_applied else " · overlay stored (merge to apply)")
+    )
+    if report.applied:
+        print(f"    locked columns: {', '.join(report.applied)}")
+    if report.skipped_needs_review:
+        print(f"    engine (needs review): {', '.join(report.skipped_needs_review)}")
+
+
+def _apply_steward_verdict_path(
+    args,
+    store: ContractStore,
+    table: str,
+    *,
+    apply_now: bool = True,
+    schema_columns: Optional[list[str]] = None,
+):
+    path = getattr(args, "steward_verdict_path", None)
+    if not path:
+        return None
+    from redibis.review.steward_attach import StewardAttachError, attach_steward_verdict_path
+
+    try:
+        report = attach_steward_verdict_path(
+            store,
+            table,
+            path,
+            actor="cli",
+            schema_columns=schema_columns,
+            apply_now=apply_now,
+        )
+    except StewardAttachError as exc:
+        print(f"steward-verdict-path: {exc}", file=sys.stderr)
+        return None
+    _print_steward_attach(report)
+    return report
+
+
 def _contract_store(args, backend) -> ContractStore:
     """Build ContractStore; attach memory config when REDIBIS_CONFIG / --config is set."""
     import os
@@ -1927,6 +1997,14 @@ def _run_deep_scan(args) -> int:
     if getattr(args, "bundle", False):
         build_bundle = True
 
+    if getattr(args, "steward_verdict_path", None):
+        backend = _build_backend(args)
+        store = _contract_store(args, backend)
+        _apply_steward_verdict_path(
+            args, store, table,
+            schema_columns=list(df.columns),
+        )
+
     result = run_deep_scan(
         table,
         run_id,
@@ -2048,6 +2126,15 @@ def _run_scan(args, store: ContractStore, backend):
         print(f"  pii: {result.pii_columns_detected}/{result.pii_columns_scanned} detected"
               + (f" → merged v{result.pii_contract_version}"
                  if result.pii_contract_version else " (in pii-contracts bucket)"))
+    if getattr(args, "steward_verdict_path", None):
+        schema = None
+        try:
+            schema = store.column_names(scan_config.table) or _file_schema_columns(args.file)
+        except Exception:
+            schema = _file_schema_columns(args.file)
+        _apply_steward_verdict_path(
+            args, store, scan_config.table, schema_columns=schema,
+        )
     if scan_config.automerge == "none":
         print(f"\nReview & merge with:  redibis runs list {scan_config.table} --kind pii|quality")
     return 0 if result.status == "success" else 1
@@ -2310,6 +2397,9 @@ def _run_enrich(args, store: ContractStore):
     if not args.table:
         print("enrich: could not resolve table name", file=sys.stderr)
         return 2
+
+    if getattr(args, "steward_verdict_path", None) and not getattr(args, "dry_run", False):
+        _apply_steward_verdict_path(args, store, args.table)
 
     if input_contract is None and store.get_active(args.table) is None:
         print(
@@ -2770,6 +2860,7 @@ def main(argv: Optional[list[str]] = None):
             "--no-phonenumbers", action="store_true",
             help="disable libphonenumber for this run (regex/msisdn fallback)",
         )
+        _steward_verdict_flag(p)
 
     p_biz = sub.add_parser("import-business")
     _common(p_biz)
@@ -2815,6 +2906,7 @@ def main(argv: Optional[list[str]] = None):
     )
     p_deep.add_argument("--no-bundle", action="store_true", help="skip synthesis bundle")
     p_deep.add_argument("--config", help="YAML config file (RedibisConfig)")
+    _steward_verdict_flag(p_deep)
 
     for name, mode, help_text in (
         ("profile", "profile", "profile a file (no quality gatekeeper / PII)"),
@@ -3088,6 +3180,7 @@ def main(argv: Optional[list[str]] = None):
         dest="context_table",
         help="table name for --scope table (add/list/remove-context)",
     )
+    _steward_verdict_flag(p_enrich)
 
     p_llm = sub.add_parser("llm", help="list / test / add / remove LLM providers; roles for capability routing")
     llm_sub = p_llm.add_subparsers(dest="llm_action", required=True)

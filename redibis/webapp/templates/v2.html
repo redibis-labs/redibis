@@ -343,8 +343,9 @@ async function renderContract(){
       <div class="row">
         <button class="btn-sm" onclick="exportMetadata()">metadata JSON</button>
         <button class="btn-sm" onclick="exportPackage()">full package JSON</button>
+        <button class="btn-sm" onclick="exportStewardArtifacts()">steward artifacts (zip)</button>
       </div></div>
-      <small class="hint">Spec (contract) + telemetry (provenance, pii_summary, decisions) for OpenMetadata / catalog tools.</small></div>
+      <small class="hint">Spec (contract) + telemetry (provenance, pii_summary, decisions) for OpenMetadata / catalog tools. Steward zip is current A1 plus finalized A0–A5 when present.</small></div>
 
     ${consentSection}
 
@@ -361,6 +362,20 @@ async function exportPackage(){
   try{ const out = await api("GET","/api/contracts/"+STATE.table+"/export-package");
        openModal(JSON.stringify(out,null,2)); }
   catch(e){ toast(e.message,false); }
+}
+async function exportStewardArtifacts(){
+  try{
+    const opt = {headers:{}};
+    if(STATE.ws) opt.headers["X-Redibis-Workspace"] = STATE.ws;
+    const r = await fetch("/api/contracts/"+encodeURIComponent(STATE.table)+"/steward/export/artifacts", opt);
+    if(!r.ok) throw new Error((await r.text()) || r.statusText);
+    const blob = await r.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "steward_artifacts_"+String(STATE.table||"table").replace(/[^\w.-]+/g,"_")+".zip";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }catch(e){ toast(e.message,false); }
 }
 async function purge(){
   if(!confirm(`Purge ${STATE.table}? Deletes the active contract + all audits. Run buckets are kept.`)) return;
