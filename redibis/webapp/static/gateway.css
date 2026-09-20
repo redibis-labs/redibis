@@ -78,6 +78,25 @@
 .gw-banner.info { background: #f3f4f6; color: var(--muted); }
 .gw-banner.block { background: rgba(193,39,45,.12); color: #C1272D; border-color: #C1272D; font-weight: 600; }
 .gw-sum-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; }
+.gw-sum-finding {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  margin: 12px 0;
+  padding: 8px 6px;
+  font-size: 13px;
+  border-top: 1px solid var(--border);
+}
+.gw-sum-finding-type { color: var(--muted); letter-spacing: .04em; }
+.gw-sum-finding-value {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  word-break: break-word;
+  max-width: 100%;
+}
+.gw-sum-finding-status { font-size: 12px; }
+.gw-sum-finding .gw-curate { margin-left: 0; justify-content: center; }
 .gw-swatch {
   width: 10px; height: 10px; border-radius: 2px; border-bottom: 2px solid currentColor;
 }

@@ -167,7 +167,7 @@ async function loadHealth() {
     if (llm.role_bound) {
       const label = [llm.provider, llm.model].filter(Boolean).join(" / ");
       banners.push({
-        kind: llm.ready ? "ok" : "warn",
+        kind: llm.ready ? "info" : "warn",
         text: (llm.ready ? "LLM refiner ready" : "LLM refiner not ready") +
           (label ? " (" + label + ")" : "") +
           (llm.reason ? ". " + llm.reason : ""),

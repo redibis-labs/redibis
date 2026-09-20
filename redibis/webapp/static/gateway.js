@@ -271,7 +271,7 @@ async function loadHealth() {
     });
   } else if (defaultLlm.ready || llm.available || llm.enabled) {
     banners.push({
-      kind: defaultLlm.ready ? "ok" : "info",
+      kind: "info",
       text: "LLM refiner ready" + (label ? " (" + label + ")" : "") +
         ". Check “Use LLM refiner” to run it; local OpenAI-compatible servers do not need a cloud API key.",
     });
@@ -506,18 +506,28 @@ function renderSummary(env) {
       }
       listed.slice(0, 24).forEach((span) => {
         const line = document.createElement("div");
-        line.className = "gw-sum-row" + (isRejected(span, curation) ? " gw-rejected" : "")
+        line.className = "gw-sum-finding" + (isRejected(span, curation) ? " gw-rejected" : "")
           + (isAccepted(span, curation) ? " gw-accepted-row" : "");
-        line.appendChild(document.createTextNode((span.entity_type || "") + " · "));
-        const surface = document.createElement("span");
+        const typeEl = document.createElement("div");
+        typeEl.className = "gw-sum-finding-type";
+        typeEl.appendChild(document.createTextNode((span.entity_type || "") + " ·"));
+        line.appendChild(typeEl);
+        const surface = document.createElement("div");
+        surface.className = "gw-sum-finding-value";
         surface.dir = "auto";
         surface.style.unicodeBidi = "isolate";
         surface.appendChild(document.createTextNode(span.text || sourceText.slice(span.start, span.end) || ""));
         line.appendChild(surface);
         if (isRejected(span, curation)) {
-          line.appendChild(document.createTextNode(" · rejected"));
+          const status = document.createElement("div");
+          status.className = "gw-sum-finding-status";
+          status.appendChild(document.createTextNode("· rejected"));
+          line.appendChild(status);
         } else if (isAccepted(span, curation)) {
-          line.appendChild(document.createTextNode(" · accepted"));
+          const status = document.createElement("div");
+          status.className = "gw-sum-finding-status";
+          status.appendChild(document.createTextNode("· accepted"));
+          line.appendChild(status);
         }
         line.appendChild(curationButtons(span));
         summaryEl.appendChild(line);

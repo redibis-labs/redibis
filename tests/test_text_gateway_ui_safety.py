@@ -334,3 +334,18 @@ def test_gateway_rules_folded_with_category_and_review_json():
     assert "isAccepted" in js
     assert "rejected_spans" in js
     assert "rulesEditor.expand" in js
+
+
+def test_gateway_ready_banner_is_info_and_findings_stack():
+    js = (STATIC / "gateway.js").read_text(encoding="utf-8")
+    eval_js = (STATIC / "gateway_eval.js").read_text(encoding="utf-8")
+    css = (STATIC / "gateway.css").read_text(encoding="utf-8")
+    ready = js[js.find("LLM refiner ready") - 120 : js.find("LLM refiner ready") + 40]
+    assert 'kind: "info"' in ready
+    assert 'kind: "ok"' not in ready
+    ev_ready = eval_js[eval_js.find("LLM refiner ready") - 80 : eval_js.find("LLM refiner ready") + 40]
+    assert 'llm.ready ? "info"' in ev_ready or '"info"' in ev_ready
+    assert "gw-sum-finding" in js
+    assert "gw-sum-finding-value" in js
+    assert "flex-direction: column" in css
+    assert "gw-sum-finding" in css
