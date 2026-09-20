@@ -1,8 +1,12 @@
-![redibis — easily govern](redibis/webapp/static/logo.png)
+<p align="center">
+  <img src="redibis/webapp/static/logo.png" alt="redibis — easily govern" width="240">
+</p>
 
-# redibis
+<h1 align="center">redibis</h1>
 
-**Open-source continuous data protection and ODCS data-contract generation.**
+<p align="center">
+  <strong>Open-source continuous data protection and ODCS data-contract generation</strong>
+</p>
 
 redibis sits in your data platform and CI/CD so tabular data is profiled,
 classified for PII, quality-gated, reviewed by humans, enriched with business
@@ -207,13 +211,6 @@ CSV / Parquet / DataFrame
 Invariants: single contract writer; PII demotions only via decision overlay;
 detector evidence vs equation verdict; enrichment output scrub; optional
 fingerprint-gated steward attach so human-verified columns win over engines.
-
----
-
-## Commercial add-ons
-
-- `redibis-reports` — filtered KPI / reports console at `/reports`
-- Hosted codegen and air-gapped enterprise bundles — separate products
 
 ---
 
