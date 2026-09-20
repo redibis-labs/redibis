@@ -374,5 +374,12 @@ def test_homepage_is_a_csv_path_box_not_a_dropzone():
     assert "Upload a CSV from this computer" in js
     assert "csv-root-print" in js
     assert ">upload</button>" in js
+    assert "function leaveSettingsToScan" in js
+    assert "function persistScanSource" in js
+    assert "function restorePersistedScanSource" in js
+    assert "function openSettings" in js
+    assert "leaveSettingsToScan()" in js.split("function applySettingsScan")[1].split("function ")[0]
+    assert "restorePersistedScanSource()" in js.split("async function restoreSessionOnBoot")[1].split("async function ")[0]
+    assert "btnSettings" in js
     assert "drop your CSV here" not in js
     assert "function uploadDropzoneHtml" not in js

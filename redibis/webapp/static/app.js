@@ -160,6 +160,7 @@ async function createSessionFromCurrentSource(){
     sess=await POST("/api/sessions",buildSessionFormData());
   }
   S.sid=sess.session_id;
+  persistScanSource();
   try{await PATCH("/api/sessions/"+S.sid+"/config",{fields:configScalars()});}catch(_){}
   return sess;
 }
@@ -185,6 +186,7 @@ function normalizeQualityApproveColumn(col){
 }
 
 var LAST_SESSION_KEY="redibis_last_session";
+var SCAN_SOURCE_KEY="redibis_scan_source";
 
 function saveLastSession(sid,table){
   if(!sid)return;
@@ -195,9 +197,107 @@ function clearLastSession(){
   try{sessionStorage.removeItem(LAST_SESSION_KEY);}catch(_){}
 }
 
+function persistScanSource(){
+  if(!S.sampleRef && !S.file && !S.sid) return;
+  try{
+    sessionStorage.setItem(SCAN_SOURCE_KEY, JSON.stringify({
+      sampleRef:S.sampleRef||null,
+      samplePathDraft:S.samplePathDraft||"",
+      fname:S.fname||"",
+      cols:S.cols||0,
+      rows:S.rows||0,
+      columns:S.columns||[],
+      sid:S.sid||null,
+      table:S.table||null,
+      scanDone:!!S.scanDone,
+      cfg:{
+        scan_mode:cfg.scan_mode,
+        equation:cfg.equation,
+        automerge:cfg.automerge,
+        scan_wait_timeout_sec:cfg.scan_wait_timeout_sec,
+        sse_ping_timeout_sec:cfg.sse_ping_timeout_sec,
+        pii_engines:cfg.pii_engines,
+        pii_regex_confidence:cfg.pii_regex_confidence,
+        pii_gliner_confidence:cfg.pii_gliner_confidence,
+        pii_gliner_always_run:!!cfg.pii_gliner_always_run,
+        use_phonenumbers:!!cfg.use_phonenumbers,
+        pii_sample_size:cfg.pii_sample_size,
+        quality_rules_mode:cfg.quality_rules_mode,
+        llm_enabled:!!cfg.llm_enabled,
+        llm_provider:cfg.llm_provider,
+        llm_model:cfg.llm_model
+      }
+    }));
+  }catch(_){}
+}
+
+function clearPersistedScanSource(){
+  try{sessionStorage.removeItem(SCAN_SOURCE_KEY);}catch(_){}
+}
+
+function restorePersistedScanSource(){
+  try{
+    var raw=sessionStorage.getItem(SCAN_SOURCE_KEY);
+    if(!raw) return false;
+    var p=JSON.parse(raw);
+    if(!p||typeof p!=="object") return false;
+    if(p.cfg&&typeof p.cfg==="object"){
+      Object.keys(p.cfg).forEach(function(k){
+        if(p.cfg[k]!=null) cfg[k]=p.cfg[k];
+      });
+    }
+    if(p.sampleRef){
+      S.sampleRef=p.sampleRef;
+      S.file=null;
+      S.samplePathDraft=p.samplePathDraft||p.sampleRef.path||DEFAULT_SAMPLE_CSV;
+      S.fname=p.fname||(p.sampleRef.path||"");
+      S.cols=p.cols||0;
+      S.rows=p.rows||0;
+      S.columns=Array.isArray(p.columns)?p.columns:[];
+      S.sid=p.sid||null;
+      S.table=p.table||null;
+      S.scanDone=!!p.scanDone;
+      S.restoredSession=false;
+      S.view="ready";
+      return true;
+    }
+    if(p.sid){
+      S.sid=p.sid;
+      S.fname=p.fname||"";
+      S.cols=p.cols||0;
+      S.rows=p.rows||0;
+      S.columns=Array.isArray(p.columns)?p.columns:[];
+      S.table=p.table||null;
+      S.scanDone=!!p.scanDone;
+      S.samplePathDraft=p.samplePathDraft||DEFAULT_SAMPLE_CSV;
+      S.restoredSession=true;
+      S.view="ready";
+      return true;
+    }
+  }catch(_){}
+  return false;
+}
+
+function openSettings(e){
+  if(e) e.preventDefault();
+  persistScanSource();
+  loadSettings();
+  return false;
+}
+
+function leaveSettingsToScan(){
+  persistScanSource();
+  if(window.REDIBIS_SETTINGS_PAGE){
+    window.location.href="/";
+    return;
+  }
+  set({view:scanLanding()});
+}
+
 function clearScanState(){
   if(S.es){S.es.close();S.es=null;}
   clearLastSession();
+  clearPersistedScanSource();
   if(location.search) history.replaceState(null,"",window.location.pathname);
   Object.assign(S,{
     file:null,fname:"",rows:0,cols:0,columns:[],sampleRef:null,
@@ -272,6 +372,7 @@ function applySessionPayload(fin){
   if(fin.common_config) applyCommonConfigFromSession(fin.common_config);
   if(fin.approved) S.approved=fin.approved;
   saveLastSession(S.sid,S.table);
+  persistScanSource();
 }
 
 function artUrlFor(key){
@@ -304,14 +405,18 @@ async function restoreSessionOnBoot(){
     var params=new URLSearchParams(location.search);
     if(params.get("fresh")==="1"){
       clearLastSession();
+      clearPersistedScanSource();
       if(location.search) history.replaceState(null,"",window.location.pathname);
       return;
     }
     var sid=params.get("session");
     var table=params.get("table");
-    // Only restore when explicitly linked (?session= / ?table= from v2 manage).
-    // Plain reload should show the upload homepage — not a stale session.
-    if(!sid&&!table) return;
+    // Explicit ?session= / ?table= from v2 manage wins. Otherwise restore the
+    // CSV picked on the scan console so Settings → Scan does not drop it.
+    if(!sid&&!table){
+      restorePersistedScanSource();
+      return;
+    }
     if(!sid&&table){
       var list=await GET("/api/sessions");
       var matches=list.filter(function(s){return s.table_name===table});
@@ -362,6 +467,7 @@ function onFile(f){
     S.cols=cs.length;
     S.columns=cs.map(function(c){return{name:c,on:true}});
     S.view="ready";render();
+    persistScanSource();
   };
   rd.readAsText(f.slice(0,200000));
 }
@@ -515,6 +621,7 @@ async function pickSample(path){
     S.columns=(pv.columns||[]).map(function(c){return{name:c,on:true}});
     S.sampleLibOpen=false;S.sampleLibBusy=false;
     S.view="ready";render();
+    persistScanSource();
   }catch(e){
     S.sampleLibBusy=false;
     S.sampleLibErr=e.message||"could not read that file";
@@ -2804,7 +2911,7 @@ function vReady(){
         "<button class='btn btn-ghost btn-sm' onclick='doScan(\"pii\")'>PII only</button>"+
         "<button class='btn btn-ghost btn-sm' onclick='doScan(\"quality\")'>Quality only</button>"+
         "<button class='btn btn-ghost btn-sm' onclick='doScan(\"both\")'>Both</button>"+
-        "<a class='btn btn-ghost btn-sm' href='/settings'>⚙ settings</a>"+
+        "<button class='btn btn-ghost btn-sm' type='button' onclick='openSettings()'>⚙ settings</button>"+
       "</div>"+
       "<div style='font-size:.72rem;color:var(--muted);font-family:\"IBM Plex Mono\",monospace'>"+
         "engines: "+cfg.pii_engines+" · regex ≥ "+cfg.pii_regex_confidence+" · gliner ≥ "+cfg.pii_gliner_confidence+
@@ -5296,7 +5403,11 @@ function applySettingsScan(){
     var sv=parseFloat(sse.value);
     if(!isNaN(sv)) cfg.sse_ping_timeout_sec=Math.max(5,Math.min(sv,300));
   }
-  render();
+  if(S.sid){
+    PATCH("/api/sessions/"+S.sid+"/config",{fields:configScalars()}).catch(function(){});
+  }
+  toast("Scan settings applied");
+  leaveSettingsToScan();
 }
 function readSettingsPiiFromDom(){
   var eng=document.getElementById("s_pii_engines");
@@ -5322,7 +5433,7 @@ function applySettingsPii(){
   }
   PUT("/api/settings/global",{settings:{pii:{sample_size:cfg.pii_sample_size}}}).catch(function(){});
   toast("PII settings applied");
-  render();
+  leaveSettingsToScan();
 }
 async function saveNerLabels(){
   var el=document.getElementById("s_ner_labels");
@@ -5379,7 +5490,8 @@ function bindConfSliders(){
 function applySettingsQuality(){
   var qm=document.getElementById("s_q_mode");
   if(qm) cfg.quality_rules_mode=qm.value;
-  render();
+  toast("Quality settings applied");
+  leaveSettingsToScan();
 }
 async function loadBehaviorPanel(){
   try{
@@ -5851,7 +5963,7 @@ async function applySettingsLlm(){
     toast("LLM settings applied");
     await loadLlmProviders().catch(function(){});
     await loadLlmRoutesRuntime().catch(function(){});
-    render();
+    leaveSettingsToScan();
   }catch(e){
     alert("Save failed: "+apiErr(e));
   }
@@ -6920,8 +7032,10 @@ function bind(){
       else if(id==="contracts"){set({view:"contracts"});loadC()}
     };
   });
-  // Settings + About
-  var g=document.getElementById("btnGear");if(g)g.onclick=loadSettings;
+  // Settings + About — keep settings in this page so the loaded CSV is not dropped.
+  var gs=document.getElementById("btnSettings");
+  if(gs) gs.onclick=function(e){e.preventDefault();openSettings();};
+  var g=document.getElementById("btnGear");if(g)g.onclick=function(e){if(e)e.preventDefault();openSettings();};
   var i=document.getElementById("btnInfo");if(i)i.onclick=function(){set({aboutOpen:true})};
   var nl=document.getElementById("navLogo");if(nl)nl.onclick=function(){
     if(sessionActive()&&confirm("Reset session and start over?")){
@@ -7000,16 +7114,20 @@ function bind(){
   var sr=document.getElementById("selReset");if(sr)sr.onclick=function(){S.columns.forEach(function(c){c.on=true});render()};
 }
 
+window.addEventListener("pagehide", persistScanSource);
+
 // ESC
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&S.aboutOpen)set({aboutOpen:false})});
 
 // Boot — paint UI immediately; restore only when ?session= / ?table= in the URL
 if(window.REDIBIS_SETTINGS_PAGE){
+  restorePersistedScanSource();
   loadSettings().catch(function(e){
     var app=document.getElementById("app");
     if(app) app.innerHTML="<main class='page'><div class='cbox'><div class='stitle'>Settings failed to load</div><pre>"+E(e&&e.message||e)+"</pre></div></main>";
   });
 }else{
+  restorePersistedScanSource();
   render();
   loadGlobalUiPrefs().then(function(){render()});
   restoreSessionOnBoot().then(function(){render();loadRx();});
