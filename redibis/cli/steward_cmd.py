@@ -53,11 +53,23 @@ def register_steward_commands(sub) -> None:
     p_fin.add_argument("--out-dir", help="also copy artifacts to a local directory")
     p_fin.add_argument("--actor", default="cli")
 
-    p_ex = ssub.add_parser("export", help="download one artifact")
+    p_ex = ssub.add_parser("export", help="download one finalized A0–A5 artifact")
     _t(p_ex)
     p_ex.add_argument("--artifact", required=True,
                       choices=["verdicts", "evidence", "llm-context", "corpus", "graph", "contract"])
     p_ex.add_argument("-o", "--out", required=True)
+
+    p_ev = ssub.add_parser(
+        "export-verdicts",
+        help="export A1 verdict memory without finalize (scan-ready)",
+    )
+    _t(p_ev)
+    p_ev.add_argument("-o", "--out", required=True, help="write steward_verdicts.json (A1)")
+    p_ev.add_argument(
+        "--scan-package",
+        help="also write a redibis.verdict_package JSON for scan decide / verdict import",
+    )
+    p_ev.add_argument("--actor", default="cli")
 
     p_imp = ssub.add_parser("import-verdicts", help="re-apply a steward_verdicts.json package")
     _t(p_imp)
@@ -134,6 +146,20 @@ def run_steward(args) -> int:
         body, _ct, filename = svc.get_artifact(args.table, args.artifact)
         Path(args.out).write_bytes(body)
         print(f"Wrote {filename} to {args.out}")
+        return 0
+    if action == "export-verdicts":
+        from redibis.review.verdict_package import steward_verdicts_to_package, write_verdict_package
+        svc, _ = _svc(args)
+        payload = svc.export_verdicts(args.table, actor=getattr(args, "actor", "cli"))
+        out = Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        print(f"Wrote A1 verdict memory to {out}")
+        scan_path = getattr(args, "scan_package", None)
+        if scan_path:
+            package = steward_verdicts_to_package(payload)
+            write_verdict_package(package, Path(scan_path))
+            print(f"Wrote scan package ({len(package.entries)} PII entries) to {scan_path}")
         return 0
     if action == "import-verdicts":
         from redibis.review.verdict_package import load_verdict_package

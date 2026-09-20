@@ -121,6 +121,7 @@ _HELP_PATHS: list[list[str]] = [
     ["steward", "verdict", "--help"],
     ["steward", "finalize", "--help"],
     ["steward", "export", "--help"],
+    ["steward", "export-verdicts", "--help"],
     ["steward", "import-verdicts", "--help"],
     ["workspace", "--help"],
     ["workspace", "list", "--help"],

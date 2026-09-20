@@ -12,6 +12,7 @@ from redibis.review.drift import LIFECYCLE_ACTIVE
 
 VERDICT_PACKAGE_VERSION = "1.0"
 VERDICT_PACKAGE_KIND = "redibis.verdict_package"
+STEWARD_VERDICTS_KIND = "redibis.steward_verdicts"
 
 
 class VerdictPackageError(ValueError):
@@ -156,6 +157,8 @@ def load_verdict_package(path: Path | str) -> VerdictPackage:
 
     if not isinstance(data, dict):
         raise VerdictPackageError("verdict package must be a JSON object")
+    if data.get("kind") == STEWARD_VERDICTS_KIND:
+        return steward_verdicts_to_package(data)
     if data.get("kind") and data.get("kind") != VERDICT_PACKAGE_KIND:
         raise VerdictPackageError(f"unsupported kind: {data.get('kind')!r}")
     version = str(data.get("schema_version") or VERDICT_PACKAGE_VERSION)
@@ -172,6 +175,78 @@ def load_verdict_package(path: Path | str) -> VerdictPackage:
         exported_at=str(data.get("exported_at") or ""),
         exporter=str(data.get("exporter") or ""),
         tables=[str(t) for t in (data.get("tables") or [])],
+        entries=entries,
+    )
+
+
+def _pii_status_from_steward_entry(entry: dict) -> Optional[str]:
+    """Map one A1 steward entry onto ``pii`` / ``not_pii``, or None to skip."""
+    field = entry.get("field")
+    if field not in (None, "", "pii", "column"):
+        return None
+    if entry.get("decision") in ("reject", "needs_review"):
+        return None
+    value = entry.get("value")
+    if value is True:
+        return "pii"
+    if value is False:
+        return "not_pii"
+    if isinstance(value, dict):
+        if "is_pii" in value:
+            return "pii" if value.get("is_pii") else "not_pii"
+        if value.get("status") in ("pii", "not_pii"):
+            return str(value.get("status"))
+        if value.get("detected") is True:
+            return "pii"
+        if value.get("detected") is False:
+            return "not_pii"
+    col_status = str(entry.get("status") or "")
+    if col_status in ("pii", "not_pii"):
+        return col_status
+    return None
+
+
+def steward_verdicts_to_package(data: dict) -> VerdictPackage:
+    """Project A1 ``redibis.steward_verdicts`` onto a scan-ready ``VerdictPackage``.
+
+    Only PII field entries become scan/import memory. Definitions, tags, and
+    table items stay in the A1 file for audit; they are not replayed by
+    ``redibis scan decide --verdicts`` or ``redibis verdict import``.
+    """
+    table_hint = str(data.get("table") or "")
+    entries: list[VerdictEntry] = []
+    for raw in data.get("entries") or []:
+        if not isinstance(raw, dict):
+            continue
+        column = raw.get("column")
+        if not column:
+            continue
+        status = _pii_status_from_steward_entry(raw)
+        if status is None:
+            continue
+        value = raw.get("value") if isinstance(raw.get("value"), dict) else {}
+        entity = value.get("entity_type") if isinstance(value, dict) else None
+        table = str(raw.get("table") or table_hint)
+        entries.append(VerdictEntry(
+            table=table,
+            column=str(column),
+            status=status,
+            entity_type=entity,
+            fingerprint_key=str(raw.get("fingerprint_key") or ""),
+            lifecycle_state=str(raw.get("lifecycle_state") or LIFECYCLE_ACTIVE),
+            decision_version=int(raw.get("decision_version") or 1),
+            decided_by=str(raw.get("by") or raw.get("decided_by") or data.get("exporter") or ""),
+            reason=str(raw.get("rationale_code") or raw.get("reason") or ""),
+            ts=str(raw.get("at") or data.get("exported_at") or ""),
+            source_run_id=str(raw.get("chosen_run_id") or ""),
+        ))
+    tables = sorted({e.table for e in entries if e.table} | ({table_hint} if table_hint else set()))
+    return VerdictPackage(
+        schema_version=str(data.get("schema_version") or VERDICT_PACKAGE_VERSION),
+        kind=VERDICT_PACKAGE_KIND,
+        exported_at=str(data.get("exported_at") or ""),
+        exporter=str(data.get("exporter") or ""),
+        tables=tables,
         entries=entries,
     )
 

@@ -241,3 +241,31 @@ def test_telemetry_backfill_missing_engines():
         assert {"regex", "ner", "phone"} <= srcs
         assert next(e for e in page["engines"]["pii"] if e["source"] == "regex")["confidence_pct"] == 80
 
+
+def test_a1_export_loads_as_scan_verdict_package():
+    from redibis.review.verdict_package import load_verdict_package, steward_verdicts_to_package
+
+    with tempfile.TemporaryDirectory() as tmp:
+        store = ContractStore(LocalBackend(tmp), "c")
+        store.upsert(_contract(), table="db.customers", workflow="manual", run_id="r1")
+        svc = StewardReviewService(store)
+        svc.decide("db.customers", "msisdn", "pii", {
+            "decision": "edit", "chosen_source": "human",
+            "value": {"is_pii": True, "entity_type": "PHONE_NUMBER"},
+            "rationale_code": "domain_knowledge",
+            "rationale_text": "phone",
+        }, actor="ada")
+        a1 = svc.export_verdicts("db.customers", actor="ada")
+        assert a1["kind"] == "redibis.steward_verdicts"
+        pkg = steward_verdicts_to_package(a1)
+        assert pkg.kind == "redibis.verdict_package"
+        by_col = pkg.by_column("db.customers")
+        assert by_col["msisdn"].status == "pii"
+        assert by_col["msisdn"].entity_type == "PHONE_NUMBER"
+        path = tmp + "/a1.json"
+        import json
+        from pathlib import Path
+        Path(path).write_text(json.dumps(a1), encoding="utf-8")
+        loaded = load_verdict_package(path)
+        assert loaded.by_column("db.customers")["msisdn"].status == "pii"
+
