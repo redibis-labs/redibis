@@ -219,7 +219,7 @@ export async function mountContractWorkspace(opts) {
       <div class="ws-batch-bar">
         <details><summary>Batch ▾</summary>
           <button type="button" data-kind="enrich">Enrich…</button>
-          <button type="button" data-kind="synthesize">Synthesise…</button>
+          <button type="button" data-kind="synthesize">Deep Enrich…</button>
           <button type="button" data-kind="steward_finalize">Finalize reviews</button>
           <button type="button" data-kind="export">Export artifacts…</button>
         </details>
@@ -277,10 +277,10 @@ export async function mountContractWorkspace(opts) {
       options.provider = provider;
     }
     if (kind === "synthesize") {
-      const mode = prompt("Synthesis analysis mode:", "deterministic") || "deterministic";
+      const mode = prompt("Deep Enrich analysis mode:", "deterministic") || "deterministic";
       options.analysis_mode = mode;
       if (mode === "assisted") {
-        options.provider = prompt("LLM provider:", "demo") || "demo";
+        options.provider = prompt("LLM provider (same as Enrich):", "demo") || "demo";
       }
     }
     if (kind === "export") {

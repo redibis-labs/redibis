@@ -214,12 +214,12 @@ async function selectTable(t){ STATE.table = t; await loadTables(); render(); }
 // ── Main render ────────────────────────────────────────────────────────────
 function render(){
   if(!STATE.table){ $("main").innerHTML = `<div class="empty">Select a table.</div>`; return; }
-  const tabs = [["contract","Contract"],["review","Steward Review"],["runs","Runs"],["enrich","Enrich"],["synthesize","Synthesis"],["share","Share"]];
+  const tabs = [["contract","Contract"],["review","Steward Review"],["runs","Runs"],["enrich","Enrich"],["synthesize","Deep Enrich"],["share","Share"]];
   $("main").innerHTML =
     `<div class="tabs">${tabs.map(([k,l])=>
         `<div class="tab ${STATE.tab===k?'active':''}" onclick="setTab(${jsArg(k)})">${l}</div>`).join("")}</div>
      <div id="tabBody"></div>`;
-  ({contract:renderContract, review:renderStewardReview, runs:renderRuns, enrich:renderEnrich, synthesize:renderSynthesis, share:renderShare}[STATE.tab])();
+  ({contract:renderContract, review:renderStewardReview, runs:renderRuns, enrich:renderEnrich, synthesize:renderDeepEnrich, share:renderShare}[STATE.tab])();
 }
 function setTab(k){ STATE.tab=k; render(); }
 
@@ -1397,70 +1397,262 @@ async function mergeEnrich(){
   }
 }
 
-// ── Contract Synthesis (portable ODCS v3.1 — no upsert) ─────────────────────
-async function renderSynthesis(){
+// ── Deep Enrich (separate candidate — selective merge only) ─────────────────
+async function renderDeepEnrich(){
   const body = $("tabBody");
   body.innerHTML = `
-    <div class="card"><h3>Contract Synthesis</h3>
-      <small class="hint">Start from the active ODCS v3 contract, add requirements + Spark/SQL/DataStage sources,
-      and export a <strong>portable ODCS v3.1</strong> candidate. This path does <strong>not</strong> call
-      <code>ContractStore.upsert</code> and does not change Redibis active contracts.</small>
+    <div class="card"><h3>Deep Enrich</h3>
+      <small class="hint">Start from the <strong>active</strong> contract, add requirements, code, and context.
+      Output is a <strong>separate Deep Enrich candidate</strong> (never auto-writes active).
+      Accept individual paths, then merge approved facets into the active contract.
+      Uses the same LLM provider routing as Enrich (<code>contract.enrichment</code>).</small>
+    </div>
+
+    <div class="card"><h3>Analysis &amp; provider</h3>
       <div class="grid2" style="margin-top:12px">
         <div><label>Analysis mode</label>
           <select id="syMode"><option value="deterministic">deterministic (default)</option>
             <option value="assisted">assisted (LLM gap-fill)</option></select></div>
         <div><label>Provider (assisted)</label>
-          <input id="syProvider" placeholder="demo / vllm / …"/></div>
-        <div style="grid-column:1/-1"><label>Requirements &amp; sources (multi-file / ZIP)</label>
-          <input type="file" id="syFiles" multiple/></div>
-        <div style="grid-column:1/-1"><label>Output directory</label>
-          <input id="syOut" placeholder="./synthesis_out/${STATE.table.replace('.','!')}" value=""/></div>
+          <select id="enProvider" style="width:100%"><option>demo</option></select>
+          <small class="hint">Shared with Enrich — defaults from Settings / capability routing.</small></div>
+        <div id="enLocalFields" class="grid2" style="grid-column:1/-1;display:none">
+          <div><label>Model</label>
+            <input id="enModel" list="enModelList" placeholder="(uses provider default)"/>
+            <datalist id="enModelList"></datalist></div>
+          <div id="enEndpointWrap"><label>Endpoint URL (api_base)</label>
+            <input id="enEndpoint" placeholder="http://localhost:30000/v1"/></div>
+        </div>
+        <div id="enCloudKey" style="display:none">
+          <label>API key</label>
+          <input id="enKey" type="password" placeholder="paste key or set env var on server"/>
+        </div>
+        <div id="enSessionKeyWrap" style="display:none">
+          <label>Session API key</label>
+          <input id="enSessionKey" type="password" placeholder="sk-local"/>
+        </div>
       </div>
-      <div class="row" style="margin-top:12px;gap:8px">
-        <button class="btn-primary" onclick="runSynthesis()">Run synthesis</button>
-        <button class="btn-sm" onclick="loadSynthesisGraph()">Reload lineage graph</button>
+    </div>
+
+    <div class="card"><h3>System prompt &amp; context</h3>
+      <small class="hint">Optional. In assisted mode these are prepended to the Deep Enrich prompt.
+        Deterministic mode ignores the LLM but still stores prompt metadata on the candidate.</small>
+      <label style="margin-top:8px">System prompt</label>
+      <textarea id="sySystemPrompt" rows="8" placeholder="Domain rules, naming conventions, SLA expectations…"></textarea>
+      <label>Additional context</label>
+      <textarea id="syExtraContext" rows="4" placeholder="Business glossary notes, cost model, freshness SLAs…"></textarea>
+    </div>
+
+    <div class="card"><h3>Requirements &amp; source code</h3>
+      <small class="hint">Upload requirements docs (.md/.yaml), SQL/Spark/Python/DataStage sources, or a ZIP.</small>
+      <div class="row" style="margin-top:8px">
+        <input type="file" id="syFiles" multiple/>
       </div>
-      <div id="syResult" style="margin-top:12px"></div>
-      <div id="syGraph" style="margin-top:12px"></div>
-    </div>`;
+      <div style="margin-top:10px"><label>Optional local output directory (portable artifacts)</label>
+        <input id="syOut" placeholder="./synthesis_out/${STATE.table.replace('.','!')}" value=""/></div>
+    </div>
+
+    <div class="row" style="margin:4px 0 14px;gap:8px">
+      <button class="btn-primary" onclick="runDeepEnrich()">Run Deep Enrich</button>
+      <button class="btn-sm" onclick="loadDeepEnrichRuns()">Refresh candidates</button>
+      <button class="btn-sm" onclick="loadSynthesisGraph()">Reload lineage graph</button>
+    </div>
+    <div id="syResult" style="margin-top:12px"></div>
+    <div id="syRuns" style="margin-top:12px"></div>
+    <div id="syDiff" style="margin-top:12px"></div>
+    <div id="syGraph" style="margin-top:12px"></div>`;
+  loadProviders();
+  loadDeepEnrichRuns();
 }
-async function runSynthesis(){
+async function runDeepEnrich(){
   if(!STATE.table) return;
   const fd = new FormData();
   fd.append("analysis_mode", $("syMode").value || "deterministic");
   fd.append("odcs_version", "v3.1.0");
-  if(($("syProvider").value||"").trim()) fd.append("provider", $("syProvider").value.trim());
+  const prov = ($("enProvider")&&$("enProvider").value) || "";
+  if(prov) fd.append("provider", prov);
+  const model = ($("enModel")&&$("enModel").value||"").trim();
+  if(model) fd.append("model", model);
+  const extras = typeof enrichPayloadExtras === "function" ? enrichPayloadExtras() : {};
+  if(extras.endpoint_url) fd.append("endpoint_url", extras.endpoint_url);
+  const key = typeof enrichSessionKey === "function" ? enrichSessionKey() : undefined;
+  if(key) fd.append("api_key", key);
+  if(($("sySystemPrompt")&&$("sySystemPrompt").value||"").trim())
+    fd.append("system_prompt", $("sySystemPrompt").value.trim());
+  if(($("syExtraContext")&&$("syExtraContext").value||"").trim())
+    fd.append("extra_context", $("syExtraContext").value.trim());
   if(($("syOut").value||"").trim()) fd.append("output_dir", $("syOut").value.trim());
   const files = $("syFiles").files || [];
   for(const f of files) fd.append("files", f);
-  $("syResult").innerHTML = `<div class="card">Running Contract Synthesis…</div>`;
+  $("syResult").innerHTML = `<div class="card">Running Deep Enrich…</div>`;
   try{
     const token = (window.CSRF_TOKEN || document.querySelector('meta[name="csrf-token"]')?.content || "");
     const headers = {};
     if(token) headers["X-CSRF-Token"] = token;
     if(STATE.ws) headers["X-Redibis-Workspace"] = STATE.ws;
-    const resp = await fetch("/api/synthesis/"+encodeURIComponent(STATE.table)+"/run", {
+    const resp = await fetch("/api/deep-enrich/"+encodeURIComponent(STATE.table)+"/run", {
       method: "POST", body: fd, headers, credentials: "same-origin",
     });
     const r = await resp.json();
-    if(!resp.ok) throw new Error(r.detail || JSON.stringify(r));
-    const cov = r.traceability || {};
-    const preview = r.candidate_preview || {};
-    $("syResult").innerHTML = `<div class="card">
-      <strong>${r.valid ? "VALID" : "INVALID"}</strong> portable candidate
-      <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">
-        <span class="chip chip-blue">apiVersion ${esc(preview.apiVersion||"?")}</span>
-        <span class="chip chip-muted">version ${esc(preview.version||"?")}</span>
-        <span class="chip chip-muted">${preview.property_count||0} properties</span>
-        <span class="chip chip-muted">writes_active=false</span>
-      </div>
-      <pre style="margin-top:10px;font-size:11px;white-space:pre-wrap">${esc(JSON.stringify({coverage:cov, artifacts:r.artifacts, errors:r.errors, warnings:r.warnings}, null, 2))}</pre>
-    </div>`;
+    if(!resp.ok) throw new Error(typeof r.detail==="string" ? r.detail : JSON.stringify(r.detail||r));
+    window.DEEP_ENRICH_RUN = r;
+    showDeepEnrichResult(r);
+    loadDeepEnrichRuns();
     if(r.lineage_react_flow) renderSynthesisGraph(r.lineage_react_flow);
   }catch(e){
     $("syResult").innerHTML = `<div class="card" style="color:#b91c1c">${esc(e.message||String(e))}</div>`;
   }
 }
+function showDeepEnrichResult(r){
+  const preview = r.candidate_preview || {};
+  const summary = r.diff_summary || {};
+  const kinds = summary.kinds || {};
+  $("syResult").innerHTML = `<div class="card">
+    <strong>${r.valid ? "VALID" : "INVALID"}</strong> Deep Enrich candidate
+    <span class="chip chip-muted">run ${esc(r.run_id||"?")}</span>
+    <span class="chip chip-muted">${esc(r.status||"draft")}</span>
+    <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">
+      <span class="chip chip-blue">apiVersion ${esc(preview.apiVersion||"?")}</span>
+      <span class="chip chip-muted">version ${esc(preview.version||"?")}</span>
+      <span class="chip chip-muted">${preview.property_count||0} properties</span>
+      <span class="chip chip-muted">writes_active=false</span>
+      <span class="chip chip-amber">${summary.total||0} path diff(s)</span>
+      ${kinds.add?`<span class="chip chip-green">+${kinds.add}</span>`:""}
+      ${kinds.change?`<span class="chip chip-amber">~${kinds.change}</span>`:""}
+      ${kinds.remove?`<span class="chip chip-red">−${kinds.remove}</span>`:""}
+    </div>
+    ${(r.errors||[]).length?`<div class="banner invalid" style="margin-top:8px">${esc((r.errors||[]).join("; "))}</div>`:""}
+    <div class="row" style="margin-top:10px;gap:8px">
+      <button class="btn-sm" onclick="renderDeepEnrichDiff()">Review path diff</button>
+      <button class="btn-sm btn-primary" onclick="mergeAcceptedDeepEnrichPaths()">Merge accepted paths</button>
+      <button class="btn-sm" onclick="discardDeepEnrichRun(${jsArg(r.run_id||"")})">Discard</button>
+    </div>
+  </div>`;
+  renderDeepEnrichDiff();
+}
+function renderDeepEnrichDiff(){
+  const el = $("syDiff"); if(!el) return;
+  const r = window.DEEP_ENRICH_RUN || {};
+  const items = r.path_diff || [];
+  const verdicts = r.path_verdicts || {};
+  if(!items.length){
+    el.innerHTML = `<div class="card"><h3>Path diff</h3><div class="hint">No differences vs active contract.</div></div>`;
+    return;
+  }
+  const rows = items.map(it=>{
+    const v = verdicts[it.path] || {};
+    const dec = v.decision || "";
+    return `<tr>
+      <td class="mono" style="font-size:11px">${esc(it.path)}</td>
+      <td><span class="chip chip-muted">${esc(it.scope||"")}</span></td>
+      <td><span class="chip chip-${it.kind==='add'?'green':(it.kind==='remove'?'red':'amber')}">${esc(it.kind||"")}</span></td>
+      <td style="font-size:11px">${esc(JSON.stringify(it.before)).slice(0,80)}</td>
+      <td style="font-size:11px">${esc(JSON.stringify(it.after)).slice(0,80)}</td>
+      <td>
+        <select data-path="${esc(it.path)}" class="syPathDec">
+          <option value="">—</option>
+          ${["accept","reject","needs_review","no_action","edit"].map(d=>
+            `<option value="${d}" ${dec===d?"selected":""}>${d}</option>`).join("")}
+        </select>
+      </td>
+    </tr>`;
+  }).join("");
+  el.innerHTML = `<div class="card"><h3>Path diff vs active</h3>
+    <small class="hint">Accept paths to include in an explicit merge. PII paths go through the decision overlay.</small>
+    <div class="row" style="margin:8px 0;gap:8px">
+      <button class="btn-sm" onclick="acceptAllDeepEnrichPaths()">Accept all</button>
+      <button class="btn-sm" onclick="saveDeepEnrichVerdicts()">Save verdicts</button>
+    </div>
+    <div style="max-height:420px;overflow:auto">
+      <table class="table"><thead><tr>
+        <th>Path</th><th>Scope</th><th>Kind</th><th>Before</th><th>After</th><th>Verdict</th>
+      </tr></thead><tbody>${rows}</tbody></table>
+    </div>
+  </div>`;
+}
+function acceptAllDeepEnrichPaths(){
+  document.querySelectorAll(".syPathDec").forEach(sel=>{ sel.value = "accept"; });
+}
+async function saveDeepEnrichVerdicts(){
+  const r = window.DEEP_ENRICH_RUN || {};
+  if(!r.run_id || !STATE.table) return;
+  const verdicts = [];
+  document.querySelectorAll(".syPathDec").forEach(sel=>{
+    if(!sel.value) return;
+    const path = sel.getAttribute("data-path");
+    const item = (r.path_diff||[]).find(x=>x.path===path) || {};
+    verdicts.push({
+      path, decision: sel.value, chosen_source: "llm_synthesis",
+      value: item.after, column: item.column||null, field: item.field||null,
+    });
+  });
+  try{
+    const updated = await api("POST",
+      `/api/deep-enrich/${encodeURIComponent(STATE.table)}/runs/${encodeURIComponent(r.run_id)}/verdicts`,
+      {verdicts});
+    window.DEEP_ENRICH_RUN = {...r, ...updated, path_diff: updated.path_diff||r.path_diff};
+    toast("Path verdicts saved");
+    showDeepEnrichResult(window.DEEP_ENRICH_RUN);
+  }catch(e){ toast(e.message||String(e), false); }
+}
+async function mergeAcceptedDeepEnrichPaths(){
+  const r = window.DEEP_ENRICH_RUN || {};
+  if(!r.run_id || !STATE.table) return;
+  await saveDeepEnrichVerdicts();
+  try{
+    const result = await api("POST",
+      `/api/deep-enrich/${encodeURIComponent(STATE.table)}/runs/${encodeURIComponent(r.run_id)}/merge`,
+      {validate_contract:true});
+    if(!result.ok) throw new Error((result.errors||[]).join("; ") || "merge failed");
+    toast(`Merged ${ (result.accepted_paths||[]).length } path(s) → v${result.version_after||"?"}`);
+    loadDeepEnrichRuns();
+  }catch(e){ toast(e.message||String(e), false); }
+}
+async function discardDeepEnrichRun(runId){
+  if(!runId || !STATE.table) return;
+  try{
+    await api("POST", `/api/deep-enrich/${encodeURIComponent(STATE.table)}/runs/${encodeURIComponent(runId)}/discard`);
+    window.DEEP_ENRICH_RUN = null;
+    toast("Candidate discarded");
+    loadDeepEnrichRuns();
+    $("syDiff").innerHTML = "";
+    $("syResult").innerHTML = "";
+  }catch(e){ toast(e.message||String(e), false); }
+}
+async function loadDeepEnrichRuns(){
+  const el = $("syRuns"); if(!el || !STATE.table) return;
+  try{
+    const data = await api("GET", `/api/deep-enrich/${encodeURIComponent(STATE.table)}/runs`);
+    const runs = data.runs || [];
+    if(!runs.length){
+      el.innerHTML = `<div class="card"><h3>Candidates</h3><div class="hint">No Deep Enrich candidates yet.</div></div>`;
+      return;
+    }
+    el.innerHTML = `<div class="card"><h3>Candidates</h3>
+      <table class="table"><thead><tr><th>Run</th><th>Status</th><th>Diff</th><th>Created</th><th></th></tr></thead>
+      <tbody>${runs.map(r=>`<tr>
+        <td class="mono">${esc(r.run_id)}</td>
+        <td><span class="chip">${esc(r.status)}</span></td>
+        <td>${r.diff_total??"—"}</td>
+        <td>${esc((r.created_at||"").slice(0,19))}</td>
+        <td><button class="btn-sm" onclick="openDeepEnrichRun(${jsArg(r.run_id)})">Open</button></td>
+      </tr>`).join("")}</tbody></table></div>`;
+  }catch(e){
+    el.innerHTML = `<div class="card hint">${esc(e.message||String(e))}</div>`;
+  }
+}
+async function openDeepEnrichRun(runId){
+  if(!runId || !STATE.table) return;
+  try{
+    const r = await api("GET", `/api/deep-enrich/${encodeURIComponent(STATE.table)}/runs/${encodeURIComponent(runId)}`);
+    window.DEEP_ENRICH_RUN = r;
+    showDeepEnrichResult(r);
+    if(r.lineage_react_flow) renderSynthesisGraph(r.lineage_react_flow);
+  }catch(e){ toast(e.message||String(e), false); }
+}
+// Back-compat aliases
+async function renderSynthesis(){ return renderDeepEnrich(); }
+async function runSynthesis(){ return runDeepEnrich(); }
 function renderSynthesisGraph(g){
   const el = $("syGraph"); if(!el) return;
   const nodes = (g.nodes||[]);
@@ -1487,6 +1679,8 @@ function renderSynthesisGraph(g){
 }
 async function loadSynthesisGraph(){
   if(!STATE.table) return;
+  const r = window.DEEP_ENRICH_RUN || {};
+  if(r.lineage_react_flow){ renderSynthesisGraph(r.lineage_react_flow); return; }
   const out = ($("syOut")&&$("syOut").value)||"";
   const q = out ? ("?output_dir="+encodeURIComponent(out)) : "";
   try{

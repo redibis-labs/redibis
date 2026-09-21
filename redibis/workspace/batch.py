@@ -226,12 +226,10 @@ def _run_enrich(stores: WorkspaceStores, table: str, options: dict) -> dict:
 
 
 def _run_synthesize(stores: WorkspaceStores, table: str, options: dict) -> dict:
-    """Portable synthesis preview. Never writes the active governed contract."""
-    from redibis.synthesis import ContractSynthesisRunner
+    """Deep Enrich batch: persist a separate candidate. Never upserts active."""
+    from redibis.services.deep_enrich_service import DeepEnrichService
+    from redibis.store.subcontract_store import SubcontractStore
 
-    base = stores.contract.get_active(table)
-    if not base:
-        raise ValueError(f"no active contract for {table}")
     analysis_mode = str(options.get("analysis_mode") or "deterministic").lower()
     provider_obj = None
     if analysis_mode == "assisted":
@@ -243,18 +241,44 @@ def _run_synthesize(stores: WorkspaceStores, table: str, options: dict) -> dict:
             raise ValueError(str(exc)) from exc
         if provider_obj is None:
             raise ValueError("assisted mode requested but no provider configured")
-    runner = ContractSynthesisRunner(
-        analysis_mode=analysis_mode or "deterministic",
+
+    if stores.backend is None:
+        raise ValueError("workspace store has no backend")
+    subs = SubcontractStore(stores.backend)
+    svc = DeepEnrichService(stores.contract, subs)
+    result = svc.run(
+        table,
         provider=provider_obj,
+        analysis_mode=analysis_mode or "deterministic",
+        system_prompt=str(options.get("system_prompt") or ""),
+        extra_context=str(options.get("extra_context") or ""),
+        created_by=str(options.get("actor") or "batch"),
     )
-    result = runner.run(base_contract=base, output_dir=None)
-    run_id = uuid.uuid4().hex[:12]
-    artifacts = _persist_synthesis_artifacts(stores, table, run_id, result, base)
-    payload = result.to_dict() if hasattr(result, "to_dict") else {"table": table}
-    payload["run_id"] = run_id
-    payload["artifacts"] = artifacts
-    payload["writes_active_contract"] = False
-    return payload
+    # Also mirror portable artifacts under runs/ for workspace explorers
+    run_id = result.get("run_id") or uuid.uuid4().hex[:12]
+    try:
+        base = stores.contract.get_active(table) or {}
+        candidate = (result.get("payload") or {}).get("candidate") or {}
+        artifacts = _persist_synthesis_artifacts(
+            stores, table, run_id,
+            type("R", (), {
+                "candidate": candidate,
+                "evidence": (result.get("payload") or {}).get("evidence"),
+                "lineage": (result.get("payload") or {}).get("lineage"),
+                "lineage_react_flow": result.get("lineage_react_flow"),
+                "traceability": result.get("traceability"),
+                "stage_results": (result.get("payload") or {}).get("stage_results"),
+                "meta": result.get("meta"),
+                "comparison": (result.get("payload") or {}).get("comparison"),
+            })(),
+            base,
+        )
+        result = dict(result)
+        result["artifacts"] = {**(result.get("artifacts") or {}), **artifacts}
+    except Exception:
+        pass
+    result["writes_active_contract"] = False
+    return result
 
 
 def _persist_synthesis_artifacts(

@@ -45,6 +45,47 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _deep_enrich_table_item_ids(store: ContractStore, table: str) -> list[str]:
+    """Facet ids from the latest Deep Enrich candidate (freshness, cost, …)."""
+    try:
+        from redibis.services.deep_enrich_service import DeepEnrichService
+        from redibis.store.subcontract_store import SubcontractStore
+
+        svc = DeepEnrichService(store, SubcontractStore(store.backend))
+        facets = svc.facets_for_steward(table)
+    except Exception:
+        return []
+    ids: list[str] = []
+    for item in facets.get("facets") or []:
+        field = str(item.get("field") or "")
+        if not field:
+            continue
+        if item.get("scope") == "sla":
+            ids.append(f"sla:{field}")
+        elif item.get("scope") == "custom":
+            ids.append(f"custom:{field}")
+        else:
+            ids.append(f"facet:{field}")
+    seen: set[str] = set()
+    out: list[str] = []
+    for i in ids:
+        if i not in seen:
+            seen.add(i)
+            out.append(i)
+    return out
+
+
+def _deep_enrich_blockers(store: ContractStore, table: str) -> list[str]:
+    try:
+        from redibis.services.deep_enrich_service import DeepEnrichService
+        from redibis.store.subcontract_store import SubcontractStore
+
+        svc = DeepEnrichService(store, SubcontractStore(store.backend))
+        return svc.unresolved_required_paths(table)
+    except Exception:
+        return []
+
+
 def _pii_value(gen: Generation) -> Optional[bool]:
     val = gen.value
     if isinstance(val, dict):
@@ -195,7 +236,14 @@ def _table_quality_item_ids(active: dict) -> list[str]:
     return ids
 
 
-def _table_item_keys(active: dict) -> list[str]:
+def _table_item_keys(
+    active: dict,
+    store: Optional[ContractStore] = None,
+    table: str = "",
+) -> list[str]:
+    # Deep Enrich facets are reviewable but not required unless a steward
+    # marks them needs_review (see _deep_enrich_blockers).
+    _ = (store, table)
     return list(TABLE_ITEMS) + _table_quality_item_ids(active)
 
 
@@ -311,16 +359,29 @@ class StewardReviewService:
                 "classification": classification,
             })
 
-        required_table = _table_item_keys(active)
+        required_table = _table_item_keys(active, self.store, table)
         blockers = self.reviews.guarantee_blockers(
             table,
             required_columns=[n for n, _ in props],
             required_table_items=required_table,
         )
+        deep_blockers = _deep_enrich_blockers(self.store, table)
+        if deep_blockers:
+            blockers = dict(blockers)
+            blockers["deep_enrich"] = deep_blockers
         reviewed = sum(1 for c in index if c["status"] in REVIEWED_STATUSES)
         needs = sum(1 for c in index if c["status"] == "needs_review")
         rejected = sum(1 for c in index if c["status"] == "rejected")
         pending = sum(1 for c in index if c["status"] == "pending")
+        deep_facets = {}
+        try:
+            from redibis.services.deep_enrich_service import DeepEnrichService
+            from redibis.store.subcontract_store import SubcontractStore
+            deep_facets = DeepEnrichService(
+                self.store, SubcontractStore(self.store.backend),
+            ).facets_for_steward(table)
+        except Exception:
+            deep_facets = {}
         return {
             "table": table,
             "contract_uuid": str(active.get("contract_uuid") or ""),
@@ -334,6 +395,7 @@ class StewardReviewService:
                 "description": schema.get("description") or active.get("description") or "",
                 "owner": _owner_from_active(active, schema),
                 "quality_rules": list(schema.get("quality") or []),
+                "deep_enrich": deep_facets,
                 "review": {
                     k: (state.table_review.items[k].to_dict()
                         if k in state.table_review.items else None)
@@ -361,6 +423,12 @@ class StewardReviewService:
                     "null_rate_p50": statistics.median(nulls) if nulls else None,
                     "ndv_ratio_p50": statistics.median(ndvs) if ndvs else None,
                     "columns_with_samples": samples_cols,
+                },
+                "deep_enrich": {
+                    "run_id": deep_facets.get("run_id"),
+                    "status": deep_facets.get("status"),
+                    "stale": deep_facets.get("stale"),
+                    "facet_count": len(deep_facets.get("facets") or []),
                 },
             },
             "guarantee": {
@@ -570,7 +638,7 @@ class StewardReviewService:
         active = self.store.get_active(table)
         if active is None:
             raise ValueError(f"No active contract for {table!r}")
-        required = _table_item_keys(active)
+        required = _table_item_keys(active, self.store, table)
         if fv.decision in REVIEWED_DECISIONS and fv.decision != "no_action":
             self._route_table_write(table, item, fv, who)
         self.reviews.set_table_item(
@@ -586,10 +654,14 @@ class StewardReviewService:
         if active is None:
             raise ValueError(f"No active contract for {table!r}")
         cols = [n for n, _ in _iter_props(active)]
-        required_table = _table_item_keys(active)
+        required_table = _table_item_keys(active, self.store, table)
         blockers = self.reviews.guarantee_blockers(
             table, required_columns=cols, required_table_items=required_table,
         )
+        deep_blockers = _deep_enrich_blockers(self.store, table)
+        if deep_blockers:
+            blockers = dict(blockers)
+            blockers["deep_enrich"] = deep_blockers
         if any(blockers.values()):
             return {
                 "ok": False,
@@ -785,7 +857,8 @@ class StewardReviewService:
             self.store.patch_column_privacy(
                 table, column, classification=str(fv.value or ""), decided_by=who,
             )
-        elif fv.field in ("entity_type", "logical_type", "masking", "quality_rules"):
+        elif fv.field in ("entity_type", "logical_type", "masking", "quality_rules",
+                          "freshness", "retention", "cost"):
             active = self.store.get_active(table)
             prop = {}
             for name, p in _iter_props(active or {}):
@@ -805,6 +878,11 @@ class StewardReviewService:
                 decision_version=int(existing.get("decision_version") or 0) + 1,
                 **fp,
             ))
+            if fv.field in ("freshness", "retention", "cost") and fv.decision in ("accept", "edit"):
+                # Also apply as table facet when the column sentinel is __table__
+                if column == "__table__":
+                    prefix = "sla" if fv.field in ("freshness", "retention") else "custom"
+                    self._apply_table_facet(table, f"{prefix}:{fv.field}", fv, who)
         if fv.decision == "accept":
             self.review.approve_column(table, column, reviewer=who, note=fv.rationale_text)
         elif fv.decision == "edit":
@@ -830,6 +908,67 @@ class StewardReviewService:
                     rule_id=rid, status="suppressed", decided_by=who,
                 ))
                 self.store._reapply_overlays(table, workflow="quality-decision", run_id="steward")
+        elif item.startswith(("sla:", "custom:", "facet:")):
+            if fv.decision in ("reject", "needs_review", "no_action"):
+                return
+            self._apply_table_facet(table, item, fv, who)
+
+    def _apply_table_facet(self, table: str, item: str, fv: FieldVerdict, who: str) -> None:
+        """Persist accepted Deep Enrich SLA / customProperty facets via upsert."""
+        from redibis.synthesis.path_diff import set_value_on_partial
+
+        kind, _, field = item.partition(":")
+        active = self.store.get_active(table) or {}
+        value = fv.value
+        if value is None:
+            return
+        partial: dict[str, Any] = {
+            "apiVersion": active.get("apiVersion") or "v3.0.1",
+            "kind": "DataContract",
+            "database_name": active.get("database_name") or "",
+            "table_name": active.get("table_name") or "",
+            "contract_uuid": active.get("contract_uuid") or "",
+        }
+        if kind == "sla" or (isinstance(value, dict) and value.get("property")):
+            prop_name = None
+            if isinstance(value, dict) and value.get("property"):
+                prop_name = str(value["property"])
+            else:
+                # Map steward facet back to an SLA property name
+                prop_name = {
+                    "freshness": "frequency",
+                    "retention": "retention",
+                }.get(field, field)
+            path = f"slaProperties.{prop_name}"
+            set_value_on_partial(partial, path, value, active=active)
+        elif kind == "custom":
+            prop_name = None
+            if isinstance(value, dict) and value.get("property"):
+                prop_name = str(value["property"])
+            else:
+                prop_name = "cost" if field == "cost" else field
+            path = f"customProperties.{prop_name}"
+            set_value_on_partial(partial, path, value, active=active)
+        else:
+            return
+        self.store.upsert(
+            partial, table=table, workflow="deep_enrich",
+            run_id=fv.chosen_run_id or "steward-facet",
+        )
+        # Record human generation on __table__
+        try:
+            gen = Generation(
+                field=field,
+                source="human",
+                value=value,
+                confidence=1.0,
+                run_id=fv.chosen_run_id or "steward",
+                ts=fv.at or _utc_now_iso(),
+                detail={"by": who, "decision": fv.decision, "item": item},
+            )
+            self.ledger.append(table, "__table__", [gen])
+        except Exception:
+            pass
 
     def _append_human_generation(self, table: str, column: str, fv: FieldVerdict, who: str) -> None:
         active = self.store.get_active(table) or {}
@@ -976,4 +1115,6 @@ def _blocker_message(blockers: dict) -> str:
         parts.append(f"{len(blockers['pending'])} pending")
     if blockers.get("table"):
         parts.append(f"{len(blockers['table'])} table items")
+    if blockers.get("deep_enrich"):
+        parts.append(f"{len(blockers['deep_enrich'])} Deep Enrich paths need review")
     return " · ".join(parts) or "blocked"

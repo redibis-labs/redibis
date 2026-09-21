@@ -374,6 +374,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
   function renderTable() {
     const t = (state.overview && state.overview.table_section) || {};
     const review = t.review || {};
+    const deep = t.deep_enrich || {};
     const rows = ["name","description","owner"].map((k) => {
       const v = review[k];
       const val = state.tableEdit[k] != null ? state.tableEdit[k] : (t[k] || "");
@@ -406,12 +407,54 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
         <div style="grid-column:2 / -1">${verdictButtons("table:"+id)}</div>
       </div>`;
     }).join("");
+    const facetRows = (deep.facets||[]).map((f)=>{
+      const scope = f.scope === "sla" ? "sla" : (f.scope === "custom" ? "custom" : "facet");
+      const id = scope + ":" + (f.field || "unknown");
+      const v = review[id];
+      const after = f.after != null ? JSON.stringify(f.after) : "—";
+      return `<div class="sr-meta-row">
+        <div class="sr-k">${esc(id)}</div>
+        <div>
+          <div class="iso" style="font-size:11px">${esc(f.path||"")}</div>
+          <div class="hint">Deep Enrich proposes: ${esc(after).slice(0,160)}</div>
+          ${deep.stale ? `<span class="chip chip-amber">stale candidate</span>` : ""}
+        </div>
+        <div class="sr-status">${v?esc(v.decision):"pending"}</div>
+        <div style="grid-column:2 / -1">${verdictButtons("table:"+id)}</div>
+      </div>`;
+    }).join("");
+    const deepBanner = deep.run_id
+      ? `<p class="hint">Deep Enrich run <code>${esc(deep.run_id)}</code>
+          · ${esc(deep.status||"draft")}
+          · ${esc(String((deep.diff_summary&&deep.diff_summary.total)||(deep.facets||[]).length))} facet path(s)
+          ${deep.stale ? " · <strong>candidate is stale vs active</strong>" : ""}
+         </p>`
+      : `<p class="hint">No Deep Enrich candidate yet. Run Deep Enrich to propose freshness, cost, and other contract facets.</p>`;
     main.innerHTML = `${errorBanner()}<div class="sr-card">
       <div class="sr-card-head"><h3>Table metadata</h3>
         <p>Accept the current value, or Edit to change name, description, or owner.</p></div>
       <div class="sr-card-body">${rows}${qrows}</div>
+    </div>
+    <div class="sr-card" style="margin-top:12px">
+      <div class="sr-card-head"><h3>Contract facets (Deep Enrich)</h3>
+        ${deepBanner}</div>
+      <div class="sr-card-body">${facetRows || `<div class="hint">No novel facets (freshness / cost / SLA) in the latest candidate.</div>`}</div>
     </div>`;
     bindVerdicts();
+    // When accepting a facet, stash Deep Enrich value from overview
+    const origBind = bindVerdicts;
+    main.querySelectorAll("[data-dec][data-scope^='table:sla:'],[data-dec][data-scope^='table:custom:'],[data-dec][data-scope^='table:facet:']").forEach((btn) => {
+      const prev = btn.onclick;
+      btn.addEventListener("click", () => {
+        const scope = btn.getAttribute("data-scope") || "";
+        const item = scope.replace(/^table:/, "");
+        const facet = (deep.facets||[]).find((f) => {
+          const scope2 = f.scope === "sla" ? "sla" : (f.scope === "custom" ? "custom" : "facet");
+          return (scope2 + ":" + (f.field || "unknown")) === item;
+        });
+        if (facet) state.tableFacetValue = facet.after;
+      }, true);
+    });
     const inp = main.querySelector("#srTableVal");
     if (inp) inp.oninput = () => { state.tableEdit[state.tableEditItem] = inp.value; };
     const save = main.querySelector("#srTableSave");
@@ -833,14 +876,30 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
         const inp = main.querySelector("#srTableVal");
         if (inp && state.tableEditItem) state.tableEdit[state.tableEditItem] = inp.value;
         const current = (state.overview && state.overview.table_section) || {};
-        const value = (item in state.tableEdit)
+        const deep = current.deep_enrich || {};
+        let value = (item in state.tableEdit)
           ? state.tableEdit[item]
           : (current[item] || null);
+        let chosen_source = "";
+        if (item.startsWith("sla:") || item.startsWith("custom:") || item.startsWith("facet:")) {
+          const facet = (deep.facets || []).find((f) => {
+            const scope2 = f.scope === "sla" ? "sla" : (f.scope === "custom" ? "custom" : "facet");
+            return (scope2 + ":" + (f.field || "unknown")) === item;
+          });
+          if (facet && decision === "accept") {
+            value = facet.after;
+            chosen_source = "llm_synthesis";
+          } else if (state.tableFacetValue != null && decision === "accept") {
+            value = state.tableFacetValue;
+            chosen_source = "llm_synthesis";
+          }
+        }
         const body = {
           item, decision,
-          rationale_code: state.rationale,
+          rationale_code: state.rationale || (chosen_source === "llm_synthesis" ? "engine_correct" : "domain_knowledge"),
           rationale_text: (main.querySelector("#srRationaleText") || {}).value || "n/a",
           value,
+          chosen_source,
         };
         if (body.rationale_code !== "other") body.rationale_text = "";
         else if (!body.rationale_text) body.rationale_text = "other";

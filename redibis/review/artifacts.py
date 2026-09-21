@@ -297,13 +297,32 @@ def _build_verdict_memory(svc, table: str, state: ReviewState, digest: str, ts: 
         })
     return {
         "kind": "redibis.steward_verdicts",
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "review_digest": digest,
         "exported_at": ts,
         "exporter": actor,
         "residency": "portable",
         "table": table,
         "entries": entries,
+        "deep_enrich": _deep_enrich_export(svc, table),
+    }
+
+
+def _deep_enrich_export(svc, table: str) -> dict:
+    try:
+        from redibis.services.deep_enrich_service import DeepEnrichService
+        from redibis.store.subcontract_store import SubcontractStore
+        deep = DeepEnrichService(
+            svc.store, SubcontractStore(svc.store.backend),
+        ).facets_for_steward(table)
+    except Exception:
+        return {}
+    return {
+        "run_id": deep.get("run_id"),
+        "status": deep.get("status"),
+        "stale": deep.get("stale"),
+        "merge_status": deep.get("merge_status"),
+        "facet_count": len(deep.get("facets") or []),
     }
 
 

@@ -144,7 +144,7 @@ def test_column_shows_engine_verdicts_with_confidence_pct():
         assert by_src["phone"]["is_pii"] is True
         assert by_src["llm"]["present"] is False
         assert by_src["llm"]["label"] == "LLM enrich"
-        assert by_src["llm_synthesis"]["label"] == "Deep enrich (synthesis)"
+        assert by_src["llm_synthesis"]["label"] == "Deep Enrich"
 
 
 def test_definition_candidates_include_enrich_and_synthesis():

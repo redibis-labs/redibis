@@ -3868,82 +3868,106 @@ async def run_enrichment_with_context(table: str, body: EnrichContextRunBody) ->
     return result.to_dict()
 
 
-# ── Contract Synthesis (portable ODCS v3.1 — no upsert) ────────────────────
+# ── Contract Synthesis / Deep Enrich (portable ODCS — no auto-upsert) ──────
 
 @app.post("/api/synthesis/{table}/run")
 async def synthesis_run(
     table: str,
+    request: Request,
     analysis_mode: str = Form("deterministic"),
     odcs_version: str = Form("v3.1.0"),
     output_dir: str = Form(""),
     provider: str = Form(""),
+    model: str = Form(""),
+    api_key: str = Form(""),
+    endpoint_url: str = Form(""),
+    system_prompt: str = Form(""),
+    extra_context: str = Form(""),
     compare_modes: str = Form("false"),
     files: list[UploadFile] = File(default=[]),
 ) -> dict:
     """
-    Run Contract Synthesis for ``table``.
+    Run Deep Enrich (legacy path ``/api/synthesis/...``).
 
-    Multipart: optional file uploads (requirements, sources, ZIP).
-    Base contract is loaded from the active store.
-    Never writes through ContractStore.upsert — portable artifacts only.
+    Multipart: optional file uploads (requirements, sources, ZIP), system prompt,
+    and free-form context. Reuses the Enrich capability-routing provider.
+    Persists a separate deep_enrich candidate — never auto-writes active.
     """
-    from redibis.synthesis import ContractSynthesisRunner
+    from redibis.services.deep_enrich_service import DeepEnrichService
+    from redibis.webapp.store_accessors import get_subcontract_store
 
     uploaded: dict[str, bytes] = {}
     for f in files or []:
         raw = await f.read()
         uploaded[f.filename or f"upload-{len(uploaded)}"] = raw
 
-    store = _cs()
-    try:
-        base = store.get_active(table)
-    except Exception as exc:
-        raise HTTPException(status_code=404, detail=f"no active contract: {exc}") from exc
-    if not base:
-        raise HTTPException(status_code=404, detail=f"no active contract for {table}")
-
-    provider_obj = None
     want_assisted = (analysis_mode or "").lower() == "assisted"
     want_compare = str(compare_modes).lower() in ("1", "true", "yes")
+    provider_obj = None
     if want_assisted or want_compare:
         try:
-            from redibis.enrich.providers import get_provider
-            provider_obj = get_provider(provider or "demo")
+            provider_obj, _binding = _provider_for_role(
+                "contract.enrichment",
+                provider=provider or "",
+                model=model or "",
+                api_key=api_key or None,
+                endpoint_url=endpoint_url or None,
+            )
+        except HTTPException:
+            raise
         except Exception as exc:
             if want_assisted:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    out = output_dir or f"./synthesis_out/{table.replace('.', '_')}"
-    runner = ContractSynthesisRunner(
-        analysis_mode=analysis_mode or "deterministic",
-        odcs_version=odcs_version or "v3.1.0",
-        provider=provider_obj,
-        redibis_config=_redibis_config(),
+    out = output_dir or None
+    actor = "local"
+    try:
+        user = getattr(request.state, "user", None)
+        actor = str(getattr(user, "username", None) or "local")
+    except Exception:
+        pass
+
+    svc = DeepEnrichService(
+        _cs(), get_subcontract_store(), redibis_config=_redibis_config(),
     )
     try:
-        result = runner.run(
-            base_contract=base,
+        result = svc.run(
+            table,
+            provider=provider_obj,
+            analysis_mode=analysis_mode or "deterministic",
+            odcs_version=odcs_version or "v3.1.0",
             uploaded=uploaded or None,
+            system_prompt=system_prompt or "",
+            extra_context=extra_context or "",
             output_dir=out,
+            created_by=actor,
             also_run_assisted_compare=want_compare,
         )
+    except ValueError as exc:
+        code = 404 if "no active" in str(exc).lower() else 400
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
     except Exception as exc:
-        logger.exception("Contract Synthesis failed for %r", table)
+        logger.exception("Deep Enrich / synthesis failed for %r", table)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    # Compatibility shape expected by older clients / tests
     return {
-        **result.to_dict(),
-        "lineage_react_flow": result.lineage_react_flow,
-        "candidate_preview": {
-            "apiVersion": (result.candidate or {}).get("apiVersion"),
-            "name": (result.candidate or {}).get("name"),
-            "version": (result.candidate or {}).get("version"),
-            "status": (result.candidate or {}).get("status"),
-            "property_count": sum(
-                len(s.get("properties") or [])
-                for s in ((result.candidate or {}).get("schema") or [])
-            ),
-        },
+        "valid": result.get("valid"),
+        "errors": result.get("errors") or [],
+        "warnings": result.get("warnings") or [],
+        "candidate_api_version": (result.get("candidate_preview") or {}).get("apiVersion"),
+        "artifacts": result.get("artifacts") or {},
+        "traceability": result.get("traceability") or {},
+        "meta": result.get("meta") or {},
+        "stage_results": (result.get("payload") or {}).get("stage_results") or [],
+        "comparison": (result.get("payload") or {}).get("comparison") or {},
+        "lineage_react_flow": result.get("lineage_react_flow") or {},
+        "candidate_preview": result.get("candidate_preview") or {},
+        "run_id": result.get("run_id"),
+        "path_diff": result.get("path_diff") or [],
+        "diff_summary": result.get("diff_summary") or {},
+        "writes_active_contract": False,
+        "status": result.get("status"),
     }
 
 
@@ -3954,9 +3978,16 @@ async def synthesis_run_file(
     odcs_version: str = Form("v3.1.0"),
     output_dir: str = Form("./synthesis_out"),
     provider: str = Form(""),
+    model: str = Form(""),
+    api_key: str = Form(""),
+    endpoint_url: str = Form(""),
     files: list[UploadFile] = File(default=[]),
 ) -> dict:
-    """Synthesis from an uploaded base contract file + optional docs/sources."""
+    """Synthesis from an uploaded base contract file + optional docs/sources.
+
+    File-based runs remain portable-only (no subcontract persistence) because
+    there is no active table identity to attach to.
+    """
     import yaml as _yaml
     from redibis.synthesis import ContractSynthesisRunner
 
@@ -3974,9 +4005,14 @@ async def synthesis_run_file(
 
     provider_obj = None
     if (analysis_mode or "").lower() == "assisted":
-        from redibis.enrich.providers import get_provider
         try:
-            provider_obj = get_provider(provider or "demo")
+            provider_obj, _binding = _provider_for_role(
+                "contract.enrichment",
+                provider=provider or "",
+                model=model or "",
+                api_key=api_key or None,
+                endpoint_url=endpoint_url or None,
+            )
         except Exception as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -3997,6 +4033,7 @@ async def synthesis_run_file(
     return {
         **result.to_dict(),
         "lineage_react_flow": result.lineage_react_flow,
+        "writes_active_contract": False,
     }
 
 
@@ -6650,6 +6687,22 @@ try:
 except Exception:
     logger.exception(
         "steward routes failed to register — /api/contracts/*/steward unavailable"
+    )
+
+try:
+    from redibis.webapp.deep_enrich_routes import register_deep_enrich_routes
+    from redibis.webapp.store_accessors import get_subcontract_store
+
+    register_deep_enrich_routes(
+        app,
+        lambda: _cs(),
+        get_subcontract_store=get_subcontract_store,
+        get_provider_for_role=_provider_for_role,
+        get_redibis_config=_redibis_config,
+    )
+except Exception:
+    logger.exception(
+        "deep enrich routes failed to register — /api/deep-enrich unavailable"
     )
 
 try:

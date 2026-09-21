@@ -223,12 +223,13 @@ def _register_builtins() -> None:
         ),
         NodeSpec(
             kind="contract_synthesis",
-            label="Contract Synthesis",
+            label="Deep Enrich",
             tool="ContractSynthesisRunner.run",
             category="governance",
             description=(
-                "Build a portable ODCS v3.1 candidate from a v3 base contract plus "
-                "requirements and Spark/SQL/DataStage sources. Does not upsert."
+                "Deep Enrich: build a separate ODCS candidate from a v3 base contract plus "
+                "requirements and Spark/SQL/DataStage sources. Does not auto-upsert; "
+                "merge accepted paths explicitly."
             ),
             params=(
                 NodeParamSpec(
