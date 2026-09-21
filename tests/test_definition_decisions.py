@@ -65,7 +65,10 @@ def test_reconcile_applies_table_owner_and_display_name():
         "columns": {},
     }
     assert reconcile_definition_decisions(contract, decisions) is True
-    assert contract["schema"][0]["owner"] == "ada"
-    assert contract["owner"] == "ada"
+    assert "owner" not in contract["schema"][0]
+    assert "owner" not in contract
+    assert "team" not in contract["schema"][0]
     assert contract["schema"][0]["businessName"] == "Customers (retail)"
     assert contract["team"][0]["name"] == "ada"
+    assert contract["team"][0]["username"] == "ada"
+    assert contract["team"][0]["role"] == "owner"

@@ -321,6 +321,76 @@ def test_allow_scan_false_blocks_scanning_but_not_browsing(client, tmp_path, mon
     assert resp.status_code == 403
 
 
+def test_upload_and_from_sample_share_both_mode_and_full_scan(client, library):
+    """use → (from-sample) must create the same both-mode session as upload and
+    run profile + quality + PII — not quality/profile alone.
+    """
+    import io
+
+    from redibis.services.session.steps import execute_unified_scan
+    from redibis.services.session_service import session_manager
+    from redibis.webapp.backend import _cs, get_backend_store
+
+    csv_bytes = (library.root / "customers.csv").read_bytes()
+    upload = client.post(
+        "/api/sessions",
+        files={"file": ("customers.csv", io.BytesIO(csv_bytes), "text/csv")},
+        data={
+            "table": "data.customers_upload",
+            "scan_mode": "both",
+            "pii_engines": "regex",
+        },
+    )
+    assert upload.status_code == 200, upload.text
+    sample = client.post(
+        "/api/sessions/from-sample",
+        json={
+            "path": "customers.csv",
+            "table": "data.customers_sample",
+            "scan_mode": "both",
+            "pii_engines": "regex",
+        },
+    )
+    assert sample.status_code == 200, sample.text
+
+    assert upload.json()["common_config"]["scan_mode"] == "both"
+    assert sample.json()["common_config"]["scan_mode"] == "both"
+
+    backend = get_backend_store()
+    store = _cs()
+    results = {}
+    for label, sid in (
+        ("upload", upload.json()["session_id"]),
+        ("sample", sample.json()["session_id"]),
+    ):
+        # Same post-create PATCH the UI sends via configScalars().
+        patched = client.patch(
+            f"/api/sessions/{sid}/config",
+            json={"fields": {"scan_mode": "both", "pii_engines": "regex"}},
+        )
+        assert patched.status_code == 200, patched.text
+        assert patched.json()["scan_mode"] == "both"
+
+        session = session_manager.get_session(sid)
+        assert session is not None
+        assert session.common_config.scan_mode == "both"
+        execute_unified_scan(session, backend, store)
+        assert session.status == "scan_complete", session.logs[-8:]
+        run_types = {r.run_type for r in session.runs}
+        quality_runs = [r for r in session.runs if r.run_type == "scan_quality"]
+        pii_runs = [r for r in session.runs if r.run_type == "scan_pii"]
+        assert quality_runs, f"{label} missing quality run: {run_types}"
+        assert pii_runs, f"{label} missing PII run: {run_types}"
+        results[label] = {
+            "quality": len(quality_runs),
+            "pii": len(pii_runs),
+            "status": session.status,
+        }
+    assert results["upload"]["status"] == results["sample"]["status"] == "scan_complete"
+    assert results["upload"]["pii"] == results["sample"]["pii"] == 1
+    assert results["upload"]["quality"] == results["sample"]["quality"] == 1
+
+
 def test_scan_button_posts_from_sample_not_a_null_file():
     """Picking a server sample must not POST FormData(file=null) to /api/sessions."""
     js = (
@@ -342,6 +412,9 @@ def test_scan_button_posts_from_sample_not_a_null_file():
     assert "S.sampleRef" in helper
     assert 'POST("/api/sessions/from-sample"' in helper
     assert 'POST("/api/sessions",' in helper
+    # Config PATCH failures must surface — silent swallow left path scans incomplete.
+    assert "Failed to apply scan config" in helper
+    assert "catch(_){}" not in helper.split("PATCH")[1].split("return sess")[0]
     ensure = js.split("async function ensureSession")[1].split("function ")[0]
     assert "createSessionFromCurrentSource" in ensure
     for fn in (
@@ -354,6 +427,29 @@ def test_scan_button_posts_from_sample_not_a_null_file():
         body = js.split("async function " + fn)[1].split("async function ")[0]
         assert "createSessionFromCurrentSource" in body
         assert 'fd.append("file",S.file)' not in body
+
+
+def test_do_scan_scoped_shortcut_does_not_stick_scan_mode():
+    """Quality-only / PII-only shortcuts must not permanently mutate cfg.scan_mode."""
+    js = (
+        Path(__file__).resolve().parents[1]
+        / "redibis"
+        / "webapp"
+        / "static"
+        / "app.js"
+    ).read_text(encoding="utf-8")
+    do_scan = js.split("async function doScan")[1].split("async function ")[0]
+    assert "var preferredMode=cfg.scan_mode" in do_scan or "var preferredMode=cfg.scan_mode||\"both\"" in do_scan
+    assert "if(scope) cfg.scan_mode=preferredMode" in do_scan
+    assert "if(scope) cfg.scan_mode=scope" not in do_scan
+    # Failed/error terminal status must not be labeled "Scan complete!".
+    assert 'st==="error"||st==="failed"' in do_scan
+    assert 'addLog("Scan failed (status="+st+")","err")' in do_scan
+    assert do_scan.index('st==="error"||st==="failed"') < do_scan.index('addLog("Scan complete!"')
+    sample_body = js.split("function buildSampleSessionBody")[1].split("function ")[0]
+    assert "pii_llm_confidence" in sample_body
+    form_body = js.split("function buildSessionFormData")[1].split("function ")[0]
+    assert "pii_llm_confidence" in form_body
 
 
 def test_homepage_is_a_csv_path_box_not_a_dropzone():
@@ -379,7 +475,12 @@ def test_homepage_is_a_csv_path_box_not_a_dropzone():
     assert "function restorePersistedScanSource" in js
     assert "function openSettings" in js
     assert "leaveSettingsToScan()" in js.split("function applySettingsScan")[1].split("function ")[0]
-    assert "restorePersistedScanSource()" in js.split("async function restoreSessionOnBoot")[1].split("async function ")[0]
+    # Boot restores the source once; restoreSessionOnBoot must not re-apply
+    # persisted cfg after loadGlobalUiPrefs (sticky quality race).
+    boot_restore = js.split("async function restoreSessionOnBoot")[1].split("async function ")[0]
+    assert "restorePersistedScanSource()" not in boot_restore
+    assert "loadGlobalUiPrefs().then" in js
     assert "btnSettings" in js
     assert "drop your CSV here" not in js
     assert "function uploadDropzoneHtml" not in js
+    assert "scan · \"+scanModeLabel()" in js

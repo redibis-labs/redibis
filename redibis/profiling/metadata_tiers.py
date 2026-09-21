@@ -67,11 +67,18 @@ def enrich_profile_with_metadata(
 
 
 def apply_catalog_props_to_partial(partial: dict, source_metadata: SourceMetadata) -> dict:
-    """Merge Tier-A table props (retention, owner) into an ODCS partial."""
+    """Merge Tier-A table props (retention, owner) into an ODCS partial.
+
+    Catalog ``Owner`` becomes a top-level ODCS ``team`` member — installed ODCS
+    forbids a bare ``owner`` string at the contract or schema level.
+    """
+    from redibis.contracts.ownership import ensure_team_member, owner_as_team_member
+
     props = source_metadata.table_props or {}
     owner = props.get("Owner") or props.get("owner")
-    if owner:
-        partial["owner"] = owner
+    member = owner_as_team_member(owner)
+    if member:
+        ensure_team_member(partial, member)
 
     retention = props.get("Retention") or props.get("retention")
     if retention is not None:

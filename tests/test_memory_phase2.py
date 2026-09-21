@@ -315,6 +315,9 @@ def test_apply_catalog_props_to_partial_sets_owner_and_retention():
         engine="hive",
     )
     out = apply_catalog_props_to_partial(partial, meta)
-    assert out["owner"] == "data_steward"
+    assert "owner" not in out
+    assert out["team"] == [
+        {"name": "data_steward", "username": "data_steward", "role": "owner"},
+    ]
     assert out["slaProperties"][0]["property"] == "retention"
     assert out["slaProperties"][0]["value"] == 90

@@ -2,10 +2,10 @@
 
 # redibis
 
-**modernize , govern and protect your data**  
-support ODCS v3 , auto pii detection , unstructured text gate way for data protection, auto quality rule and code generation .
+** modernize , govern and protect your data **  
+Auto generates data contract [support ODCS v3] , auto pii detection , unstructured data protection  gateway  , auto quality rules and code generation .
 
-put redibis at hheart of your [CI/CD- monitoring ] pipelines to contiues protect your data 
+put redibis at heart of your [CI/CD- monitoring ] pipelines to contiues protect your data 
 
 ---
 
@@ -74,8 +74,6 @@ tutorials are verified; today the hands-on path is the
 - Catalog push status and backends
 - Optional column-memory learning loop (when configured)
 
-### Agentic (optional)
-- Ask / Composer style board behind config flags (disabled until you enable it)
 
 ### Free-text / gateway
 - Text PII scan policies, gateway sessions, and evaluation helpers for unstructured content

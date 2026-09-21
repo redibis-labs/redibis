@@ -155,6 +155,7 @@ def _has_profile_stats(stats: dict) -> bool:
 
 
 def _owner_from_active(active: dict, schema: dict) -> str:
+    # Legacy owner fields (pre-ODCS) then canonical top-level team.
     for candidate in (schema.get("owner"), active.get("owner")):
         if isinstance(candidate, str) and candidate.strip():
             return candidate.strip()
@@ -164,10 +165,21 @@ def _owner_from_active(active: dict, schema: dict) -> str:
                 return label
     team = active.get("team") or schema.get("team") or []
     if isinstance(team, list) and team:
+        preferred = None
+        for member in team:
+            if not isinstance(member, dict):
+                continue
+            label = str(member.get("name") or member.get("username") or "").strip()
+            if not label:
+                continue
+            if str(member.get("role") or "").lower() == "owner":
+                return label
+            if preferred is None:
+                preferred = label
+        if preferred:
+            return preferred
         first = team[0]
-        if isinstance(first, dict):
-            return str(first.get("name") or first.get("username") or "").strip()
-        return str(first).strip()
+        return str(first).strip() if not isinstance(first, dict) else ""
     if isinstance(team, str):
         return team.strip()
     return ""

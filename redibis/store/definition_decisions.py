@@ -45,17 +45,28 @@ def reconcile_definition_decisions(contract: dict, decisions: dict) -> bool:
                 schema_obj["businessName"] = copy.deepcopy(table_dec["businessName"])
                 changed = True
             if table_dec.get("owner") is not None:
+                from redibis.contracts.ownership import owner_as_team_member
+
                 owner = table_dec["owner"]
-                schema_obj["owner"] = copy.deepcopy(owner)
-                contract["owner"] = copy.deepcopy(owner)
-                if isinstance(owner, str) and owner.strip():
-                    team = list(contract.get("team") or schema_obj.get("team") or [])
-                    if team and isinstance(team[0], dict):
-                        team[0] = {**team[0], "name": owner, "username": owner}
-                    else:
-                        team = [{"name": owner, "username": owner, "role": "owner"}]
+                # ODCS forbids schema/top-level ``owner``; keep ownership in team.
+                schema_obj.pop("owner", None)
+                schema_obj.pop("team", None)
+                contract.pop("owner", None)
+                member = owner_as_team_member(owner)
+                # Drop prior owner-role members, then set the new owner if any.
+                team = [
+                    m for m in (contract.get("team") or [])
+                    if not (
+                        isinstance(m, dict)
+                        and str(m.get("role") or "").lower() == "owner"
+                    )
+                ]
+                if member:
+                    team.append(copy.deepcopy(member))
+                if team:
                     contract["team"] = team
-                    schema_obj["team"] = team
+                else:
+                    contract.pop("team", None)
                 changed = True
         for prop in schema_obj.get("properties", []) or []:
             if not isinstance(prop, dict):

@@ -219,8 +219,16 @@ def test_table_owner_edit_persists_on_overview():
         )
         assert ov["table_section"]["owner"] == "ada@example.com"
         active = store.get_active("db.customers")
-        assert active["owner"] == "ada@example.com"
-        assert active["schema"][0]["owner"] == "ada@example.com"
+        # ODCS: ownership lives in top-level team, not owner fields.
+        assert "owner" not in active
+        assert "owner" not in active["schema"][0]
+        owners = [
+            m for m in (active.get("team") or [])
+            if isinstance(m, dict) and str(m.get("role") or "").lower() == "owner"
+        ]
+        assert owners
+        assert owners[0]["name"] == "ada@example.com"
+        assert owners[0]["username"] == "ada@example.com"
 
 
 def test_edit_pii_off_and_batch_save():

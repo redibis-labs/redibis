@@ -33,9 +33,10 @@ OPERATIONAL_CONTRACT_FIELDS: frozenset[str] = frozenset({
 def slim_contract(contract: dict) -> dict:
     """Return a copy of ``contract`` with operational telemetry removed.
 
-    Also normalises column privacy blocks and drops legacy ``pii``/``maskingPolicy``
-    duplicates.
+    Also normalises column privacy blocks, migrates legacy ``owner`` into ODCS
+    ``team``, and drops legacy ``pii``/``maskingPolicy`` duplicates.
     """
+    from redibis.contracts.ownership import normalize_odcs_ownership
     from redibis.contracts.privacy import normalize_column_privacy
 
     out = copy.deepcopy(contract)
@@ -51,6 +52,8 @@ def slim_contract(contract: dict) -> dict:
             out["customProperties"] = kept
         else:
             out.pop("customProperties", None)
+
+    normalize_odcs_ownership(out)
 
     for col in _iter_columns(out):
         normalize_column_privacy(col)

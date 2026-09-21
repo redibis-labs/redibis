@@ -161,7 +161,13 @@ async function createSessionFromCurrentSource(){
   }
   S.sid=sess.session_id;
   persistScanSource();
-  try{await PATCH("/api/sessions/"+S.sid+"/config",{fields:configScalars()});}catch(_){}
+  // Config patch must succeed — a silent failure left path scans on a stale
+  // mode while Settings UI still showed the preferred "both".
+  try{
+    await PATCH("/api/sessions/"+S.sid+"/config",{fields:configScalars()});
+  }catch(e){
+    throw new Error("Failed to apply scan config: "+apiErr(e));
+  }
   return sess;
 }
 
@@ -411,10 +417,10 @@ async function restoreSessionOnBoot(){
     }
     var sid=params.get("session");
     var table=params.get("table");
-    // Explicit ?session= / ?table= from v2 manage wins. Otherwise restore the
-    // CSV picked on the scan console so Settings → Scan does not drop it.
+    // Explicit ?session= / ?table= from v2 manage wins. Source restore already
+    // ran at boot — do not re-apply persisted cfg here (it raced after
+    // loadGlobalUiPrefs and could sticky-overwrite scan_mode back to quality).
     if(!sid&&!table){
-      restorePersistedScanSource();
       return;
     }
     if(!sid&&table){
@@ -487,6 +493,7 @@ function buildSessionFormData(){
   fd.append("pii_engines",cfg.pii_engines);
   fd.append("pii_regex_confidence",cfg.pii_regex_confidence);
   fd.append("pii_gliner_confidence",cfg.pii_gliner_confidence);
+  fd.append("pii_llm_confidence",cfg.pii_llm_confidence||0.82);
   fd.append("pii_gliner_model",cfg.pii_gliner_model);
   if(cfg.pii_models_dir) fd.append("pii_models_dir",cfg.pii_models_dir);
   fd.append("pii_gliner_always_run",cfg.pii_gliner_always_run?'true':'false');
@@ -515,6 +522,7 @@ function buildSampleSessionBody(){
     pii_engines:cfg.pii_engines,
     pii_regex_confidence:cfg.pii_regex_confidence,
     pii_gliner_confidence:cfg.pii_gliner_confidence,
+    pii_llm_confidence:cfg.pii_llm_confidence||0.82,
     pii_gliner_model:cfg.pii_gliner_model,
     pii_gliner_always_run:!!cfg.pii_gliner_always_run,
     automerge:cfg.automerge||"none"
@@ -703,10 +711,14 @@ async function doScan(scope){
     return;
   }
   S.scanBusy=true;
-  // scope overrides cfg.scan_mode if provided explicitly
-  if(scope) cfg.scan_mode=scope;
+  // One-shot scope for PII/Quality/Both shortcuts — do NOT permanently mutate
+  // cfg.scan_mode. A prior "Quality only" click used to stick and made later
+  // main-scan + path (use →) runs skip PII even when Settings showed Both.
+  var preferredMode=cfg.scan_mode||"both";
+  var mode=scope||preferredMode;
+  cfg.scan_mode=mode;
   S.logs=[];S.prog=5;S.pmsg="Creating session…";S.view="scanning";render();
-  addLog("Starting scan (mode="+cfg.scan_mode+"): "+S.fname,"step");
+  addLog("Starting scan (mode="+mode+"): "+S.fname,"step");
   try{
     var sess=await createSessionFromCurrentSource();
     addLog("Session "+sess.session_id+" created","ok");
@@ -723,17 +735,29 @@ async function doScan(scope){
     await POST("/api/sessions/"+S.sid+"/scan",null);
     // poll for completion — unified scan only finishes at scan_complete
     var done=["scan_complete","error","failed"];
-    await wait(S.sid,done);
+    var terminal=await wait(S.sid,done);
     S.prog=95;S.pmsg="Fetching results…";render();
     var fin=await GET("/api/sessions/"+S.sid);
     S.result=fin;S.scanDone=true;
     syncScanLinksFromResult(fin);
     saveLastSession(S.sid,S.table||fin.table_name);
-    S.prog=100;S.pmsg="Done";
-    addLog("Scan complete!","ok");
-    render();
+    var st=(fin&&fin.status)||(terminal&&terminal.status)||"";
+    if(st==="error"||st==="failed"){
+      S.prog=100;S.pmsg="Failed";
+      addLog("Scan failed (status="+st+")","err");
+      render();
+    }else{
+      S.prog=100;S.pmsg="Done";
+      addLog("Scan complete!","ok");
+      render();
+    }
   }catch(e){addLog("ERROR: "+e.message,"err");S.pmsg="Failed";render()}
-  finally{S.scanBusy=false;}
+  finally{
+    // Restore the preferred Settings mode after a scoped one-shot shortcut.
+    if(scope) cfg.scan_mode=preferredMode;
+    persistScanSource();
+    S.scanBusy=false;
+  }
 }
 
 // ── Debug page functions ──────────────────────────────────────────────────────
@@ -2905,7 +2929,7 @@ function vReady(){
     // Unified scan button — reads cfg.scan_mode
     "<div style='margin-bottom:20px;display:flex;flex-direction:column;align-items:center;gap:10px'>"+
       "<button class='btn btn-red' style='width:300px;height:56px;font-size:18px;font-weight:800;letter-spacing:-.01em' onclick='doScan()'>"+
-        "scan"+
+        "scan · "+scanModeLabel()+
       "</button>"+
       "<div class='row' style='gap:8px'>"+
         "<button class='btn btn-ghost btn-sm' onclick='doScan(\"pii\")'>PII only</button>"+
@@ -2914,7 +2938,7 @@ function vReady(){
         "<button class='btn btn-ghost btn-sm' type='button' onclick='openSettings()'>⚙ settings</button>"+
       "</div>"+
       "<div style='font-size:.72rem;color:var(--muted);font-family:\"IBM Plex Mono\",monospace'>"+
-        "engines: "+cfg.pii_engines+" · regex ≥ "+cfg.pii_regex_confidence+" · gliner ≥ "+cfg.pii_gliner_confidence+
+        "mode: "+scanModeLabel()+" · engines: "+cfg.pii_engines+" · regex ≥ "+cfg.pii_regex_confidence+" · gliner ≥ "+cfg.pii_gliner_confidence+
         (cfg.pii_regex_config_name?" · regex: "+cfg.pii_regex_config_name:"")+
         (cfg.quality_config_name?" · quality: "+cfg.quality_config_name:"")+
       "</div>"+
@@ -7127,8 +7151,13 @@ if(window.REDIBIS_SETTINGS_PAGE){
     if(app) app.innerHTML="<main class='page'><div class='cbox'><div class='stitle'>Settings failed to load</div><pre>"+E(e&&e.message||e)+"</pre></div></main>";
   });
 }else{
+  // Restore the CSV source first, then let saved global prefs win for
+  // scan_mode / engines so a sticky one-shot Quality-only does not survive
+  // reload and silently shrink the next use→ scan.
   restorePersistedScanSource();
   render();
-  loadGlobalUiPrefs().then(function(){render()});
-  restoreSessionOnBoot().then(function(){render();loadRx();});
+  loadGlobalUiPrefs().then(function(){
+    render();
+    restoreSessionOnBoot().then(function(){render();loadRx();});
+  });
 }
