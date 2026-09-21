@@ -6,17 +6,18 @@ Each run writes one object into its **type-specific bucket**, never directly
 into the active contract. You later select one run and merge it into the
 single active contract (see redibis.store.run_merger).
 
-Two dedicated run buckets (the locked v2 decision):
+Dedicated run buckets:
 
-    pii-contracts/       {schema}.{table}/{run_id}.yaml   — one per PII run
-    quality-contracts/   {schema}.{table}/{run_id}.yaml   — one per quality run
+    pii-contracts/          {schema}.{table}/{run_id}.yaml   — one per PII run
+    quality-contracts/      {schema}.{table}/{run_id}.yaml   — one per quality run
+    deep-enrich-contracts/  {schema}.{table}/{run_id}.yaml   — Deep Enrich candidates
 
-So a table accumulates a history of PII runs and a history of quality runs.
+So a table accumulates a history of PII, quality, and Deep Enrich runs.
 A bad run is simply never selected (and purge wipes the active if poisoned).
 
 Lifecycle:  draft → (edit) → reviewed → (merge) → merged   ; or discarded.
 
-This module is the ONLY writer to the two run buckets. It never touches the
+This module is the ONLY writer to the run buckets. It never touches the
 active-contracts bucket (that is ContractStore's job).
 """
 
@@ -37,7 +38,8 @@ from redibis.store.storage_backend import StorageBackend
 
 KIND_PII = "pii"
 KIND_QUALITY = "quality"
-VALID_KINDS = (KIND_PII, KIND_QUALITY)
+KIND_DEEP_ENRICH = "deep_enrich"
+VALID_KINDS = (KIND_PII, KIND_QUALITY, KIND_DEEP_ENRICH)
 
 # Subcontract lifecycle states
 STATUS_DRAFT = "draft"
@@ -95,7 +97,7 @@ class Subcontract:
     subcontract_id: str
     contract_uuid: Optional[str]     # which active contract it targets (None until known)
     schema_table: str                # 'schema.table'
-    kind: str                        # 'pii' | 'quality'
+    kind: str                        # 'pii' | 'quality' | 'deep_enrich'
     run_id: str                      # the scan run that produced it
     payload: dict = field(default_factory=dict)
     status: str = STATUS_DRAFT
@@ -169,10 +171,12 @@ class SubcontractStore:
         backend: StorageBackend,
         pii_bucket: str = "pii-contracts",
         quality_bucket: str = "quality-contracts",
+        deep_enrich_bucket: str = "deep-enrich-contracts",
     ):
         self.backend = backend
         self.pii_bucket = pii_bucket
         self.quality_bucket = quality_bucket
+        self.deep_enrich_bucket = deep_enrich_bucket
 
     # ── Bucket / key helpers ─────────────────────────────────────────────
 
@@ -181,6 +185,8 @@ class SubcontractStore:
             return self.pii_bucket
         if kind == KIND_QUALITY:
             return self.quality_bucket
+        if kind == KIND_DEEP_ENRICH:
+            return self.deep_enrich_bucket
         raise ValueError(f"Unknown subcontract kind {kind!r}; expected one of {VALID_KINDS}")
 
     def _run_key(self, table: str, run_id: str) -> str:

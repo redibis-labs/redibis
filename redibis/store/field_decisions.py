@@ -23,6 +23,9 @@ VALID_FIELDS = frozenset({
     "masking",
     "quality_rules",
     "entity_type",
+    "freshness",
+    "retention",
+    "cost",
 })
 
 

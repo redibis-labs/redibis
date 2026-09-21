@@ -163,6 +163,7 @@ def _detect_contributed_fields(partial: dict) -> list[str]:
     if "description"   in partial:                     contributed.add("description")
     if "pii_summary"   in partial:                     contributed.add("pii_summary")
     if "slaProperties" in partial:                     contributed.add("slaProperties")
+    if "customProperties" in partial:                  contributed.add("customProperties")
     if "terms"         in partial:                     contributed.add("terms")
     if "schema"        in partial and partial["schema"]:
         for table in partial["schema"]:
@@ -245,7 +246,7 @@ def merge_two_contracts(
                 merged[id_field] = incoming_val
 
     # Top-level non-identity replaceable fields (spec only — no telemetry)
-    for field in ("description", "slaProperties", "terms"):
+    for field in ("description", "slaProperties", "terms", "customProperties"):
         if field in incoming:
             merged[field] = incoming[field]
 

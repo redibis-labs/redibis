@@ -97,6 +97,7 @@ class S3Config:
     # v2: two dedicated run buckets — one subcontract object per scan run.
     pii_runs_bucket:     str           = "pii-contracts"
     quality_runs_bucket: str           = "quality-contracts"
+    deep_enrich_runs_bucket: str       = "deep-enrich-contracts"
     pii_configs_bucket:  str           = "pii-configs"
     quality_configs_bucket: str        = "quality-configs"
     # Operational contract telemetry (provenance, pii_summary). When unset,
@@ -117,6 +118,7 @@ class S3Config:
             contracts_bucket      = os.getenv("S3_CONTRACTS_BUCKET", "active-contracts"),
             pii_runs_bucket       = os.getenv("S3_PII_RUNS_BUCKET",     "pii-contracts"),
             quality_runs_bucket   = os.getenv("S3_QUALITY_RUNS_BUCKET", "quality-contracts"),
+            deep_enrich_runs_bucket = os.getenv("S3_DEEP_ENRICH_RUNS_BUCKET", "deep-enrich-contracts"),
             pii_configs_bucket    = os.getenv("S3_PII_CONFIGS_BUCKET", "pii-configs"),
             quality_configs_bucket= os.getenv("S3_QUALITY_CONFIGS_BUCKET", "quality-configs"),
             metadata_bucket       = os.getenv("S3_METADATA_BUCKET"),

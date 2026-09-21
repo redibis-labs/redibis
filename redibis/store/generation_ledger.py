@@ -37,6 +37,9 @@ FIELDS = (
     "logical_type",
     "quality_rules",
     "masking",
+    "freshness",
+    "retention",
+    "cost",
 )
 GENERATION_SET = frozenset(GENERATIONS)
 FIELD_SET = frozenset(FIELDS)
@@ -50,7 +53,7 @@ SOURCE_LABELS = {
     "phone": "Phone number",
     "custom_rule": "Business rules",
     "llm": "LLM enrich",
-    "llm_synthesis": "Deep enrich (synthesis)",
+    "llm_synthesis": "Deep Enrich",
     "supplied": "Supplied verdict",
     "human": "Data steward",
 }

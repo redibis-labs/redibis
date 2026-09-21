@@ -109,6 +109,7 @@ def get_subcontract_store() -> SubcontractStore:
         get_backend_store(),
         pii_bucket=os.getenv("S3_PII_RUNS_BUCKET", "pii-contracts"),
         quality_bucket=os.getenv("S3_QUALITY_RUNS_BUCKET", "quality-contracts"),
+        deep_enrich_bucket=os.getenv("S3_DEEP_ENRICH_RUNS_BUCKET", "deep-enrich-contracts"),
     )
     _stores["subcontract"] = st
     return st

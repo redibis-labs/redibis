@@ -352,6 +352,7 @@ class StorageConfig:
     contracts_bucket: str = "active-contracts"
     pii_runs_bucket: str = "pii-contracts"
     quality_runs_bucket: str = "quality-contracts"
+    deep_enrich_runs_bucket: str = "deep-enrich-contracts"
 
 
 @dataclass
