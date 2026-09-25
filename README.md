@@ -16,10 +16,7 @@ context, and de-identified before it is shared or sent to an LLM.
 The name combines **"redact" + "ibis"** — the Egyptian ibis was Thoth's sacred
 bird, the symbol of writing, records, and the categorization of knowledge.
 
-This repository is the **Apache-2.0 open core**. Commercial add-ons (filtered
-reports console, hosted codegen, air-gapped enterprise bundles) are separate
-products and are not included here.
-
+This repository is the **Apache-2.0 open core**.
 ---
 
 ## Why use it
