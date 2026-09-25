@@ -1,6 +1,8 @@
-![redibis — easily govern](redibis/webapp/static/logo.png)
+<p align="center">
+  <img src="redibis/webapp/static/logo.png" alt="redibis — easily govern" width="240">
+</p>
 
-# redibis
+<h1 align="center">redibis</h1>
 
 ** modernize , govern and protect your data **  
 Auto generates data contract [support ODCS v3] , auto pii detection , unstructured data protection  gateway  , auto quality rules and code generation .
