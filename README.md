@@ -9,6 +9,8 @@ Auto generates data contract [support ODCS v3] , auto pii detection , unstructur
 
 put redibis at heart of your [CI/CD- monitoring ] pipelines to contiues protect your data 
 
+📖 **Help and guides:** <https://redibis-labs.github.io/redibis/>
+
 ---
 
 redibis sits in your data platform and CI/CD so tabular data is profiled,
@@ -89,9 +91,8 @@ optional S3/MinIO).
 | Area | Purpose |
 |------|---------|
 | Start / scan console (`/`) | Upload or pick sample CSV, run scans, watch session progress |
-| Contracts v2 (`/v2`) | Active contract, PII/quality views, Steward Review, enrich, synthesis, share |
-| Settings (`/settings`) | Models, LLM providers, agents, governance, runtime |
-| Agents (`/agents`) | Optional agentic Ask / Composer / results (config-gated) |
+| Contracts v2 (`/v2`) | Active contract, PII/quality views, Steward Review, enrich, share |
+| Settings (`/settings`) | Models, LLM providers, governance, runtime |
 | Gateway | Free-text / evaluation operator UI (when enabled) |
 | Login / users | Auth on by default; bootstrap `admin` / `admin` if empty users store |
 | Swagger (`/docs`) | Interactive HTTP API after login |
@@ -149,8 +150,6 @@ redibis <command> --help
 | `memory` / `golden` / `vector` / `similar` | Column memory and golden similarity (when enabled) |
 | `workspace` / `scan-batch` | Named multi-table workspaces and folder batch scan |
 | `eval` / `dataset` (`training`) | Evaluation datasets and steward training export |
-| `agents` | Agentic pipeline board helpers |
-| `report` | PII reporting (needs commercial `redibis-reports` add-on) |
 | `import-business` | Import business metadata into contracts |
 
 Global flags include `--output-dir` (CLI store root), `--use-s3`, and logging
@@ -159,13 +158,13 @@ enrich / steward share one `_dev_storage`.
 
 ### HTTP API
 
-The dashboard exposes **400+** JSON routes under `/api/…` plus HTML pages.
+The dashboard exposes **350+** JSON routes under `/api/…` plus HTML pages.
 Full method/path listing:
 
 **[docs/API_SURFACE.md](docs/API_SURFACE.md)**
 
 Grouped areas include: sessions & scan, contracts & steward, evidence, enrich,
-masking, PII / gateway, agents, catalog, classification, behavior, workspaces,
+masking, PII / gateway, catalog, classification, behavior, workspaces,
 LLM providers, models, packs, users/auth, and settings. Session cookie auth
 applies by default; use `/docs` after login for live schemas.
 

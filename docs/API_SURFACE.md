@@ -4,7 +4,7 @@ Generated from FastAPI route decorators in `redibis/webapp/`.
 Auth is on by default — most `/api/*` routes require a session cookie.
 Interactive docs: `/docs` (Swagger) after login.
 
-**412 routes** registered in this build.
+**355 routes** listed below.
 
 ## Dashboard HTML pages
 
@@ -12,7 +12,6 @@ Interactive docs: `/docs` (Swagger) after login.
 |--------|------|
 | `GET` | `/` |
 | `POST` | `/admin/reset` |
-| `GET` | `/agents` |
 | `GET` | `/batch` |
 | `GET` | `/gateway` |
 | `GET` | `/gateway/evaluations` |
@@ -21,6 +20,7 @@ Interactive docs: `/docs` (Swagger) after login.
 | `GET` | `/gateway/usecases/{uc_id}` |
 | `GET` | `/health` |
 | `GET` | `/healthz` |
+| `GET` | `/help` |
 | `GET` | `/login` |
 | `POST` | `/login` |
 | `POST` | `/logout` |
@@ -31,64 +31,6 @@ Interactive docs: `/docs` (Swagger) after login.
 | `GET` | `/share/{token}` |
 | `GET` | `/users` |
 | `GET` | `/v2` |
-
-## Agentic board
-
-| Method | Path |
-|--------|------|
-| `POST` | `/api/agents/ask` |
-| `POST` | `/api/agents/batch` |
-| `GET` | `/api/agents/capabilities` |
-| `POST` | `/api/agents/codegen/request` |
-| `GET` | `/api/agents/codegen/status` |
-| `POST` | `/api/agents/codegen/submit` |
-| `POST` | `/api/agents/compile` |
-| `GET` | `/api/agents/dashboard` |
-| `POST` | `/api/agents/deep-profile` |
-| `GET` | `/api/agents/defaults` |
-| `PUT` | `/api/agents/defaults` |
-| `POST` | `/api/agents/docgen` |
-| `GET` | `/api/agents/docgen/registry` |
-| `GET` | `/api/agents/dynamic-tools` |
-| `POST` | `/api/agents/dynamic-tools/register` |
-| `POST` | `/api/agents/execute` |
-| `POST` | `/api/agents/handoff` |
-| `GET` | `/api/agents/nodes` |
-| `GET` | `/api/agents/packs` |
-| `POST` | `/api/agents/packs` |
-| `GET` | `/api/agents/packs/{name}` |
-| `PUT` | `/api/agents/packs/{name}` |
-| `POST` | `/api/agents/plan` |
-| `POST` | `/api/agents/preview` |
-| `POST` | `/api/agents/providers/validate` |
-| `GET` | `/api/agents/recipes` |
-| `GET` | `/api/agents/recipes/{recipe_id}` |
-| `GET` | `/api/agents/registry` |
-| `DELETE` | `/api/agents/runs` |
-| `GET` | `/api/agents/runs` |
-| `DELETE` | `/api/agents/runs/{run_id}` |
-| `GET` | `/api/agents/runs/{run_id}` |
-| `GET` | `/api/agents/runs/{run_id}/artifacts` |
-| `GET` | `/api/agents/runs/{run_id}/artifacts/{artifact_id}` |
-| `GET` | `/api/agents/runs/{run_id}/audit` |
-| `POST` | `/api/agents/runs/{run_id}/cancel` |
-| `GET` | `/api/agents/runs/{run_id}/queue` |
-| `POST` | `/api/agents/runs/{run_id}/resume` |
-| `GET` | `/api/agents/runs/{run_id}/stream` |
-| `GET` | `/api/agents/runs/{run_id}/tables` |
-| `GET` | `/api/agents/runs/{run_id}/tables/{table}/summary` |
-| `GET` | `/api/agents/runs/{run_id}/trace` |
-| `GET` | `/api/agents/runtime` |
-| `GET` | `/api/agents/source/samples` |
-| `POST` | `/api/agents/source/samples/clear` |
-| `POST` | `/api/agents/source/samples/session` |
-| `DELETE` | `/api/agents/source/samples/{filename}` |
-| `GET` | `/api/agents/source/schemas` |
-| `GET` | `/api/agents/source/tables` |
-| `POST` | `/api/agents/source/tables` |
-| `POST` | `/api/agents/source/test` |
-| `POST` | `/api/agents/source/upload` |
-| `POST` | `/api/agents/validate` |
 
 ## Behavior policies
 
@@ -237,12 +179,6 @@ Interactive docs: `/docs` (Swagger) after login.
 | `POST` | `/api/enrich/{table}/context/preview` |
 | `POST` | `/api/enrich/{table}/context/promote` |
 | `POST` | `/api/enrich/{table}/run` |
-
-## Enterprise plugin status
-
-| Method | Path |
-|--------|------|
-| `GET` | `/api/enterprise/status` |
 
 ## Evidence review
 
@@ -555,14 +491,6 @@ Interactive docs: `/docs` (Swagger) after login.
 | `DELETE` | `/api/share/{token}` |
 | `GET` | `/api/share/{token}` |
 | `PATCH` | `/api/share/{token}` |
-
-## Contract synthesis
-
-| Method | Path |
-|--------|------|
-| `POST` | `/api/synthesis/run-file` |
-| `GET` | `/api/synthesis/{table}/graph` |
-| `POST` | `/api/synthesis/{table}/run` |
 
 ## Users / auth admin
 

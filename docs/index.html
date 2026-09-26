@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>redibis — open-source data protection and data contracts</title>
+  <meta name="description" content="redibis is an open-source tool that looks at your tabular data, finds personal information (PII), checks data quality, and writes the result down as a data contract your team can review, trust and share. Everything runs on your own machine or servers."/>
+  <link rel="icon" type="image/png" href="logo.png"/>
+  <style>
+    :root{--bg:#ffffff;--fg:#0f172a;--muted:#475569;--border:#e2e8f0;--accent:#dc2626;--card:#f8fafc}
+    @media (prefers-color-scheme: dark){
+      :root{--bg:#0b1120;--fg:#e2e8f0;--muted:#94a3b8;--border:#1e293b;--accent:#f87171;--card:#111827}
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+    a{color:inherit}
+    header.site{border-bottom:1px solid var(--border)}
+    .site-bar{max-width:920px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:12px}
+    .site-bar img{width:36px;height:36px;border-radius:8px}
+    .site-bar strong{font-size:1.15rem}
+    .site-bar .tag{color:var(--muted);font-size:.9rem}
+    .site-bar .gh{margin-left:auto;padding:6px 14px;border:1px solid var(--border);border-radius:8px;text-decoration:none;font-size:.9rem}
+    .hero{max-width:920px;margin:0 auto;padding:40px 24px 8px}
+    .hero h1{font-size:2rem;line-height:1.25;margin:0}
+    .hero + .help-wrap{padding-top:12px}
+    .help-sec code{background:var(--card);padding:2px 6px;border-radius:6px}
+    footer.site{border-top:1px solid var(--border);color:var(--muted);font-size:.85rem;text-align:center;padding:20px}
+  </style>
+    <style>
+    .help-wrap{max-width:920px;margin:0 auto;padding:32px 24px 80px}
+    .help-intro{font-size:1.05rem;line-height:1.6;color:var(--muted,#475569);margin:8px 0 24px}
+    .help-toc{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:28px}
+    .help-toc a{font-size:.85rem;padding:4px 10px;border:1px solid var(--border,#e2e8f0);border-radius:999px;text-decoration:none;color:inherit}
+    .help-sec{border-top:1px solid var(--border,#e2e8f0);padding:24px 0}
+    .help-sec h2{margin:0 0 12px;font-size:1.25rem}
+    .help-sec p,.help-sec li{line-height:1.6;overflow-wrap:anywhere}
+    .help-sec ol li{margin-bottom:6px}
+    .help-sec code{font-size:.85em;overflow-wrap:anywhere}
+    .help-videos{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:14px}
+    .help-video{display:flex;gap:10px;align-items:center;padding:12px;border:1px solid var(--border,#e2e8f0);border-radius:10px;text-decoration:none;color:inherit}
+    .help-video .play{flex:0 0 36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#dc2626;color:#fff;font-size:14px}
+    .help-video.soon{opacity:.55;cursor:default}
+    .help-video.soon .play{background:#94a3b8}
+    .help-video small{display:block;color:var(--muted,#64748b)}
+  </style>
+</head>
+<body>
+  <header class="site">
+    <div class="site-bar">
+      <img src="logo.png" alt="" onerror="this.style.display='none'"/>
+      <strong>redibis</strong><span class="tag">easily govern</span>
+      <a class="gh" href="https://github.com/redibis-labs/redibis" rel="noopener">View on GitHub</a>
+    </div>
+  </header>
+  <div class="hero">
+    <h1>Find personal data, check quality, and publish trusted data contracts.</h1>
+  </div>
+  <main class="help-wrap">
+    
+    <p class="help-intro">redibis is an open-source tool that looks at your tabular data, finds personal information (PII), checks data quality, and writes the result down as a data contract your team can review, trust and share. Everything runs on your own machine or servers.</p>
+    <div class="help-toc">
+      <a href="#what">What is redibis?</a><a href="#start">Quick start</a><a href="#results">Reading your results</a><a href="#review">Steward Review</a><a href="#mask">Masking and safe export</a><a href="#enrich">Business definitions with an LLM (optional)</a><a href="#cli">Command line and API</a><a href="#community">Get involved</a>
+    </div>
+    
+    <section class="help-sec" id="what">
+      <h2>What is redibis?</h2>
+      <p>Point redibis at a CSV or Parquet file. It profiles every column, detects personal data such as names, phone numbers, emails and national IDs, and checks quality rules.</p><p>The findings become one versioned data contract in the open ODCS v3 format. People review and correct it, and their decisions are remembered on the next scan.</p><p>When you need to share the data, redibis can mask, hash, encrypt or replace sensitive values with realistic fakes first.</p>
+      
+      
+      <div class="help-videos">
+        
+          
+          <div class="help-video soon" aria-disabled="true">
+            <span class="play">▶</span>
+            <span>redibis in 3 minutes<small>video coming soon</small></span>
+          </div>
+          
+        
+      </div>
+      
+    </section>
+    
+    <section class="help-sec" id="start">
+      <h2>Quick start</h2>
+      
+      <ol><li>Clone the redibis repository from GitHub and open a terminal in it.</li><li>Install redibis in a virtual environment:<br><code>python3 -m venv .venv &amp;&amp; source .venv/bin/activate &amp;&amp; pip install -e &#34;.[dev,web]&#34; -c requirements/constraints.txt</code></li><li>Start the dashboard, then open http://127.0.0.1:8000/<br><code>./scripts/webapp.sh --start</code></li><li>Log in. A fresh install creates admin / admin — change that password straight away under Users.</li><li>On the scan page, upload a CSV (or pick the sample tests/data/realistic_eshop_customer_account.csv) and press Scan.</li><li>Open Contracts to see the contract created for your table.</li></ol>
+      
+      <div class="help-videos">
+        
+          
+          <div class="help-video soon" aria-disabled="true">
+            <span class="play">▶</span>
+            <span>Install and run your first scan<small>video coming soon</small></span>
+          </div>
+          
+        
+      </div>
+      
+    </section>
+    
+    <section class="help-sec" id="results">
+      <h2>Reading your results</h2>
+      <p>Each column shows whether it holds personal data, what kind (for example PHONE_NUMBER or EMAIL_ADDRESS), how sensitive it is, and which detection engines agreed.</p><p>The profile panel shows null rate, distinct values, type and format. Quality results show which rules passed or failed.</p><p>Nothing is final until a person approves it: detections are suggestions.</p>
+      
+      
+      <div class="help-videos">
+        
+          
+          <div class="help-video soon" aria-disabled="true">
+            <span class="play">▶</span>
+            <span>Understanding scan results<small>video coming soon</small></span>
+          </div>
+          
+        
+      </div>
+      
+    </section>
+    
+    <section class="help-sec" id="review">
+      <h2>Steward Review</h2>
+      <p>Contracts → Steward Review walks you through the contract column by column. Accept a finding, correct it, or mark it for review.</p><p>Verified decisions are locked in: the next scan will not overwrite what a person confirmed.</p><p>Reviewing never starts a new scan, so it is safe to explore.</p>
+      
+      
+      <div class="help-videos">
+        
+          
+          <div class="help-video soon" aria-disabled="true">
+            <span class="play">▶</span>
+            <span>Reviewing a contract<small>video coming soon</small></span>
+          </div>
+          
+        
+      </div>
+      
+    </section>
+    
+    <section class="help-sec" id="mask">
+      <h2>Masking and safe export</h2>
+      <p>Data → Mask &amp; Export suggests a rule per column: keep, redact, mask, hash, encrypt, format-preserving encryption (FF3-1) or realistic fakes (names, phones, emails, dates, social profile links and more).</p><p>The same input always gets the same fake, so joins across tables still work.</p><p>The risk panel warns about weak choices before you export. Keys never leave the run.</p>
+      
+      
+      <div class="help-videos">
+        
+          
+          <div class="help-video soon" aria-disabled="true">
+            <span class="play">▶</span>
+            <span>Masking a file for sharing<small>video coming soon</small></span>
+          </div>
+          
+        
+      </div>
+      
+    </section>
+    
+    <section class="help-sec" id="enrich">
+      <h2>Business definitions with an LLM (optional)</h2>
+      <p>Contracts → Enrich can draft column definitions and glossary terms using an LLM provider you configure in Settings, including models you host yourself.</p><p>Drafts are suggestions for a person to accept. The model can see column details and a few sample values, so use a provider you trust with your data — or one you host yourself.</p>
+      
+      
+    </section>
+    
+    <section class="help-sec" id="cli">
+      <h2>Command line and API</h2>
+      <p>Everything in the dashboard is also available from the redibis command (run redibis --help) and the HTTP API (open API Docs after logging in).</p>
+      <ol><li>Example: scan a file for personal data and save the contract.<br><code>redibis scan data.csv shop.customers --mode pii --automerge pii --output-dir ./reports</code></li></ol>
+      
+      <div class="help-videos">
+        
+          
+          <div class="help-video soon" aria-disabled="true">
+            <span class="play">▶</span>
+            <span>redibis from the command line<small>video coming soon</small></span>
+          </div>
+          
+        
+      </div>
+      
+    </section>
+    
+    <section class="help-sec" id="community">
+      <h2>Get involved</h2>
+      <p>redibis is Apache-2.0 licensed. Bug reports, ideas and pull requests are welcome: see CONTRIBUTING.md in the repository.</p><p>Found a security issue? Please follow SECURITY.md instead of opening a public issue.</p>
+      
+      
+    </section>
+    
+  </main>
+  <footer class="site">redibis · Apache-2.0 license</footer>
+</body>
+</html>
