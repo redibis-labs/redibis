@@ -115,6 +115,7 @@ and the matching Python and CLI entry points — are documented in
 | `GET` | `/api/contracts/{table}` |
 | `GET` | `/api/contracts/{table}/audit/{run_uuid}` |
 | `POST` | `/api/contracts/{table}/columns/{column}/add-pii` |
+| `POST` | `/api/contracts/{table}/columns/{column}/pii` |
 | `DELETE` | `/api/contracts/{table}/columns/{column}/pii-decision` |
 | `PATCH` | `/api/contracts/{table}/columns/{column}/privacy` |
 | `POST` | `/api/contracts/{table}/columns/{column}/sampling-consent` |
@@ -134,6 +135,7 @@ and the matching Python and CLI entry points — are documented in
 | `POST` | `/api/contracts/{table}/example-docs` |
 | `DELETE` | `/api/contracts/{table}/example-docs/{filename}` |
 | `GET` | `/api/contracts/{table}/export-package` |
+| `GET` | `/api/contracts/{table}/head` |
 | `GET` | `/api/contracts/{table}/history` |
 | `GET` | `/api/contracts/{table}/html` |
 | `GET` | `/api/contracts/{table}/memory/hints` |
@@ -174,6 +176,7 @@ and the matching Python and CLI entry points — are documented in
 | `POST` | `/api/contracts/{table}/steward/table/verdict` |
 | `GET` | `/api/contracts/{table}/triage` |
 | `GET` | `/api/contracts/{table}/verdicts/export` |
+| `GET` | `/api/contracts/{table}/yaml` |
 
 ## LLM enrichment
 

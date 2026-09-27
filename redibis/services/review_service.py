@@ -125,6 +125,45 @@ def _snapshots_match(current: dict, approved: dict) -> bool:
     )
 
 
+def pii_on_payload(store: Any, table: str, column: str, entity_type: Optional[str] = None) -> dict:
+    """The column fragment that turns PII on: privacy block, masking, classification, tags.
+
+    Starts from the steward's earlier PII payload, else from the column's current PII
+    signals (a scanned PII column keeps its masking), else builds the fragment a scan
+    detection would — so a column switched back on is masked again, not just labelled.
+    """
+    import copy
+
+    existing = (store.get_pii_decisions(table) or {}).get(column) or {}
+    payload = copy.deepcopy(existing.get("payload") or {}) if existing.get("status") == "pii" else {}
+    prop: dict = {}
+    for schema_obj in (store.get_active(table) or {}).get("schema", []) or []:
+        for p in schema_obj.get("properties", []) or []:
+            if isinstance(p, dict) and p.get("name") == column:
+                prop = p
+    entity_type = entity_type or existing.get("entity_type") or col_entity_type(prop) or None
+    if not payload.get("privacy") and existing.get("status") != "not_pii" and column_is_pii(prop) \
+            and isinstance(prop.get("privacy"), dict):
+        payload = {"privacy": copy.deepcopy(prop["privacy"]),
+                   **{k: copy.deepcopy(prop[k]) for k in ("classification", "tags") if k in prop},
+                   **payload}
+    if not payload.get("privacy"):
+        from redibis.services.session.approved import pii_row_to_fragment
+
+        fragment = pii_row_to_fragment({"column": column, "detected": True,
+                                        "entity_type": entity_type or "PII", "confidence": 1.0})
+        for key in ("_column_evidence", "name", "logicalType"):
+            fragment.pop(key, None)
+        payload = {**fragment, **{k: v for k, v in payload.items() if k in ("tags", "_replace_tags")}}
+    elif entity_type:
+        ce = payload["privacy"].setdefault("classification_engine", {})
+        ce["entity_type"] = entity_type
+        ce["detected"] = True
+    if entity_type:
+        payload["entity_type"] = entity_type
+    return payload
+
+
 class ReviewService:
     """Final-Review orchestration. REST routes are thin adapters over this."""
 
@@ -270,7 +309,7 @@ class ReviewService:
                 fp_meta = fingerprint_metadata_from_prop(column, prop)
             existing = (self.store.get_pii_decisions(table) or {}).get(column) or {}
             version = int(existing.get("decision_version") or 0) + 1
-            payload = {"entity_type": entity_type} if pii_status == "pii" and entity_type else None
+            payload = pii_on_payload(self.store, table, column, entity_type) if pii_status == "pii" else None
             self.store.set_pii_decision(
                 table,
                 column,

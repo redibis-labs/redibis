@@ -153,7 +153,12 @@ def run_steward(args) -> int:
         payload = svc.export_verdicts(args.table, actor=getattr(args, "actor", "cli"))
         out = Path(args.out)
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        if out.suffix.lower() in (".yaml", ".yml"):
+            import yaml
+
+            out.write_text(yaml.safe_dump(payload, sort_keys=False, allow_unicode=True), encoding="utf-8")
+        else:
+            out.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         print(f"Wrote A1 verdict memory to {out}")
         scan_path = getattr(args, "scan_package", None)
         if scan_path:
@@ -166,7 +171,12 @@ def run_steward(args) -> int:
         from redibis.services.evidence_review_service import EvidenceReviewService
         svc, store = _svc(args)
         raw = Path(args.package).read_text(encoding="utf-8")
-        data = json.loads(raw)
+        if Path(args.package).suffix.lower() in (".yaml", ".yml"):
+            import yaml
+
+            data = yaml.safe_load(raw)
+        else:
+            data = json.loads(raw)
         # Steward A1 generalises VerdictPackage; map pii entries onto the supplied path.
         entries = []
         for e in data.get("entries") or []:

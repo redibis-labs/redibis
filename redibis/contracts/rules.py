@@ -116,6 +116,13 @@ def extract_rules(contract: dict) -> list[QualityRule]:
 # ODCS → GE reverse mapper
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _mostly_from_percent(p: dict) -> dict:
+    """``mustBeGreaterOrEqualTo: 95, unit: percent`` (share of values that must pass) → ``mostly``."""
+    if p.get("unit") == "percent" and isinstance(p.get("mustBeGreaterOrEqualTo"), (int, float)):
+        return {"mostly": round(p["mustBeGreaterOrEqualTo"] / 100.0, 4)}
+    return {}
+
+
 def _rule_to_ge(rule: QualityRule) -> Optional[dict]:
     """Convert one canonical QualityRule to a GE ExpectationConfiguration dict."""
     p = rule.params
@@ -159,14 +166,16 @@ def _rule_to_ge(rule: QualityRule) -> Optional[dict]:
 
     if rule.type == "set":
         value_set = (p.get("arguments", {}) or {}).get("validValues", p.get("value_set", []))
-        return {"expectation_type": "expect_column_values_to_be_in_set",
-                "kwargs": {"column": rule.column, "value_set": value_set}}
+        kwargs = {"column": rule.column, "value_set": value_set}
+        kwargs.update(_mostly_from_percent(p))
+        return {"expectation_type": "expect_column_values_to_be_in_set", "kwargs": kwargs}
 
     if rule.type == "regex":
-        return {"expectation_type": "expect_column_values_to_match_regex",
-                "kwargs": {"column": rule.column,
-                           "regex": ((p.get("arguments") or {}).get("pattern")
-                                     or p.get("pattern") or p.get("regex") or "")}}
+        kwargs = {"column": rule.column,
+                  "regex": ((p.get("arguments") or {}).get("pattern")
+                            or p.get("pattern") or p.get("regex") or "")}
+        kwargs.update(_mostly_from_percent(p))
+        return {"expectation_type": "expect_column_values_to_match_regex", "kwargs": kwargs}
 
     return None
 

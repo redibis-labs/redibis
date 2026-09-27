@@ -91,6 +91,9 @@ tr.diff-row td{vertical-align:top}
 .ws-batch-item.error{color:#991b1b}
 .ws-uuid{cursor:copy}
 .tab.tab-disabled{opacity:.4;cursor:not-allowed}
+.qe-switch{display:inline-flex;gap:6px;align-items:center;margin:0;color:var(--ink);font-size:12px;font-weight:700;cursor:pointer}
+.qe-rule{display:flex;gap:6px;align-items:flex-start;margin:2px 0;color:var(--ink)}
+.qe-def{padding:5px 8px;font-size:13px}
 </style>
 </head>
 <body>
@@ -218,14 +221,15 @@ async function selectTable(t){ STATE.table = t; await loadTables(); render(); }
 const TAB_DISABLED = { synthesize: "Deep Enrich is temporarily unavailable" };
 function render(){
   if(!STATE.table){ $("main").innerHTML = `<div class="empty">Select a table.</div>`; return; }
-  const tabs = [["contract","Contract"],["review","Steward Review"],["runs","Runs"],["enrich","Enrich"],["synthesize","Deep Enrich"],["share","Share"]];
+  const tabs = [["contract","Contract"],["review","Steward Review"],["details","Details"],["runs","Runs"],["enrich","Enrich"],["synthesize","Deep Enrich"],["share","Share"]];
   if(TAB_DISABLED[STATE.tab]) STATE.tab = "contract";
   $("main").innerHTML =
     `<div class="tabs">${tabs.map(([k,l])=> TAB_DISABLED[k]
         ? `<div class="tab tab-disabled" aria-disabled="true" title="${TAB_DISABLED[k]}">${l}</div>`
         : `<div class="tab ${STATE.tab===k?'active':''}" onclick="setTab(${jsArg(k)})">${l}</div>`).join("")}</div>
      <div id="tabBody"></div>`;
-  ({contract:renderContract, review:renderStewardReview, runs:renderRuns, enrich:renderEnrich, synthesize:renderDeepEnrich, share:renderShare}[STATE.tab])();
+  ({contract:renderContract, review:renderStewardReview, details:renderDetails, runs:renderRuns, enrich:renderEnrich, synthesize:renderDeepEnrich, share:renderShare}[STATE.tab] || renderContract)();
+  watchContract();
 }
 function setTab(k){ STATE.tab = TAB_DISABLED[k] ? "contract" : k; render(); }
 
@@ -242,8 +246,156 @@ async function renderStewardReview(){
   }
 }
 
-// ── Contract view (PII report + rules + export + purge) ─────────────────────
+// ── Contract (quick edit): the live contract, PII on/off, quality on/off, definitions ──
+// Every switch here is the same decision the Steward Review page records, so both
+// pages (and share links) edit one shared object: the active contract.
+const PII_TAGS = new Set(["pii","gdpr_personal_data","personal_data"]);
+function propIsPii(p){
+  const pv = p.privacy||{};
+  return !!((pv.classification_engine||{}).detected || (p.pii||{}).detected
+    || (pv.masking_policy||{}).default_strategy || (p.maskingPolicy||{}).default
+    || (p.tags||[]).some(t=>PII_TAGS.has(String(t).toLowerCase()))
+    || String(p.classification||pv.classification||"").toLowerCase().startsWith("pii"));
+}
+function propEntity(p){
+  return p.entity_type || ((p.privacy||{}).classification_engine||{}).entity_type || (p.pii||{}).entity_type || "";
+}
+function ruleLabel(r){
+  const p = r.params||{}; const bits=[];
+  for(const k of ["mustBe","mustBeBetween","mustBeLessThan","mustBeGreaterOrEqualTo","unit"]) if(p[k]!==undefined) bits.push(k+"="+JSON.stringify(p[k]));
+  const a = p.arguments||{};
+  if(a.pattern) bits.push("regex="+a.pattern);
+  if(a.validValues) bits.push(a.validValues.length+" values");
+  const ge = (p.implementation||{}).expectation_type || p.expectation_type;
+  return (ge||r.type)+(bits.length?" · "+bits.join(" "):"");
+}
 async function renderContract(){
+  const body = $("tabBody"); body.innerHTML = "Loading…";
+  let active, qview = {rules:[], suppressed:[]}, pdec = {};
+  try { active = await api("GET", contractPath(STATE.table)); }
+  catch(e){ body.innerHTML = `<div class="empty">No active contract. Merge a run first.</div>`; return; }
+  try { qview = await api("GET", contractPath(STATE.table, "/quality-view")); }catch(e){}
+  const piiNow = {};   // what Steward Review shows: the steward decision wins over the scan signals
+  try { const d = await api("GET", contractPath(STATE.table, "/pii-decisions"));
+        (d.columns||[]).forEach(c=>{ const st = (c.decision||{}).status;
+          if(c.decision) pdec[c.column]=c.decision;
+          piiNow[c.column] = st==="not_pii" ? false : (st==="pii" ? true : !!c.is_pii); }); }catch(e){}
+  STATE.version = active.version;
+  const props = (active.schema||[]).flatMap(s=>s.properties||[]);
+  const byCol = {};
+  (qview.rules||[]).forEach(r=>{ (byCol[r.column||""] = byCol[r.column||""]||[]).push({...r, on:true}); });
+  (qview.suppressed||[]).forEach(r=>{ (byCol[r.column||""] = byCol[r.column||""]||[]).push({...r, on:false}); });
+  const qCell = (col)=>{
+    const rules = byCol[col||""]||[];
+    if(!rules.length) return `<span class="hint">—</span>`;
+    const on = rules.filter(r=>r.on).length;
+    return `<details><summary class="mono" style="cursor:pointer">${on}/${rules.length} on</summary>
+      <div style="margin-top:6px">${rules.map(r=>`<label class="qe-rule">
+        <input type="checkbox" ${r.on?"checked":""} onchange="toggleRule(${jsArg(r.rule_id)},${jsArg(col||"")},this.checked)"/>
+        <span class="mono" style="font-size:11px">${esc(r.on?ruleLabel(r):(r.rule_id+" · off"))}</span></label>`).join("")}</div></details>`;
+  };
+  const rows = props.map(p=>{
+    const pii = (p.name in piiNow) ? piiNow[p.name] : propIsPii(p); const ent = propEntity(p);
+    const decided = pdec[p.name] ? `<span class="hint" title="set by ${esc(pdec[p.name].decided_by||"")}">✎</span>` : "";
+    return `<tr>
+      <td class="mono">${esc(p.name)}<div class="hint">${esc(p.logicalType||"")}</div></td>
+      <td><input class="qe-def" data-col="${esc(p.name)}" value="${esc(p.description||"")}" placeholder="add a definition…"/></td>
+      <td style="white-space:nowrap"><label class="qe-switch"><input type="checkbox" ${pii?"checked":""}
+          onchange="switchPii(${jsArg(p.name)},this.checked,${jsArg(ent)})"/><span>${pii?"PII":"off"}</span></label>
+        ${pii&&ent?`<span class="chip chip-red">${esc(ent)}</span>`:""} ${decided}</td>
+      <td>${qCell(p.name)}</td></tr>`;
+  }).join("");
+  const tableRules = byCol[""]||[];
+  const fmt = STATE.contractFmt || "yaml";
+  body.innerHTML = `
+    <div class="card"><div class="row" style="justify-content:space-between">
+      <div><h3 style="margin:0">${esc(STATE.table)} · v${esc(active.version)}</h3>
+        <small class="hint" id="qeSync">live · every change here, in Steward Review and on share links edits this one contract</small></div>
+      <div class="row"><button class="btn-sm" onclick="setTab('review')">Steward Review →</button>
+        <button class="btn-sm" onclick="setTab('details')">Details →</button></div></div></div>
+    <div class="card"><h3>Columns — definition · PII · quality</h3>
+      <small class="hint">Definitions save when you leave the field (Enter also saves). PII and quality switches save at once and hold across future scans and merges.</small>
+      <table><thead><tr><th style="width:18%">Column</th><th>Definition</th><th style="width:16%">PII</th><th style="width:22%">Quality rules</th></tr></thead>
+      <tbody>${rows}${tableRules.length?`<tr><td class="mono">(table)</td><td class="hint">table-level rules</td><td></td><td>${qCell("")}</td></tr>`:""}</tbody></table></div>
+    <div class="card"><div class="row" style="justify-content:space-between">
+      <h3 style="margin:0">Contract</h3>
+      <div class="row"><button class="btn-sm ${fmt==="yaml"?"btn-primary":""}" onclick="setContractFmt('yaml')">YAML</button>
+        <button class="btn-sm ${fmt==="json"?"btn-primary":""}" onclick="setContractFmt('json')">JSON</button>
+        <button class="btn-sm" onclick="copyContractText()">copy</button>
+        <a class="btn btn-sm" href="${contractPath(STATE.table, fmt==="yaml"?"/yaml?download=true":"")}" ${fmt==="json"?`download="${esc(STATE.table)}_contract.json"`:""}>download</a></div></div>
+      <pre id="qeContract" style="max-height:560px;margin-top:10px">Loading…</pre></div>`;
+  body.querySelectorAll(".qe-def").forEach(inp=>{
+    inp.dataset.orig = inp.value;
+    inp.onkeydown = (ev)=>{ if(ev.key==="Enter"){ ev.preventDefault(); inp.blur(); } };
+    inp.onblur = ()=>{ if(inp.value!==inp.dataset.orig) saveDefinition(inp.dataset.col, inp.value, inp); };
+  });
+  const box = $("qeContract");
+  if(fmt==="yaml"){
+    try{ box.textContent = await api("GET", contractPath(STATE.table, "/yaml")); }
+    catch(e){ box.textContent = JSON.stringify(active,null,2); }
+  } else box.textContent = JSON.stringify(active,null,2);
+}
+function setContractFmt(f){ STATE.contractFmt = f; renderContract(); }
+function copyContractText(){
+  const t = ($("qeContract")||{}).textContent||"";
+  (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(()=>toast("Contract copied"),()=>toast("Copy failed",false));
+}
+async function saveDefinition(col, text, inp){
+  try{
+    const r = await api("PATCH", contractPath(STATE.table, "/definitions"), {columns:{[col]:{description:text}}, decided_by:"contract-page"});
+    if(inp) inp.dataset.orig = text;
+    toast(`Definition saved → v${r.version_after}`); STATE.version = r.version_after; refreshContractText();
+  }catch(e){ toast(e.message,false); }
+}
+async function switchPii(col, on, entity){
+  let ent = entity||"";
+  if(on && !ent){
+    ent = prompt(`PII type for "${col}" (e.g. PHONE_NUMBER, EMAIL_ADDRESS, PERSON):`, "");
+    if(!ent){ render(); return; }
+  }
+  try{
+    const r = await api("POST", contractPath(STATE.table, "/columns/"+encodeURIComponent(col)+"/pii"),
+      {on, entity_type: on ? ent : null, decided_by:"contract-page"});
+    toast(`${col}: PII ${on?"on":"off"} → v${r.version_after}`); render();
+  }catch(e){ toast(e.message,false); render(); }
+}
+async function toggleRule(ruleId, col, on){
+  try{
+    const r = on
+      ? await api("POST", contractPath(STATE.table, `/quality-decisions/${encodeURIComponent(ruleId)}/restore`), {})
+      : await api("POST", contractPath(STATE.table, `/quality-decisions/${encodeURIComponent(ruleId)}/suppress`), {column: col||null, decided_by:"contract-page"});
+    toast(`Rule ${on?"on":"off"} → v${r.version_after}`); render();
+  }catch(e){ toast(e.message,false); render(); }
+}
+async function refreshContractText(){
+  const box = $("qeContract"); if(!box) return;
+  try{
+    box.textContent = (STATE.contractFmt||"yaml")==="yaml"
+      ? await api("GET", contractPath(STATE.table, "/yaml"))
+      : JSON.stringify(await api("GET", contractPath(STATE.table)),null,2);
+  }catch(e){}
+}
+// Live sync: poll the contract head; when someone else changes it, refresh this view
+// (or say so, when you are typing, so nothing you type is lost).
+let _watch = null;
+function watchContract(){
+  if(_watch) return;
+  _watch = setInterval(async ()=>{
+    if(!STATE.table || document.hidden) return;
+    let head; try{ head = await api("GET", contractPath(STATE.table, "/head")); }catch(e){ return; }
+    if(STATE.version && head.version && head.version !== STATE.version){
+      const who = head.changed_by ? ` (${head.changed_by})` : "";
+      STATE.version = head.version;
+      const typing = document.activeElement && ["INPUT","TEXTAREA","SELECT"].includes(document.activeElement.tagName);
+      if(typing || !["contract","details"].includes(STATE.tab)){
+        toast(`Contract changed to v${head.version}${who} — reopen the tab to see it`);
+      } else { toast(`Contract updated to v${head.version}${who}`); render(); }
+    }
+  }, 8000);
+}
+
+// ── Details view (PII evidence + rules + export + consent + purge) ──────────
+async function renderDetails(){
   const body = $("tabBody"); body.innerHTML = "Loading…";
   let active;
   try { active = await api("GET", contractPath(STATE.table)); }
@@ -359,8 +511,9 @@ async function renderContract(){
         <button class="btn-sm" onclick="exportMetadata()">metadata JSON</button>
         <button class="btn-sm" onclick="exportPackage()">full package JSON</button>
         <button class="btn-sm" onclick="exportStewardArtifacts()">steward artifacts (zip)</button>
+        <a class="btn btn-sm" href="${contractPath(STATE.table, "/steward/export/verdicts?format=yaml")}">steward decisions (YAML)</a>
       </div></div>
-      <small class="hint">Spec (contract) + telemetry (provenance, pii_summary, decisions) for OpenMetadata / catalog tools. Steward zip is current A1 plus finalized A0–A5 when present.</small></div>
+      <small class="hint">Spec (contract) + telemetry (provenance, pii_summary, decisions) for OpenMetadata / catalog tools. Steward zip is current A1 plus finalized A0–A5 when present. Steward decisions (YAML) attach to another scan with <span class="mono">--steward-verdict-path</span>: the columns a steward decided keep their verdict.</small></div>
 
     ${consentSection}
 
@@ -408,47 +561,47 @@ async function suppressQualityRule(ruleId, col){
   try{
     const r = await api("POST",`/api/contracts/${STATE.table}/quality-decisions/${encodeURIComponent(ruleId)}/suppress`,
       {column: col||null, decided_by:"v2"});
-    toast(`Rule removed → v${r.version_after}`); renderContract();
+    toast(`Rule removed → v${r.version_after}`); render();
   }catch(e){ toast(e.message,false); }
 }
 async function restoreQualityRule(ruleId){
   try{
     const r = await api("POST",`/api/contracts/${STATE.table}/quality-decisions/${encodeURIComponent(ruleId)}/restore`,{});
-    toast(`Rule restored → v${r.version_after}`); renderContract();
+    toast(`Rule restored → v${r.version_after}`); render();
   }catch(e){ toast(e.message,false); }
 }
 async function suppressAllQualityRules(){
   if(!confirm(`Remove ALL quality rules from ${STATE.table}? Scan runs are kept — merge again later without rescanning.`)) return;
   try{
     const r = await api("POST",`/api/contracts/${STATE.table}/quality-decisions/suppress-all`,{decided_by:"v2"});
-    toast(`All rules removed → v${r.version_after}`); renderContract();
+    toast(`All rules removed → v${r.version_after}`); render();
   }catch(e){ toast(e.message,false); }
 }
 async function stripPii(col){
   if(!confirm(`Strip all PII metadata from "${col}"? It becomes a normal column and stays demoted on future merges.`)) return;
   try{ const r = await api("POST","/api/contracts/"+STATE.table+"/columns/"+encodeURIComponent(col)+"/strip-pii",{decided_by:"v2"});
-       toast(`Stripped ${col} → v${r.version_after}`); renderContract(); }
+       toast(`Stripped ${col} → v${r.version_after}`); render(); }
   catch(e){ toast(e.message,false); }
 }
 async function addPiiCol(col){
   const et = prompt(`PII entity type for "${col}" (e.g. PHONE_NUMBER, EMAIL_ADDRESS, PERSON):`);
   if(!et) return;
   try{ const r = await api("POST","/api/contracts/"+STATE.table+"/columns/"+encodeURIComponent(col)+"/add-pii",{entity_type:et,decided_by:"v2"});
-       toast(`Marked ${col} as PII → v${r.version_after}`); renderContract(); }
+       toast(`Marked ${col} as PII → v${r.version_after}`); render(); }
   catch(e){ toast(e.message,false); }
 }
 async function approveSampling(col){
   try{
     await api("POST","/api/contracts/"+STATE.table+"/columns/"+encodeURIComponent(col)+"/sampling-consent",
       {approved:true, approved_by:"v2"});
-    toast(`Sampling approved for ${col}`); renderContract();
+    toast(`Sampling approved for ${col}`); render();
   }catch(e){ toast(e.message,false); }
 }
 async function revokeSampling(col){
   try{
     await api("POST","/api/contracts/"+STATE.table+"/columns/"+encodeURIComponent(col)+"/sampling-consent",
       {approved:false, approved_by:"v2"});
-    toast(`Sampling consent revoked for ${col}`); renderContract();
+    toast(`Sampling consent revoked for ${col}`); render();
   }catch(e){ toast(e.message,false); }
 }
 

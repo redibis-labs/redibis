@@ -225,6 +225,15 @@ SEVERITIES = ("P1", "P2", "P3")
 
 # Great Expectations defaults ``to_code`` leaves out, and the order it writes arguments in.
 _GE_DEFAULTS = {"mostly": 1.0, "strict_min": False, "strict_max": False}
+# Row-by-row rules whose tolerance (``mostly``) is written out even at 1.0, as the
+# interactive review does, so it is visible and editable in the generated code.
+_NO_MOSTLY_SHOWN = ("expect_column_values_to_be_unique", "expect_column_values_to_not_be_null",
+                    "expect_column_values_to_be_null")
+
+
+def _shows_mostly(rule: str) -> bool:
+    return (str(rule).startswith(("expect_column_values_", "expect_column_value_lengths_"))
+            and rule not in _NO_MOSTLY_SHOWN)
 _ARG_ORDER = {k: i for i, k in enumerate(
     ("column_list", "column_set", "value_set", "regex", "regex_list", "min_value", "max_value"))}
 
@@ -999,8 +1008,12 @@ class QualityDraft:
             kwargs.pop("column", None)
             kwargs.pop("meta", None)
             for key, default in _GE_DEFAULTS.items():
-                if key in kwargs and kwargs[key] == default:
+                if key in kwargs and kwargs[key] == default and key != "mostly":
                     del kwargs[key]
+            if _shows_mostly(r["rule"]):
+                kwargs.setdefault("mostly", 1.0)        # the share of rows that must pass — tune it here
+            elif kwargs.get("mostly") == 1.0:
+                del kwargs["mostly"]
             kwargs = dict(sorted(kwargs.items(), key=lambda kv: (_ARG_ORDER.get(kv[0], 99), kv[0])))
             if r["rule"] == "sql":
                 query = kwargs.pop("sql")

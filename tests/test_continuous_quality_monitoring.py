@@ -1140,7 +1140,7 @@ def test_web_ui_exposes_jupyter_code_and_package_actions():
     assert "loadQualityPythonFile" in app_js
     assert "window.redibisRenderJupyterCode" in app_js
     # Both the review page and the results page must offer the code actions.
-    assert app_js.count("copyFullQualityCode()") >= 2
+    assert app_js.count("copyFullQualityCode()") + app_js.count("copyFullQualityCode({review:true})") >= 2
     assert app_js.count("downloadMonitoringPackage()") >= 2
 
 

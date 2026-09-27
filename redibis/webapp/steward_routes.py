@@ -139,9 +139,21 @@ def register_steward_routes(app: Any, store_getter: StoreGetter) -> None:
         return _call(_svc().list_artifacts, table)
 
     @app.get("/api/contracts/{table}/steward/export/verdicts")
-    def steward_export_verdicts(request: Request, table: str) -> dict:
+    def steward_export_verdicts(request: Request, table: str, format: str = "json"):
+        """The steward's decisions as a file to attach to another scan
+        (``--steward-verdict-path``); ``format=yaml`` for YAML."""
         actor = _actor_from_request(request)
-        return _call(_svc().export_verdicts, table, actor=actor)
+        data = _call(_svc().export_verdicts, table, actor=actor)
+        if format != "yaml":
+            return data
+        import yaml
+
+        safe = table.replace(".", "_")
+        return Response(
+            yaml.safe_dump(data, sort_keys=False, allow_unicode=True),
+            media_type="application/yaml; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="steward_verdicts_{safe}.yaml"'},
+        )
 
     @app.get("/api/contracts/{table}/steward/export/artifacts")
     def steward_export_artifact_bundle(request: Request, table: str):

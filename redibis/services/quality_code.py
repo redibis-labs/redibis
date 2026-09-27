@@ -175,9 +175,10 @@ def resolve_curated_rules(
                 rule_source="session_draft",
                 dropped_rule_ids=dropped_ids,
             )
-        runs = getattr(session, "runs", None) or []
-        if runs:
-            last_results = getattr(runs[-1], "quality_results", None) or []
+        # The latest run that evaluated quality rules — a scan ends with its PII run,
+        # which has none, so looking only at the last run fell through to the contract.
+        for run in reversed(getattr(session, "runs", None) or []):
+            last_results = getattr(run, "quality_results", None) or []
             evaluated = [r for r in last_results if r.get("rule") or r.get("expectation_type")]
             if evaluated:
                 return CuratedRules(

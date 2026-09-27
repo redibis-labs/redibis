@@ -140,10 +140,12 @@ def _map_row_count_equal(kwargs: dict) -> dict:
 
 def _map_valid_values(kwargs: dict) -> dict:
     """expect_column_values_to_be_in_set → validValues."""
-    return {
-        "rule": "validValues",
-        "arguments": {"validValues": kwargs.get("value_set", [])},
-    }
+    rule: dict = {"rule": "validValues", "arguments": {"validValues": kwargs.get("value_set", [])}}
+    mostly = kwargs.get("mostly")
+    if mostly is not None and mostly < 1.0:
+        rule["mustBeGreaterOrEqualTo"] = round(mostly * 100, 2)
+        rule["unit"] = "percent"
+    return rule
 
 
 def _map_unique_count_between(kwargs: dict) -> dict:

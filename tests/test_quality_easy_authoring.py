@@ -140,10 +140,11 @@ def test_to_code_is_readable_and_runs_back_to_the_same_rules():
     qa.add_sql("SELECT AVG(points) FROM ${object}", mustBeBetween=[0, 5000], severity="P3")
     code = qa.to_code()
     assert code.startswith("from redibis.quality import QualityDraft\n\nqa = QualityDraft.new('shop.customers')")
-    assert "qa.expect_column_values_to_match_regex('id', regex=r'^C\\d{5}$')" in code
+    assert "qa.expect_column_values_to_match_regex('id', regex=r'^C\\d{5}$', mostly=1.0)" in code
     assert "add_sql('SELECT * FROM ${object} WHERE points < 0', description='no negative points')" in code
     assert "severity='P2'" in code and "severity='P3'" in code
-    assert "mostly=1.0" not in code and "strict_min" not in code          # GE defaults left out
+    assert "strict_min" not in code                                        # GE defaults left out
+    assert "not_be_null('id', mostly" not in code                          # …but the tolerance of row rules is shown
 
     ns: dict = {}
     exec(code, ns)                                                         # noqa: S102 — our own output

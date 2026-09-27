@@ -2137,7 +2137,7 @@ async function downloadMonitoringPackage(opts){
   opts=opts||{};
   try{await ensureSession()}catch(e){alert("Start a session first.");return}
   var body={schedule:"0 6 * * *"};
-  if(opts.rules) body.rules=opts.rules;
+  if(opts.rules){body.rules=opts.rules;if(opts.label) body.label=opts.label}
   else if(opts.code) body.code=opts.code;
   else body.dropped_indices=reviewDroppedIndices();
   try{
@@ -2168,7 +2168,7 @@ async function fetchFullQualityCode(opts){
   var body={engine:opts.engine||"spark",style:opts.style||"program"};
   // Explicit rules/code are already curated by the caller; applying the review
   // page's dropped indices again would drop the wrong entries.
-  if(opts.rules) body.rules=opts.rules;
+  if(opts.rules){body.rules=opts.rules;if(opts.label) body.label=opts.label}
   else if(opts.code) body.code=opts.code;
   else body.dropped_indices=reviewDroppedIndices();
   var res=await fetch("/api/sessions/"+S.sid+"/quality/full-code",{
@@ -2181,17 +2181,45 @@ async function fetchFullQualityCode(opts){
   return {code:await res.text(),source:res.headers.get("X-Redibis-Rule-Source")||"",
           count:res.headers.get("X-Redibis-Rule-Count")||"?",opts:opts};
 }
-// Rules the user approved on this page (green) or already sent — "approved rules only" scope.
+// Every rule the Quality page shows, with its full parameters (mostly, regex,
+// min/max, value sets…) — the code is built from these, not from the contract.
+function pageQualityRulesForCode(){
+  return latestQualityResults().filter(function(d){return d.rule||d.expectation_type}).map(function(d){
+    return {rule:d.rule||d.expectation_type,column:normalizeQualityApproveColumn(d.column),
+            kwargs:d.kwargs||{},meta:d.meta||{}};
+  });
+}
+// "Approved rules only": the page's rules that are approved (green), sent to the
+// Approved page, or already in the contract — in page order, re-read on every
+// approve / unapprove — plus approved rules that are not on this page.
 function approvedQualityRulesForCode(){
-  var out=stagedQualityRules().map(function(it){
-    return {rule:it.rule.expectation_type,column:it.column,kwargs:it.rule.kwargs||{},meta:it.rule.meta||{}};
+  var out=[],seen={};
+  pageQualityRulesForCode().forEach(function(r){
+    var k=qStageKey(r.column,r.rule);
+    if(seen[k]||!(isQualityRuleStaged(r.column,r.rule)||isQualityRuleApproved(r.column,r.rule))) return;
+    seen[k]=1;out.push(r);
+  });
+  stagedQualityRules().forEach(function(it){
+    var k=qStageKey(it.column,it.rule.expectation_type);
+    if(seen[k]) return;
+    seen[k]=1;
+    out.push({rule:it.rule.expectation_type,column:it.column,kwargs:it.rule.kwargs||{},meta:it.rule.meta||{}});
   });
   (S.approved.items||[]).forEach(function(p){
     if(p.kind!=="quality"||p.merged||!p.payload) return;
+    var onPage=pageQualityRulesForCode().some(function(r){return qualitySentItem(r.column,r.rule)===p});
+    if(onPage) return;
     // The basket stores the contract form; the server turns it back into expectations.
     out.push(Object.assign({},p.payload,{column:normalizeQualityApproveColumn(p.column)}));
   });
   return out;
+}
+// Rules for a code scope: "approved" or "all" (the page's rules; the server's
+// session rules when the page has none, e.g. the review page).
+function qualityRulesForScope(scope){
+  if(scope==="approved") return {rules:approvedQualityRulesForCode(),label:"approved"};
+  var page=pageQualityRulesForCode();
+  return page.length?{rules:page,label:"quality_page"}:{};
 }
 function copyTextToClipboard(text){
   if(navigator.clipboard&&navigator.clipboard.writeText){
@@ -2236,7 +2264,7 @@ function showFullCodeModal(info){
     "<div class='row' style='gap:6px;flex-wrap:wrap'>"+
       sel("codeStyleSel",o.style||"notebook",[["notebook",CODE_STYLE_LABELS.notebook],["rules",CODE_STYLE_LABELS.rules],["program",CODE_STYLE_LABELS.program]])+
       sel("codeEngineSel",o.engine||"spark",[["spark","Spark"],["pandas","pandas"]])+
-      sel("codeScopeSel",o.scope||"all",[["all","All rules"],["approved","Approved rules only ("+nApproved+")"]])+
+      sel("codeScopeSel",o.scope||"all",[["all","All rules"+(pageQualityRulesForCode().length?" ("+pageQualityRulesForCode().length+")":"")],["approved","Approved rules only ("+nApproved+")"]])+
     "</div>";
   var pre=document.createElement("pre");
   pre.style.cssText="margin:0;padding:16px 18px;overflow:auto;flex:1;font-size:.72rem;"+
@@ -2264,11 +2292,13 @@ function showFullCodeModal(info){
       var next={style:head.querySelector("#codeStyleSel").value,engine:head.querySelector("#codeEngineSel").value,
                 scope:scopeSel.value,base:o.base||{}};
       if(next.scope==="approved"){
-        var rules=approvedQualityRulesForCode();
-        if(!rules.length){alert("No approved rules yet — approve some rules (green) first.");scopeSel.value="all";return}
-        next.rules=rules;
+        var ap=qualityRulesForScope("approved");
+        if(!ap.rules.length){alert("No approved rules yet — approve some rules (green) first.");scopeSel.value="all";return}
+        next.rules=ap.rules;next.label=ap.label;
       }else if(next.base.rules){next.rules=next.base.rules}
       else if(next.base.code){next.code=next.base.code}
+      else if(!o.review){var all=qualityRulesForScope("all");next.rules=all.rules;next.label=all.label}
+      next.review=o.review;
       try{showFullCodeModal(await fetchFullQualityCode(next))}catch(e){alert("Code generation failed: "+e.message)}
     };
   });
@@ -2276,8 +2306,17 @@ function showFullCodeModal(info){
   document.body.appendChild(back);
 }
 async function copyFullQualityCode(opts){
-  opts=Object.assign({style:"notebook",engine:"spark",scope:"all"},opts||{});
+  opts=Object.assign({style:"notebook",engine:"spark"},opts||{});
   opts.base={rules:opts.rules,code:opts.code};    // what the page asked for, kept when the scope changes
+  if(!opts.rules&&!opts.code&&!opts.review){
+    // Rebuilt from the page on every click: approved rules when there are any
+    // (so each approve / unapprove changes the code), else every rule shown.
+    if(!opts.scope) opts.scope=approvedQualityRulesForCode().length?"approved":"all";
+    var picked=qualityRulesForScope(opts.scope);
+    if(opts.scope==="approved"&&!picked.rules.length){opts.scope="all";picked=qualityRulesForScope("all")}
+    opts.rules=picked.rules;opts.label=picked.label;
+  }
+  opts.scope=opts.scope||"all";
   try{
     var info=await fetchFullQualityCode(opts);
     await copyTextToClipboard(info.code);
@@ -3160,7 +3199,7 @@ function vQualityReview(){
     "<div class=\"split-head\" style=\"flex-shrink:0\">"+
       "<div><div class=\"h2\">Review Quality Rules</div><div class=\"hsub\">Edit drafted expectations generated from profiling</div></div>"+
       "<div style=\"display:flex;gap:8px;flex-wrap:wrap\"><button class=\"btn btn-ghost\" onclick=\"cancelScan()\">Cancel</button>"+
-      "<button class=\"btn btn-ghost\" onclick=\"copyFullQualityCode()\">Copy Jupyter Code</button>"+
+      "<button class=\"btn btn-ghost\" onclick=\"copyFullQualityCode({review:true})\">Copy Jupyter Code</button>"+
       "<button class=\"btn btn-ghost\" onclick=\"downloadMonitoringPackage()\">Download monitor package</button>"+
       "<button class=\"btn btn-primary\" onclick=\"executeQualityScan()\">Execute Quality Checks</button></div>"+
     "</div>"+

@@ -30,7 +30,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
-from redibis.store.auth_store import apply_scoped_edits, SCOPES
+from redibis.store.auth_store import apply_scoped_edits, scope_allows, SCOPES
 from redibis.store.subcontract_store import VALID_KINDS
 from redibis.config import ConfigError
 from redibis.webapp.auth_deps import require_admin
@@ -1809,6 +1809,12 @@ class FullCodeBody(BaseModel):
     # "notebook": complete Jupyter code (read the uploaded file → DataFrame →
     # QualityDraft rules → validate); "rules": the rules + validate(df) only.
     style: str = "program"
+    # What the caller's rules are, shown in the code header: "quality_page" (every
+    # rule on the Quality page) or "approved" (the rules approved there).
+    label: Optional[str] = None
+
+
+_CODE_LABELS = {"quality_page": "the Quality page", "approved": "approved rules"}
 
 
 def _resolve_quality_rules(session, table: str, body):
@@ -1846,6 +1852,8 @@ async def generate_full_quality_code(session_id: str, body: FullCodeBody):
     if body.style not in CODE_STYLES:
         raise HTTPException(status_code=400, detail=f"style must be one of {', '.join(CODE_STYLES)}")
     curated = _resolve_quality_rules(session, table, body)
+    if body.rules is not None and body.label in _CODE_LABELS and body.style != "program":
+        curated.rule_source = _CODE_LABELS[body.label]
     try:
         if body.style == "program":
             code = render_quality_program(table=table, curated=curated, engine=body.engine)
@@ -3021,6 +3029,63 @@ async def add_pii_column(table: str, column: str, body: AddPiiColumnBody) -> dic
         raise HTTPException(status_code=400, detail=str(e))
     return {"status": "added", "table": table, "column": column,
             "entity_type": body.entity_type, "version_after": res.version_after}
+
+
+class PiiSwitchBody(BaseModel):
+    on: bool
+    entity_type: Optional[str] = None
+    decided_by: str = "web"
+
+
+def _request_actor(request: Request, fallback: str) -> str:
+    user = getattr(request.state, "user", None)
+    return str(getattr(user, "username", "") or fallback or "web")
+
+
+@app.post("/api/contracts/{table}/columns/{column}/pii")
+async def switch_pii_column(request: Request, table: str, column: str, body: PiiSwitchBody) -> dict:
+    """PII on / off for one column — the same switch the Steward Review page uses.
+
+    On keeps (or rebuilds) the column's masking and entity type; off strips every PII
+    signal. Both are PII decisions, so they hold across later scans and merges.
+    """
+    from redibis.services.contract_edits import pii_switch
+
+    try:
+        res = store_op(pii_switch, _cs(), table, column, body.on, entity_type=body.entity_type,
+                       decided_by=_request_actor(request, body.decided_by))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"status": "pii" if body.on else "not_pii", "table": table, "column": column,
+            "version_after": res.version_after}
+
+
+@app.get("/api/contracts/{table}/head")
+async def contract_head(table: str) -> dict:
+    """The live contract's version and last change — pages poll it to stay in sync."""
+    active = store_op(_cs().get_active, table)
+    if active is None:
+        raise HTTPException(status_code=404, detail=f"No active contract for '{table}'")
+    last = (_cs().get_history(table, limit=1) or [None])[0]
+    return {"table": table, "version": active.get("version"),
+            "changed_at": getattr(last, "timestamp", "") or "",
+            "changed_by": getattr(last, "run_id", "") or "",
+            "workflow": getattr(last, "workflow", "") or ""}
+
+
+@app.get("/api/contracts/{table}/yaml")
+async def contract_yaml(table: str, download: bool = False):
+    """The active contract as YAML (the same object ``GET /api/contracts/{table}`` returns)."""
+    import yaml
+    from fastapi.responses import PlainTextResponse
+
+    active = store_op(_cs().get_active, table)
+    if active is None:
+        raise HTTPException(status_code=404, detail=f"No active contract for '{table}'")
+    text = yaml.safe_dump(active, sort_keys=False, allow_unicode=True, default_flow_style=False)
+    headers = ({"Content-Disposition": f'attachment; filename="{table.replace(".", "_")}_contract.yaml"'}
+               if download else {})
+    return PlainTextResponse(text, media_type="application/yaml; charset=utf-8", headers=headers)
 
 
 @app.delete("/api/contracts/{table}/columns/{column}/pii-decision")
@@ -4675,27 +4740,39 @@ async def edit_via_share(token: str, body: ShareEditBody) -> dict:
                 except ValueError:
                     pass  # column missing / no contract — skip silently
 
-    # Re-fetch: a strip above may have produced a new active version.
-    active = store_op(_cs().get_active, share.table) or active
-    modified, applied = apply_scoped_edits(active, body.edits, share.scope)
+    # Column edits go through the overlay that owns each field (definitions, PII) —
+    # written into the contract body they were undone by the next write.
+    from redibis.services.contract_edits import apply_column_edits
+
+    def _allowed(field: str) -> bool:
+        return field != "remove_pii" and (
+            scope_allows(share.scope, field) or (field == "tags" and share.scope in ("business", "all")))
+
+    columns = {c: {f: v for f, v in ce.items() if f != "remove_pii"}
+               for c, ce in (body.edits.get("columns") or {}).items() if isinstance(ce, dict)}
+    applied: list[str] = []
+    try:
+        if any(columns.values()):
+            applied = store_op(apply_column_edits, _cs(), share.table, columns,
+                               decided_by=f"share:{token[:8]}", run_id=f"share_{token[:8]}",
+                               allowed=_allowed, validate=body.validate_contract)["applied"]
+        # Table-level edits (table tags, table quality) stay in the contract body.
+        table_edits = {k: v for k, v in body.edits.items() if k != "columns"}
+        if table_edits:
+            active = store_op(_cs().get_active, share.table) or active
+            modified, table_applied = apply_scoped_edits(active, table_edits, share.scope)
+            if table_applied:
+                store_op(_cs().upsert, partial=modified, table=share.table,
+                         workflow=f"share:{share.scope}", run_id=f"share_{token[:8]}",
+                         validate=body.validate_contract)
+                applied += table_applied
+    except Exception as e:  # noqa: BLE001 — a bad edit is the caller's error
+        raise HTTPException(status_code=400, detail=f"Edit failed: {e}")
     applied = applied + applied_strip
     if not applied:
         return {"status": "noop", "applied_fields": [], "scope": share.scope}
-    if not (set(applied) - set(applied_strip)):
-        # Only strips happened — they're already persisted; report and return.
-        return {"status": "applied", "applied_fields": applied, "scope": share.scope,
-                "version_after": (store_op(_cs().get_active, share.table) or {}).get("version")}
-    try:
-        upsert = store_op(
-            _cs().upsert,
-            partial=modified, table=share.table,
-            workflow=f"share:{share.scope}",
-            run_id=f"share_{token[:8]}", validate=body.validate_contract,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Edit failed: {e}")
     return {"status": "applied", "applied_fields": applied, "scope": share.scope,
-            "version_after": upsert.version_after}
+            "version_after": (store_op(_cs().get_active, share.table) or {}).get("version")}
 
 
 @app.delete("/api/share/{token}")

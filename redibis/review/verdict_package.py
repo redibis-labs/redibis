@@ -126,8 +126,17 @@ def _parse_jsonl(text: str) -> list[dict]:
     return rows
 
 
+def _parse_yaml(raw: str) -> Any:
+    import yaml
+
+    try:
+        return yaml.safe_load(raw)
+    except yaml.YAMLError as exc:
+        raise VerdictPackageError(f"invalid verdict package YAML: {exc}") from exc
+
+
 def load_verdict_package(path: Path | str) -> VerdictPackage:
-    """Load a verdict package from JSON or JSONL."""
+    """Load a verdict package from JSON, JSONL or YAML (the same object as the JSON form)."""
     p = Path(path)
     if not p.is_file():
         raise VerdictPackageError(f"verdict package not found: {p}")
@@ -151,7 +160,10 @@ def load_verdict_package(path: Path | str) -> VerdictPackage:
             return VerdictPackage(
                 entries=[VerdictEntry.from_dict(r) for r in rows],
             )
-        data = json.loads(raw)
+        if p.suffix.lower() in (".yaml", ".yml"):
+            data = _parse_yaml(raw)
+        else:
+            data = json.loads(raw)
     except json.JSONDecodeError as exc:
         raise VerdictPackageError(f"invalid verdict package JSON: {exc}") from exc
 

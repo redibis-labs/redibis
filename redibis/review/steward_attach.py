@@ -26,7 +26,7 @@ from redibis.store.pii_decisions import PiiDecision
 from redibis.store.review_store import REVIEWED_DECISIONS, REVIEWED_STATUSES
 
 STEWARD_VERDICT_ACTOR_PREFIX = "steward-verdict:"
-_VERDICT_SUFFIXES = {".json", ".jsonl"}
+_VERDICT_SUFFIXES = {".json", ".jsonl", ".yaml", ".yml"}
 
 
 class StewardAttachError(ValueError):
@@ -89,8 +89,14 @@ def load_steward_verdict_path(path: Path | str) -> list[tuple[Path, VerdictPacka
         raw: Optional[dict] = None
         if file.suffix.lower() != ".jsonl":
             try:
-                data = json.loads(file.read_text(encoding="utf-8"))
-            except json.JSONDecodeError:
+                text = file.read_text(encoding="utf-8")
+                if file.suffix.lower() in (".yaml", ".yml"):
+                    import yaml
+
+                    data = yaml.safe_load(text)
+                else:
+                    data = json.loads(text)
+            except Exception:  # noqa: BLE001 — unreadable → no raw A1 rows
                 data = None
             if isinstance(data, dict) and data.get("kind") == STEWARD_VERDICTS_KIND:
                 raw = data

@@ -864,22 +864,26 @@ class StewardReviewService:
                     reviewer=who,
                     run_id=fv.chosen_run_id,
                 )
+        elif fv.field == "tags" and fv.value is not None and self._effective_pii(table, column):
+            # A PII column's tags live in its PII payload, next to its masking.
+            self._patch_pii_fields(table, column, who, tags=_as_list(fv.value))
         elif fv.field in ("definition", "tags"):
             patch: dict[str, Any] = {}
             if fv.field == "definition" and fv.value is not None:
                 patch["description"] = fv.value
             if fv.field == "tags" and fv.value is not None:
-                patch["tags"] = list(fv.value) if isinstance(fv.value, list) else [fv.value]
+                # PII tags on a column that is not PII would make it look PII again.
+                patch["tags"] = [t for t in _as_list(fv.value) if not _is_pii_tag(t)]
             if patch:
                 self.store.patch_definitions(
                     table, column_patches={column: patch}, decided_by=who,
                 )
-        elif fv.field == "classification":
-            self.store.patch_column_privacy(
-                table, column, classification=str(fv.value or ""), decided_by=who,
-            )
-        elif fv.field in ("entity_type", "logical_type", "masking", "quality_rules",
+        elif fv.field == "classification" and self._effective_pii(table, column):
+            if fv.value:
+                self._patch_pii_fields(table, column, who, classification=str(fv.value))
+        elif fv.field in ("classification", "entity_type", "logical_type", "masking", "quality_rules",
                           "freshness", "retention", "cost"):
+            # (classification of a column that is not PII: recorded, never turns PII on)
             active = self.store.get_active(table)
             prop = {}
             for name, p in _iter_props(active or {}):
@@ -909,6 +913,41 @@ class StewardReviewService:
         elif fv.decision == "edit":
             # edit_column already checkpointed as edited when pii/definition routed
             pass
+
+    def _effective_pii(self, table: str, column: str) -> bool:
+        """Whether the column is PII now: the steward decision wins over the contract signals."""
+        dec = (self.store.get_pii_decisions(table) or {}).get(column) or {}
+        if str(dec.get("lifecycle_state") or "active").lower() not in ("stale", "superseded"):
+            if dec.get("status") == "not_pii":
+                return False
+            if dec.get("status") == "pii":
+                return True
+        for name, prop in _iter_props(self.store.get_active(table) or {}):
+            if name == column:
+                return column_is_pii(prop)
+        return False
+
+    def _patch_pii_fields(self, table: str, column: str, who: str, *,
+                          classification: Optional[str] = None, tags: Optional[list] = None) -> None:
+        """Change a PII column's classification / tags, keeping its entity type and masking.
+
+        (``ContractStore.patch_column_privacy`` rebuilds the whole PII payload, so using it for
+        one field dropped the masking and entity type — and turned a non-PII column PII.)
+        """
+        from redibis.services.review_service import pii_on_payload
+
+        payload = pii_on_payload(self.store, table, column)
+        if classification is not None:
+            payload["classification"] = classification
+            if isinstance(payload.get("privacy"), dict):
+                payload["privacy"]["classification"] = classification
+        if tags is not None:
+            payload["tags"] = list(tags)
+            payload["_replace_tags"] = True
+        self.store.set_pii_decision(
+            table, column, "pii", entity_type=payload.get("entity_type"), payload=payload,
+            decided_by=who, run_id=f"steward:{column}",
+        )
 
     def _route_table_write(self, table: str, item: str, fv: FieldVerdict, who: str) -> None:
         if item in ("name", "description", "owner"):
@@ -1016,6 +1055,15 @@ class StewardReviewService:
         )
         self.ledger.append(table, column, [gen])
         fv.evidence_refs = list(fv.evidence_refs) + [gen.id]
+
+
+def _as_list(value: Any) -> list:
+    return list(value) if isinstance(value, (list, tuple)) else [value]
+
+
+def _is_pii_tag(tag: Any) -> bool:
+    t = str(tag or "").strip().lower()
+    return t in ("pii", "gdpr_personal_data", "personal_data") or t.startswith("pii")
 
 
 def _coerce_pii(value: Any) -> bool:
