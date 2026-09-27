@@ -278,6 +278,11 @@ def fake_phone(rng: KeyedRandom, original: str, *, preserve_format: bool = True,
         m = re.match(r"\s*\+\d{1,3}", s)
         if m:
             keep = sum(1 for ch in m.group(0) if ch.isdigit())
+    elif preserve_country_code and s.lstrip().startswith("0") and len(digit_positions) >= 8:
+        # National format (trunk "0" + carrier/area digits, e.g. Egypt 010/011/012/015):
+        # keep the 3-digit prefix so the fake is still a valid-looking number. The
+        # prefix names a carrier, not a person; the subscriber digits are randomized.
+        keep = 3
     for n, i in enumerate(digit_positions):
         if n < keep:
             continue
@@ -300,6 +305,43 @@ def fake_email(rng: KeyedRandom, original: str, *, preserve_domain: bool = True,
     if preserve_domain and domain:
         return f"{lp}@{domain}"
     return f"{lp}@{rng.choice(_EMAIL_DOMAINS)}"
+
+
+_SOCIAL_HOSTS = ["facebook.com", "instagram.com", "x.com", "linkedin.com", "tiktok.com"]
+_URL_RE = re.compile(r"^(?P<scheme>[a-zA-Z][a-zA-Z0-9+.-]*://)?(?P<host>[^/?#\s]+\.[^/?#\s]+)(?P<path>/[^?#]*)?")
+
+
+def _fake_handle_shape(s: str, rng: KeyedRandom) -> str:
+    """Replace letters/digits keeping case, length and separators (. _ - /)."""
+    out = []
+    for ch in s:
+        if ch.isdigit():
+            out.append(str(rng.randint(0, 9)))
+        elif ch.isalpha():
+            c = chr(ord("a") + rng.randint(0, 25))
+            out.append(c.upper() if ch.isupper() else c)
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def fake_social_url(rng: KeyedRandom, original: str, *, preserve_host: bool = True) -> str:
+    """Fake a social profile URL: keep scheme + host, replace the profile handle.
+
+    ``https://facebook.com/bzurcbcr.kyeydt`` -> ``https://facebook.com/qwmtoxla.pzrhce``.
+    Query strings and fragments are dropped (they often carry ids). A bare handle
+    (``@someone``) is replaced in the same shape.
+    """
+    s = str(original).strip()
+    m = _URL_RE.match(s)
+    if not m:
+        return _fake_handle_shape(s, rng)
+    scheme = m.group("scheme") or ""
+    host = m.group("host") if preserve_host else rng.choice(_SOCIAL_HOSTS)
+    path = m.group("path") or ""
+    if not path.strip("/"):
+        path = "/" + _fake_handle_shape("user" + str(rng.randint(1000, 99999)), rng)
+    return f"{scheme}{host}{_fake_handle_shape(path, rng)}"
 
 
 def fake_national_id(rng: KeyedRandom, original: str) -> str:

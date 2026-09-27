@@ -148,7 +148,19 @@ class Subcontract:
             "created_by": self.created_by,
             "edit_count": len(self.edits),
             "summary_stats": self.summary_stats,
+            **self._counts(),
         }
+
+    def _counts(self) -> dict:
+        """How much the run holds: quality rules, or PII-flagged columns."""
+        rules = columns = 0
+        for obj in (self.payload or {}).get("schema", []) or []:
+            rules += len(obj.get("quality") or [])
+            for prop in obj.get("properties", []) or []:
+                rules += len(prop.get("quality") or [])
+                if prop.get("entity_type") or prop.get("classification") or prop.get("pii"):
+                    columns += 1
+        return {"rule_count": rules} if self.kind == "quality" else {"column_count": columns}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -1,0 +1,29 @@
+{# Shared by help.html (/help) and help_site.html (GitHub Pages build). #}
+    <p class="help-intro">{{ help.intro }}</p>
+    <div class="help-toc">
+      {% for s in help.sections %}<a href="#{{ s.id }}">{{ s.title }}</a>{% endfor %}
+    </div>
+    {% for s in help.sections %}
+    <section class="help-sec" id="{{ s.id }}">
+      <h2>{{ s.title }}</h2>
+      {% for t in s.text or [] %}<p>{{ t }}</p>{% endfor %}
+      {% if s.steps %}<ol>{% for t in s.steps %}<li>{{ t.text }}{% if t.cmd %}<br><code>{{ t.cmd }}</code>{% endif %}</li>{% endfor %}</ol>{% endif %}
+      {% if s.videos %}
+      <div class="help-videos">
+        {% for v in s.videos %}
+          {% if v.url %}
+          <a class="help-video" href="{{ v.url }}" target="_blank" rel="noopener noreferrer">
+            <span class="play">▶</span>
+            <span>{{ v.title }}{% if v.minutes %}<small>{{ v.minutes }} min video</small>{% endif %}</span>
+          </a>
+          {% else %}
+          <div class="help-video soon" aria-disabled="true">
+            <span class="play">▶</span>
+            <span>{{ v.title }}<small>video coming soon</small></span>
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+    </section>
+    {% endfor %}

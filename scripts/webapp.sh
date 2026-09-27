@@ -421,9 +421,9 @@ start_webapp() {
     fi
     echo "  pid: $(cat "${PID_FILE}")"
     echo "  scan: http://127.0.0.1:${PORT}/"
-    echo "  agents: http://127.0.0.1:${PORT}/agents  (type URL; not linked in nav)"
+    # echo "  agents: http://127.0.0.1:${PORT}/agents  (type URL; not linked in nav)"
     echo "  settings: http://127.0.0.1:${PORT}/settings"
-    echo "  local-full preset: REDIBIS_CONFIG=config/examples/agents-local-full.yaml"
+    # echo "  local-full preset: REDIBIS_CONFIG=config/examples/agents-local-full.yaml"
     echo "  monitor: ./scripts/webapp.sh --logs"
     if [ "${MONITOR}" = "1" ]; then
       echo ""
@@ -433,9 +433,9 @@ start_webapp() {
   fi
 
   echo "Starting webapp on http://127.0.0.1:${PORT}/ (Ctrl+C to stop)…"
-  echo "  agents: http://127.0.0.1:${PORT}/agents  (type URL; not linked in nav)"
+  # echo "  agents: http://127.0.0.1:${PORT}/agents  (type URL; not linked in nav)"
   echo "  settings: http://127.0.0.1:${PORT}/settings"
-  echo "  local-full preset: REDIBIS_CONFIG=config/examples/agents-local-full.yaml"
+  # echo "  local-full preset: REDIBIS_CONFIG=config/examples/agents-local-full.yaml"
   echo "  python: ${python_bin}"
   if [ "${USE_NER}" = "1" ]; then
     echo "  ner: REDIBIS_MODELS_DIR=${REDIBIS_MODELS_DIR:-}"

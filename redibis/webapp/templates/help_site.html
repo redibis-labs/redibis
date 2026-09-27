@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+{# Standalone public help page for GitHub Pages. Built by scripts/build_help_site.py
+   from static/help.json; do not edit the generated packaging/site/index.html. #}
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>redibis — open-source data protection and data contracts</title>
+  <meta name="description" content="{{ help.intro }}"/>
+  <link rel="icon" type="image/png" href="logo.png"/>
+  <style>
+    :root{--bg:#ffffff;--fg:#0f172a;--muted:#475569;--border:#e2e8f0;--accent:#dc2626;--card:#f8fafc}
+    @media (prefers-color-scheme: dark){
+      :root{--bg:#0b1120;--fg:#e2e8f0;--muted:#94a3b8;--border:#1e293b;--accent:#f87171;--card:#111827}
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+    a{color:inherit}
+    header.site{border-bottom:1px solid var(--border)}
+    .site-bar{max-width:920px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:12px}
+    .site-bar img{width:36px;height:36px;border-radius:8px}
+    .site-bar strong{font-size:1.15rem}
+    .site-bar .tag{color:var(--muted);font-size:.9rem}
+    .site-bar .gh{margin-left:auto;padding:6px 14px;border:1px solid var(--border);border-radius:8px;text-decoration:none;font-size:.9rem}
+    .hero{max-width:920px;margin:0 auto;padding:40px 24px 8px}
+    .hero h1{font-size:2rem;line-height:1.25;margin:0}
+    .hero + .help-wrap{padding-top:12px}
+    .help-sec code{background:var(--card);padding:2px 6px;border-radius:6px}
+    footer.site{border-top:1px solid var(--border);color:var(--muted);font-size:.85rem;text-align:center;padding:20px}
+  </style>
+  {% include "_help_style.html" %}
+</head>
+<body>
+  <header class="site">
+    <div class="site-bar">
+      <img src="logo.png" alt="" onerror="this.style.display='none'"/>
+      <strong>redibis</strong><span class="tag">easily govern</span>
+      {% if help.repo_url %}<a class="gh" href="{{ help.repo_url }}" rel="noopener">View on GitHub</a>{% endif %}
+    </div>
+  </header>
+  <div class="hero">
+    <h1>Find personal data, check quality, and publish trusted data contracts.</h1>
+  </div>
+  <main class="help-wrap">
+    {% include "_help_body.html" %}
+  </main>
+  <footer class="site">redibis · Apache-2.0 license</footer>
+</body>
+</html>

@@ -1,5 +1,7 @@
 # Contributing
 
+_Last updated: 2026-09-26_
+
 Thanks for helping improve redibis.
 
 ## Development setup
@@ -45,9 +47,15 @@ You can sign your commit automatically using `git commit -s`.
 - Keep diffs focused; match existing naming (`*Scan`, `*Result`, `*Store`).
 - Add or update tests for behavior changes.
 - Update `README.md` and release notes when user-facing behavior changes.
+- Docs carry a `_Last updated: YYYY-MM-DD_` line under the title; bump it when you
+  edit the doc. Quality-rule changes also update `docs/QUALITY_RULES.md`.
 
 ## Security
 
 Do not commit credentials. LLM/S3 keys are read from environment variables or
 config files listed in `.gitignore`. Follow `SECURITY.md` for private
 vulnerability reporting.
+
+## Contributors
+
+See [CONTRIBUTORS.md](CONTRIBUTORS.md).

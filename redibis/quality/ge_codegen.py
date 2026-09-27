@@ -71,6 +71,28 @@ def _kwargs_with_meta(rule: dict[str, Any]) -> dict[str, Any]:
     return kwargs
 
 
+def _render_paste_rule(rule: dict[str, Any], column: Optional[str]) -> str:
+    """One paste-fragment line: ``qa.add_gx_expectation(...)``, or ``sql_rule(...)``
+    for a custom SQL rule (both read back by the AST-safe parser)."""
+    from redibis.quality.sql_rules import is_sql_rule, normalize_sql_rule
+
+    if is_sql_rule(rule):
+        n = normalize_sql_rule(rule)
+        kw = dict(n["kwargs"])
+        parts = [_format_literal(kw.pop("sql"))]
+        if n.get("column"):
+            parts.append(f"column={_format_literal(n['column'])}")
+        if n.get("description"):
+            parts.append(f"description={_format_literal(n['description'])}")
+        parts += [f"{k}={_format_literal(v)}" for k, v in sorted(kw.items())]
+        return f"sql_rule(\n    {', '.join(parts)})"
+    return render_gx_expectation_line(
+        rule.get("rule") or rule.get("expectation_type", ""),
+        column=column,
+        kwargs=_kwargs_with_meta(rule),
+    )
+
+
 def render_ge_paste_module(rules: Sequence[dict[str, Any]]) -> str:
     """Build ``ge_paste.py`` content — parse-safe, no imports or side effects."""
     lines = [
@@ -88,21 +110,13 @@ def render_ge_paste_module(rules: Sequence[dict[str, Any]]) -> str:
     if table_rules:
         lines.append("# Table-level rules")
         for r in table_rules:
-            lines.append(render_gx_expectation_line(
-                r.get("rule") or r.get("expectation_type", ""),
-                column=None,
-                kwargs=_kwargs_with_meta(r),
-            ))
+            lines.append(_render_paste_rule(r, None))
             lines.append("")
 
     for col in sorted(col_rules.keys()):
         lines.append(f"# Column: {col}")
         for r in col_rules[col]:
-            lines.append(render_gx_expectation_line(
-                r.get("rule") or r.get("expectation_type", ""),
-                column=col,
-                kwargs=_kwargs_with_meta(r),
-            ))
+            lines.append(_render_paste_rule(r, col))
             lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"
@@ -141,11 +155,11 @@ def _pretty_rule_literal(rule: dict[str, Any], indent: int) -> str:
     pad = " " * indent
     inner_pad = " " * (indent + 4)
     lines = [pad + "{"]
-    for key in ("rule", "column", "kwargs", "meta"):
+    for key in ("rule", "column", "kwargs", "description", "meta"):
         if key not in rule:
             continue
         value = rule[key]
-        if key in ("kwargs", "meta") and not value:
+        if key in ("kwargs", "description", "meta") and not value:
             continue
         lines.append(f"{inner_pad}{key!r}: {_format_literal(value)},")
     lines.append(pad + "},")
@@ -266,6 +280,9 @@ Dependencies: {", ".join(dep_notes)}
 # ═══════════════════════════════════════════════════════════════════════════
 # Quality rules — edit freely. Each dict is one Great Expectations rule:
 #   {{"rule": "<expect_*>", "column": "<name or None>", "kwargs": {{...}}}}
+# …or a custom SQL rule (the query returns the rows that break it, or one
+# number from SELECT COUNT(*)/SUM/AVG/MIN/MAX; ${{object}} is this table):
+#   sql_rule("SELECT * FROM ${{object}} WHERE amount < 0", description="…")
 # ═══════════════════════════════════════════════════════════════════════════
 RULES: list[dict] = [
 {rules_literal}
@@ -277,6 +294,77 @@ def build_rule_set() -> QualityRuleSet:
     return QualityRuleSet(name={slug!r}, rules=[dict(r) for r in RULES])
 '''
 
+    continue_block = f'''
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Continue in redibis — author here, hand the rules back to the contract.
+#   report = validate(df)          check RULES on a full partition; edit, repeat
+#   more = discover_rules(df)      rules redibis finds on this data (a draft)
+#   add_rules(more)                …append the new ones to RULES, then validate()
+#   RULES.append(sql_rule("SELECT * FROM ${{object}} WHERE …"))   your own SQL rule
+#   save_quality_run(df)           → a quality run: `redibis quality-run diff/merge`
+# ═══════════════════════════════════════════════════════════════════════════
+OUTPUT_DIR = "./reports"   # same store as `redibis … --output-dir`
+
+
+def discover_rules(df):
+    """Rules redibis discovers on this whole DataFrame (a QualityDraft).
+
+    Curate before adding, e.g. ``more.drop(rule_types=SNAPSHOT_RULES)``.
+    """
+    return author_quality(df, TABLE)
+
+
+def add_rules(rules) -> int:
+    """Append rules (a QualityDraft or RULES-style dicts) to RULES, filling gaps only.
+
+    Great Expectations keeps one expectation per (type, column), so a rule whose
+    type and column are already in RULES is skipped — your existing rule wins.
+    SQL rules are told apart by their query.
+    """
+    if hasattr(rules, "to_rules"):
+        rules = rules.to_rules()
+
+    def _key(r):
+        return (r.get("rule"), r.get("column"),
+                (r.get("kwargs") or {{}}).get("sql") or r.get("sql"))
+
+    seen = {{_key(r) for r in RULES}}
+    added = 0
+    for r in rules:
+        key = _key(r)
+        if key not in seen:
+            RULES.append(dict(r))
+            seen.add(key)
+            added += 1
+    print(f"added {{added}} rule(s); RULES now has {{len(RULES)}}")
+    return added
+
+
+def save_quality_run(df, *, note: str = "authored in a notebook",
+                     output_dir: str = OUTPUT_DIR, rules: list | None = None) -> str:
+    """Validate RULES on ``df`` and store them as a redibis quality run.
+
+    Nothing reaches the contract until the run is merged
+    (``redibis quality-run merge``). For an S3/MinIO store use
+    ``QualityAuthor.from_s3(TABLE).save(draft_from_rules(TABLE, RULES, df=df))``.
+    """
+    draft = draft_from_rules(TABLE, RULES if rules is None else rules, df=df)
+    run = QualityAuthor(TABLE, output_dir=output_dir).save(draft, note=note)
+    print(f"saved quality run {{run.run_id}}: {{draft.passed}}/{{draft.total}} rules pass on this data")
+    print(f"review: redibis quality-run diff {{TABLE}} --run {{run.run_id}} --output-dir {{output_dir}}")
+    print(f"merge:  redibis quality-run merge {{TABLE}} --run {{run.run_id}} --output-dir {{output_dir}}")
+    return run.run_id
+
+
+def _in_notebook() -> bool:
+    """True inside Jupyter/IPython, where ``__name__`` is also ``"__main__"``."""
+    try:
+        return get_ipython() is not None  # noqa: F821 - defined by IPython
+    except NameError:
+        return False
+'''
+
     if engine == "spark":
         return header + f'''
 from __future__ import annotations
@@ -286,8 +374,16 @@ import json
 
 from pyspark.sql import DataFrame, SparkSession
 
+from redibis.quality.authoring import (
+    SNAPSHOT_RULES,
+    QualityAuthor,
+    author_quality,
+    draft_from_rules,
+    sql_rule,
+)
 from redibis.quality.gatekeeper import QualityGatekeeper
 from redibis.quality.rule_set import QualityRuleSet
+from redibis.quality.sql_rules import add_sql_results
 from redibis.services.pipeline import apply_quality_rules
 
 TABLE = {table!r}
@@ -301,6 +397,9 @@ SOURCE_FORMAT = "parquet"  # used only with SOURCE_PATH
 # Validate one full business-day partition, e.g. "txn_date = '2026-08-30'".
 # Empty means the whole table — expectations run over every row either way.
 PARTITION_FILTER = ""
+# "fused": every aggregate rule in ONE Spark job (the rest by Great Expectations on
+# the cached frame); "persist": Great Expectations on a cached frame; "ge": as is.
+SPARK_MODE = "fused"
 {rules_block}
 
 def get_spark(app_name: str = {f"quality_{slug}"!r}) -> SparkSession:
@@ -342,19 +441,53 @@ def load_data(
     return df
 
 
-def validate(df: DataFrame, rule_set: QualityRuleSet | None = None) -> dict:
+def validate(df: DataFrame, rule_set: QualityRuleSet | None = None, *,
+             spark_mode: str = SPARK_MODE) -> dict:
     """Run the rules against a Spark DataFrame and return a JSON-ready dict.
 
-    Great Expectations attaches to the Spark DataFrame directly, so the whole
-    partition is evaluated in the cluster — nothing is sampled or collected.
+    The whole partition is evaluated in the cluster — nothing is sampled or
+    collected. ``spark_mode="fused"`` (default) computes the aggregate rules in one
+    Spark job; ``"ge"`` runs every rule with Great Expectations.
     """
     rule_set = rule_set or build_rule_set()
+    if spark_mode != "ge":
+        result = draft_from_rules(TABLE, [dict(r) for r in rule_set.rules]).validate(
+            df, spark_mode=spark_mode)
+        return _report(result)
     qa = QualityGatekeeper(suite_name={suite_name!r}, in_memory=True)
     qa.attach_dataframe(df, dataset_name={slug!r})
     apply_quality_rules(qa, rule_set, profiler_expectations=[])
     raw = qa.run_tests(stage="standalone", generate_docs=False)
-    return qa._extract_report_data(raw)
+    # Custom SQL rules ({{"rule": "sql", ...}}) run on the same DataFrame.
+    return add_sql_results(qa._extract_report_data(raw), df, rule_set.rules, table=TABLE)
 
+
+def _report(result) -> dict:
+    """A redibis validation result in the report shape ``validate`` returns."""
+    rows = [{{"rule": r.expectation_type, "column": r.column, "success": bool(r.success),
+             "severity": r.severity, "unexpected_count": r.unexpected_count,
+             "observed_value": r.observed_value, "partial_unexpected": list(r.partial_unexpected),
+             "message": r.message, "rule_id": r.rule_id}} for r in result.results]
+    passed = sum(1 for r in rows if r["success"])
+    return {{
+        "table": TABLE, "engine": result.engine, "stats": result.stats, "results": rows,
+        "statistics": {{"evaluated_expectations": len(rows), "successful_expectations": passed,
+                        "unsuccessful_expectations": len(rows) - passed,
+                        "success_percent": 100.0 * passed / len(rows) if rows else 100.0}},
+    }}
+
+
+def record_partition(df: DataFrame, partition: str, *, store: str = "",
+                     spark_mode: str = SPARK_MODE, fingerprint: str = ""):
+    """Validate ``df`` (one partition, chosen by you) and store one row per rule in
+    the quality result store (``partition_runs`` / ``rule_results``) — Iceberg by
+    default, or ``store`` (``s3://…``, ``postgresql://…``, ``file://…``)."""
+    from redibis.quality.results import validate_partition
+
+    draft = draft_from_rules(TABLE, [dict(r) for r in RULES])
+    return validate_partition(df, TABLE, partition=partition, contract=draft.payload,
+                              store=store or None, spark_mode=spark_mode, fingerprint=fingerprint)
+{continue_block}
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate {table} against its quality rules (Spark).")
@@ -366,6 +499,13 @@ def main(argv: list[str] | None = None) -> int:
         help="Spark SQL predicate, e.g. \\"txn_date = '2026-08-30'\\"",
     )
     parser.add_argument("--out", help="write JSON results to this path (in addition to stdout)")
+    parser.add_argument("--spark-mode", default=SPARK_MODE, choices=["fused", "persist", "ge"],
+                        help="fused: aggregate rules in one Spark job (default)")
+    parser.add_argument("--partition", default="",
+                        help="record the run in the quality result store as this partition, e.g. dt=2026-08-30")
+    parser.add_argument("--results-store", default="",
+                        help="result store URI (default: REDIBIS_QUALITY_RESULTS_STORE or Iceberg)")
+    parser.add_argument("--fingerprint", default="", help="data version, e.g. the Iceberg snapshot id")
     args = parser.parse_args(argv)
 
     spark = get_spark()
@@ -376,7 +516,15 @@ def main(argv: list[str] | None = None) -> int:
         source_format=args.format,
         partition_filter=args.partition_filter,
     )
-    report = validate(df)
+    if args.partition:
+        run = record_partition(df, args.partition, store=args.results_store,
+                               spark_mode=args.spark_mode, fingerprint=args.fingerprint)
+        print(run)
+        if args.out:
+            with open(args.out, "w", encoding="utf-8") as fh:
+                fh.write(json.dumps(run.row(), indent=2, default=str))
+        return 0 if run.status == "passed" else 1
+    report = validate(df, spark_mode=args.spark_mode)
     payload = json.dumps(report, indent=2, default=str)
     if args.out:
         with open(args.out, "w", encoding="utf-8") as fh:
@@ -385,7 +533,7 @@ def main(argv: list[str] | None = None) -> int:
     return 0 if all(r.get("success") for r in report.get("results", [])) else 1
 
 
-if __name__ == "__main__":
+if __name__ == "__main__" and not _in_notebook():
     raise SystemExit(main())
 '''
 
@@ -398,8 +546,16 @@ from pathlib import Path
 
 import pandas as pd
 
+from redibis.quality.authoring import (
+    SNAPSHOT_RULES,
+    QualityAuthor,
+    author_quality,
+    draft_from_rules,
+    sql_rule,
+)
 from redibis.quality.gatekeeper import QualityGatekeeper
 from redibis.quality.rule_set import QualityRuleSet
+from redibis.quality.sql_rules import add_sql_results
 from redibis.services.pipeline import apply_quality_rules
 
 TABLE = {table!r}
@@ -416,7 +572,9 @@ def load_sample(path: str, rows: int = 5000) -> pd.DataFrame:
     p = Path(path)
     if p.suffix.lower() == ".parquet":
         return pd.read_parquet(p).head(rows)
-    return pd.read_csv(p, nrows=rows)
+    # Every column as text, exactly as redibis read it when the rules were
+    # authored — otherwise "01012345678" becomes 1012345678 and length rules fail.
+    return pd.read_csv(p, nrows=rows, dtype=str, keep_default_na=False)
 
 
 def validate(df: pd.DataFrame, rule_set: QualityRuleSet | None = None) -> dict:
@@ -426,8 +584,9 @@ def validate(df: pd.DataFrame, rule_set: QualityRuleSet | None = None) -> dict:
     qa.attach_dataframe(df, dataset_name={slug!r})
     apply_quality_rules(qa, rule_set, profiler_expectations=[])
     raw = qa.run_tests(stage="standalone", generate_docs=False)
-    return qa._extract_report_data(raw)
-
+    # Custom SQL rules ({{"rule": "sql", ...}}) run on the same DataFrame.
+    return add_sql_results(qa._extract_report_data(raw), df, rule_set.rules, table=TABLE)
+{continue_block}
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate a sample against {table} quality rules.")
@@ -445,6 +604,6 @@ def main(argv: list[str] | None = None) -> int:
     return 0 if all(r.get("success") for r in report.get("results", [])) else 1
 
 
-if __name__ == "__main__":
+if __name__ == "__main__" and not _in_notebook():
     raise SystemExit(main())
 '''

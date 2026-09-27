@@ -1,8 +1,14 @@
 # HTTP API surface (open-core dashboard)
 
+_Last updated: 2026-09-27_
+
 Generated from FastAPI route decorators in `redibis/webapp/`.
 Auth is on by default — most `/api/*` routes require a session cookie.
 Interactive docs: `/docs` (Swagger) after login.
+
+Quality rules — how they are authored, stored as quality runs, reviewed and merged,
+and the matching Python and CLI entry points — are documented in
+**[QUALITY_RULES.md](QUALITY_RULES.md)**.
 
 **355 routes** listed below.
 
@@ -307,6 +313,11 @@ Interactive docs: `/docs` (Swagger) after login.
 
 | Method | Path |
 |--------|------|
+| `GET` | `/api/pii/capabilities` |
+| `GET` | `/api/pii/capabilities/guide` |
+| `GET` | `/api/pii/capabilities/report` |
+| `GET` | `/api/pii/capabilities/verification` |
+| `POST` | `/api/pii/capabilities/verify` |
 | `GET` | `/api/pii/ner/labels` |
 | `PUT` | `/api/pii/ner/labels` |
 | `GET` | `/api/pii/ner/models` |
@@ -372,6 +383,14 @@ Interactive docs: `/docs` (Swagger) after login.
 | `GET` | `/api/regex-catalog/{name}` |
 
 ## Run artifacts
+
+`{kind}` is `pii` or `quality`. Quality runs saved from code (`QualityAuthor.save()`,
+`save_quality_run(df)` in the Quality page's generated program, or
+`redibis quality-run import`) are served by the same routes: `GET` shows the rules,
+`PATCH` edits them, `merge` applies them to the active contract (each column in the
+run has its rules replaced), `discard` drops the run. List a table's quality runs with
+`GET /api/contracts/{table}/runs?kind=quality`. See
+[QUALITY_RULES.md](QUALITY_RULES.md#8-reference).
 
 | Method | Path |
 |--------|------|

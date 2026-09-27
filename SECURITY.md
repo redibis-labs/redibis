@@ -1,5 +1,7 @@
 # Security policy
 
+_Last updated: 2026-09-07_
+
 ## Reporting a vulnerability
 
 Please report vulnerabilities privately through the **Security** tab of the

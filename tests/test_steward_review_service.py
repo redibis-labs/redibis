@@ -317,3 +317,137 @@ def test_a1_export_loads_as_scan_verdict_package():
         loaded = load_verdict_package(path)
         assert loaded.by_column("db.customers")["msisdn"].status == "pii"
 
+
+
+# ── profile_status: why the Profile panel is (or is not) populated ─────────────
+
+def test_has_profile_stats_ignores_logical_type():
+    from redibis.services.steward_review_service import _has_profile_stats
+
+    assert not _has_profile_stats({"logical_type": "string"})
+    assert not _has_profile_stats({})
+    assert _has_profile_stats({"logical_type": "string", "null_rate": 0.0})
+    assert _has_profile_stats({"ndv": 12})
+
+
+def _store(tmp):
+    store = ContractStore(LocalBackend(tmp), "c")
+    store.upsert(_contract(), table="db.customers", workflow="manual", run_id="r1")
+    return store
+
+
+def _write_legacy_manifest(store, run_id, *, engines, extra=None):
+    """Write a manifest + empty column record the way pre-fix scans did."""
+    backend = store.profiles.backend
+    bucket = store.profiles.bucket
+    backend.put_json(bucket, store.profiles._column_key("db.customers", run_id, "msisdn"),
+                     {"quality": []})
+    man = {"table": "db.customers", "run_id": run_id, "engines": engines,
+           "residency": "portable", "columns_written": ["msisdn"], "samples_written": [],
+           "digests": {}, "written_at": "2026-01-01T00:00:00Z"}
+    man.update(extra or {})
+    backend.put_json(bucket, store.profiles._manifest_key("db.customers", run_id), man)
+
+
+def test_column_payload_reports_no_run_when_no_profile_record():
+    with tempfile.TemporaryDirectory() as tmp:
+        page = StewardReviewService(_store(tmp)).column("db.customers", "msisdn", actor="ada")
+        prof = page["profile"]
+        assert prof["profile_status"] == "no_run"
+        assert prof["profile_run_id"] == ""
+        assert prof["samples_withheld"] == ""
+        # logical_type still shown from the contract, but it is not a profile.
+        assert prof["stats"]["logical_type"] == "string"
+
+
+def test_column_payload_reports_not_run_when_profiling_skipped():
+    from types import SimpleNamespace
+
+    import pandas as pd
+
+    from redibis.services.scan_service import ScanService
+
+    with tempfile.TemporaryDirectory() as tmp:
+        store = _store(tmp)
+        svc = ScanService(backend=store.backend, store=store)
+        # An earlier quality-only run with no profiler output.
+        run_result = SimpleNamespace(
+            status="success", profile=None,
+            quality_results={"msisdn": [{"type": "not_null", "passed": True}]},
+        )
+        cfg = SimpleNamespace(table="db.customers", scan_types=["quality"])
+        svc._write_guarded_profiles(cfg, "run-q", run_result,
+                                    pd.DataFrame({"msisdn": ["0100"]}))
+        page = StewardReviewService(store).column("db.customers", "msisdn", actor="ada")
+        # quality-only runs do not record the "profile" engine
+        assert "profile" not in page["profile"]["profile_engines"]
+        assert page["profile"]["profile_status"] == "not_run"
+
+
+def test_legacy_record_with_empty_engines_classifies_as_not_run():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = _store(tmp)
+        _write_legacy_manifest(store, "run-42", engines=[])
+        page = StewardReviewService(store).column("db.customers", "msisdn", actor="ada")
+        assert page["profile"]["profile_status"] == "not_run"
+        assert page["profile"]["profile_run_id"] == "run-42"
+        assert page["profile"]["profile_engines"] == []
+
+
+def test_column_payload_reports_ok_after_a_profiling_scan():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = _store(tmp)
+        store.profiles.write(
+            "db.customers", "r2",
+            profile_result={"columns": {"msisdn": {"null_rate": 0.0, "ndv": 10}}},
+            engines=["profile"],
+        )
+        page = StewardReviewService(store).column("db.customers", "msisdn", actor="ada")
+        prof = page["profile"]
+        assert prof["profile_status"] == "ok"
+        assert prof["profile_engines"] == ["profile"]
+        assert prof["stats"]["null_rate"] == 0.0
+
+
+def test_write_failure_surfaces_as_write_failed_in_the_column_payload():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = _store(tmp)
+        store.profiles.mark_write_error("db.customers", "r3", "boom")
+        page = StewardReviewService(store).column("db.customers", "msisdn", actor="ada")
+        assert page["profile"]["profile_status"] == "write_failed"
+        assert page["profile"]["profile_error"] == "boom"
+
+
+def test_ledger_fallback_promotes_not_run_to_ok():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = _store(tmp)
+        _write_legacy_manifest(store, "run-42", engines=[])
+        store.generation_ledger.append("db.customers", "msisdn", [
+            Generation(field="logical_type", source="profile", value="string",
+                       confidence=None, run_id="r0", ts="t", detail={"null_rate": 0.0}),
+        ])
+        page = StewardReviewService(store).column("db.customers", "msisdn", actor="ada")
+        assert page["profile"]["profile_status"] == "ok"
+
+
+def test_samples_withheld_is_only_about_samples():
+    from redibis.memory.consent import SamplingConsentStore
+    from redibis.store.profile_store import ProfileStore
+
+    with tempfile.TemporaryDirectory() as tmp:
+        backend = LocalBackend(tmp)
+        store = ContractStore(backend, "c")
+        store.upsert(_contract(), table="db.customers", workflow="manual", run_id="r1")
+        consent = SamplingConsentStore(backend, "c")  # nothing approved
+        profiles = ProfileStore(backend, "c", consent=consent)
+        profiles.write(
+            "db.customers", "r1",
+            profile_result={"columns": {"msisdn": {"null_rate": 0.0}}},
+            samples={"msisdn": ["01012345678"]}, consent=consent, engines=["profile"],
+        )
+        page = StewardReviewService(store, profiles=profiles).column(
+            "db.customers", "msisdn", actor="ada", role="admin", include_samples=True,
+        )
+        assert page["profile"]["profile_status"] == "ok"
+        assert page["profile"]["samples_withheld"] == "no consent"
+        assert page["profile"]["samples"] is None

@@ -11,12 +11,21 @@ __all__ = [
     "TableSampler",
     "PandasTableSampler",
     "SamplingConfig",
+    "QualityDraft",
+    "scan",
+    "merge",
 ]
 
 _SAMPLING_EXPORTS = frozenset({"TableSampler", "PandasTableSampler", "SamplingConfig"})
 
 
 def __getattr__(name: str) -> Any:
+    if name in ("QualityDraft", "scan", "merge"):
+        from redibis.quality.authoring import QualityDraft, merge  # noqa: PLC0415
+
+        value = {"QualityDraft": QualityDraft, "scan": QualityDraft.scan, "merge": merge}[name]
+        globals()[name] = value
+        return value
     if name in _SAMPLING_EXPORTS:
         from redibis.quality.sampling import (  # noqa: PLC0415
             PandasTableSampler,

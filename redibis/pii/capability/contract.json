@@ -1,0 +1,2293 @@
+{
+  "kind": "redibis.pii_capability_contract",
+  "schema_version": "1.0",
+  "version": "2026.09.27",
+  "title": "PII detection capability contract",
+  "summary": "What the redibis PII engines detect in CSV files (cell values, column names and context), through edge rules, and in free text through the Text Gateway — each with an example that is verified against the engine — and what they do not detect. It is the reference the technology and privacy/legal teams agree on. A new type is added only through the change request below.",
+  "parties": {
+    "technology": "Data platform team (redibis owners)",
+    "legal": "Privacy and legal team"
+  },
+  "outcomes": {
+    "detected": "The column or text span is confirmed as this PII type and appears in the contract / scan result.",
+    "evidence_only": "The pattern matches, but the evidence is not strong enough to confirm; the column is listed as a candidate for a person to review.",
+    "not_detected": "The engine does not report it. Listed on purpose so that nobody relies on it.",
+    "not_verified": "Needs an optional model (NER or LLM) that is not installed where the verification ran."
+  },
+  "engines": [
+    {
+      "name": "Regex catalogue",
+      "role": "Patterns for each PII type, per script (Latin / Arabic), for single values (columns) and for free text."
+    },
+    {
+      "name": "Validators",
+      "role": "Checksums and structure checks (Luhn, national-ID birth date and governorate, IBAN mod-97, …) that confirm a match."
+    },
+    {
+      "name": "Column context",
+      "role": "Column-name tokens (English and Arabic) that confirm or disambiguate a pattern — e.g. nine digits are a tax ID only under a tax column."
+    },
+    {
+      "name": "Phone engine",
+      "role": "Numbering-plan checks for mobile and landline numbers."
+    },
+    {
+      "name": "Edge rules",
+      "role": "Declarative when → then rules of the active policy pack (telecom by default) that correct a verdict from column semantics."
+    },
+    {
+      "name": "NER model (optional)",
+      "role": "Names, places and organisations inside free text; needs a model to be installed."
+    },
+    {
+      "name": "LLM refinement (optional)",
+      "role": "Second opinion on uncertain columns and spans; off by default."
+    },
+    {
+      "name": "Text Gateway",
+      "role": "Scans free text (tickets, notes, messages) and returns each PII span with its position; the same engines as above."
+    }
+  ],
+  "change_process": {
+    "summary": "Legal asks, technology implements, the contract proves it.",
+    "steps": [
+      "Privacy/legal files a request with the template below: the PII type, why it is personal data, the countries it applies to, where it appears (CSV columns, free text, both), at least three real-looking examples that must be detected and two that must not.",
+      "Technology adds the pattern, validator or edge rule, and adds the examples to this contract as cases.",
+      "Every case is verified automatically on each change (pytest). A case that the engine does not satisfy blocks the release.",
+      "A new version of this document is generated from the Reports page (or `redibis pii capabilities report`) and shared with legal."
+    ],
+    "request_template": {
+      "entity_type": "e.g. EG_COMMERCIAL_REGISTRY",
+      "title": "Commercial registry number",
+      "why_personal_data": "…",
+      "jurisdictions": [
+        "EG"
+      ],
+      "appears_in": [
+        "csv_column",
+        "free_text"
+      ],
+      "column_names_seen": [
+        "commercial_registry",
+        "سجل_تجاري"
+      ],
+      "must_detect": [
+        "…",
+        "…",
+        "…"
+      ],
+      "must_not_detect": [
+        "…",
+        "…"
+      ],
+      "requested_by": "name / team",
+      "needed_by": "YYYY-MM-DD"
+    }
+  },
+  "entities": [
+    {
+      "entity_type": "PHONE_NUMBER",
+      "title": "Phone number",
+      "category": "Direct identifier",
+      "description": "Mobile and landline numbers: Egypt (national, +20, 0020, landlines), Saudi Arabia, UAE, and any number written in international E.164 form. Arabic-Indic digits are normalised first.",
+      "cases": [
+        {
+          "id": "phone-col-eg-mobile",
+          "kind": "column",
+          "title": "Egyptian mobile numbers, national format",
+          "column": "mobile",
+          "values": [
+            "01012345678",
+            "01123456789",
+            "01234567891",
+            "01512345670",
+            "01098765432"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "PHONE_NUMBER"
+          }
+        },
+        {
+          "id": "phone-col-eg-intl",
+          "kind": "column",
+          "title": "Egyptian mobile numbers with +20",
+          "column": "msisdn",
+          "values": [
+            "+201012345678",
+            "+201123456789",
+            "+201234567891",
+            "+201512345670",
+            "+201098765432"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "PHONE_NUMBER"
+          }
+        },
+        {
+          "id": "phone-col-eg-0020",
+          "kind": "column",
+          "title": "Egyptian mobile numbers with 0020",
+          "column": "contact_phone",
+          "values": [
+            "00201012345678",
+            "00201123456789",
+            "00201234567891",
+            "00201512345670",
+            "00201098765432"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "PHONE_NUMBER"
+          }
+        },
+        {
+          "id": "phone-col-eg-landline",
+          "kind": "column",
+          "title": "Cairo / Alexandria landlines",
+          "column": "landline",
+          "values": [
+            "0223456789",
+            "0233445566",
+            "0344556677",
+            "0227894561",
+            "0225556677"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "PHONE_NUMBER"
+          }
+        },
+        {
+          "id": "phone-col-ksa",
+          "kind": "column",
+          "title": "Saudi mobile numbers",
+          "column": "mobile_ksa",
+          "values": [
+            "+966501234567",
+            "+966551234567",
+            "0501234567",
+            "0561234567",
+            "+966591234567"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "PHONE_NUMBER"
+          }
+        },
+        {
+          "id": "phone-col-uae",
+          "kind": "column",
+          "title": "UAE mobile numbers",
+          "column": "mobile_uae",
+          "values": [
+            "+971501234567",
+            "+971521234567",
+            "+971551234567",
+            "+971561234567",
+            "+971581234567"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "PHONE_NUMBER"
+          }
+        },
+        {
+          "id": "phone-col-e164",
+          "kind": "column",
+          "title": "International numbers in E.164",
+          "column": "phone_international",
+          "values": [
+            "+14155552671",
+            "+442071838750",
+            "+33142685300",
+            "+4930901820",
+            "+97142000000"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "PHONE_NUMBER"
+          }
+        },
+        {
+          "id": "phone-col-arabic-name",
+          "kind": "column",
+          "title": "Arabic column name",
+          "column": "رقم_الهاتف",
+          "values": [
+            "01012345678",
+            "01123456789",
+            "01234567891",
+            "01512345670",
+            "01098765432"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "PHONE_NUMBER"
+          }
+        },
+        {
+          "id": "phone-text-en",
+          "kind": "text",
+          "title": "Mobile number in an English sentence",
+          "text": "Please call me on 01012345678 tomorrow.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "PHONE_NUMBER",
+                "value": "01012345678"
+              }
+            ],
+            "absent": []
+          }
+        },
+        {
+          "id": "phone-text-intl",
+          "kind": "text",
+          "title": "Number with +20 in text",
+          "text": "My WhatsApp is +201123456789.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "PHONE_NUMBER",
+                "value": "+201123456789"
+              }
+            ],
+            "absent": []
+          }
+        },
+        {
+          "id": "phone-text-ar",
+          "kind": "text",
+          "title": "Mobile number in Arabic text",
+          "text": "اتصل بي على 01012345678 من فضلك",
+          "language": "ar",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "PHONE_NUMBER",
+                "value": "01012345678"
+              }
+            ],
+            "absent": []
+          }
+        },
+        {
+          "id": "phone-text-arabic-digits",
+          "kind": "text",
+          "title": "Mobile number in Arabic-Indic digits",
+          "text": "اتصل على ٠١٠١٢٣٤٥٦٧٨",
+          "language": "ar",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "PHONE_NUMBER",
+                "value": "٠١٠١٢٣٤٥٦٧٨"
+              }
+            ],
+            "absent": []
+          }
+        },
+        {
+          "id": "phone-text-landline",
+          "kind": "text",
+          "title": "Landline in text",
+          "text": "Office line 0223456789, ask for billing.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "PHONE_NUMBER",
+                "value": "0223456789"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "EMAIL_ADDRESS",
+      "title": "E-mail address",
+      "category": "Direct identifier",
+      "description": "E-mail addresses, and InstaPay payment handles (name@instapay), which identify a person the same way.",
+      "cases": [
+        {
+          "id": "email-col",
+          "kind": "column",
+          "title": "E-mail column",
+          "column": "email",
+          "values": [
+            "ahmed.hassan@example.com",
+            "mona@company.eg",
+            "s.ali@mail.net",
+            "omar99@example.org",
+            "nour@site.io"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "EMAIL_ADDRESS"
+          }
+        },
+        {
+          "id": "email-col-instapay",
+          "kind": "column",
+          "title": "InstaPay handles",
+          "column": "instapay_address",
+          "values": [
+            "ahmed.h@instapay",
+            "mona_adel@instapay",
+            "sara.ali@instapay",
+            "omar.k@instapay",
+            "nour99@instapay"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "EMAIL_ADDRESS"
+          }
+        },
+        {
+          "id": "email-text",
+          "kind": "text",
+          "title": "E-mail in text",
+          "text": "Send the contract to mona.adel@example.com please.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "EMAIL_ADDRESS",
+                "value": "mona.adel@example.com"
+              }
+            ],
+            "absent": []
+          }
+        },
+        {
+          "id": "email-text-ar",
+          "kind": "text",
+          "title": "E-mail in Arabic text",
+          "text": "راسلني على ahmed.hassan@example.com",
+          "language": "ar",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "EMAIL_ADDRESS",
+                "value": "ahmed.hassan@example.com"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "EG_NATIONAL_ID",
+      "title": "Egyptian national ID (14 digits)",
+      "category": "Direct identifier",
+      "description": "The 14-digit Egyptian national ID. The engine checks century, birth date, governorate and check digit, so random 14-digit numbers are not taken for IDs.",
+      "cases": [
+        {
+          "id": "egnid-col",
+          "kind": "column",
+          "title": "National ID column (checksum-valid)",
+          "column": "national_id",
+          "values": [
+            "29001150139134",
+            "28506300279712",
+            "30103092151318",
+            "27811028819730",
+            "29912311311687"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "EG_NATIONAL_ID"
+          }
+        },
+        {
+          "id": "egnid-col-ar",
+          "kind": "column",
+          "title": "Arabic column name",
+          "column": "الرقم_القومي",
+          "values": [
+            "29001150139134",
+            "28506300279712",
+            "30103092151318",
+            "27811028819730",
+            "29912311311687"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "EG_NATIONAL_ID"
+          }
+        },
+        {
+          "id": "egnid-text",
+          "kind": "text",
+          "title": "National ID in text",
+          "text": "Customer national ID 29001150139134 verified.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "EG_NATIONAL_ID",
+                "value": "29001150139134"
+              }
+            ],
+            "absent": []
+          }
+        },
+        {
+          "id": "egnid-text-ar",
+          "kind": "text",
+          "title": "National ID in Arabic text",
+          "text": "الرقم القومي 28506300279712 للعميل",
+          "language": "ar",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "EG_NATIONAL_ID",
+                "value": "28506300279712"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "NATIONAL_ID",
+      "title": "Other national IDs (KSA, UAE, Jordan, Morocco)",
+      "category": "Direct identifier",
+      "description": "National IDs of other countries: Saudi national ID / Iqama and UAE Emirates ID (checksum-validated), Jordanian national number and Moroccan CIN (shape only).",
+      "cases": [
+        {
+          "id": "nid-col-ksa",
+          "kind": "column",
+          "title": "Saudi national ID / Iqama",
+          "column": "iqama_number",
+          "values": [
+            "2627594175",
+            "2741451856",
+            "1161279482",
+            "1112857485",
+            "1010347134"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "NATIONAL_ID"
+          }
+        },
+        {
+          "id": "nid-col-uae",
+          "kind": "column",
+          "title": "Emirates ID",
+          "column": "emirates_id",
+          "values": [
+            "784-2002-3015738-8",
+            "784-2001-4380659-2",
+            "784-1971-3829503-1",
+            "784-2002-4050431-4",
+            "784-1998-3444537-3"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "NATIONAL_ID"
+          }
+        },
+        {
+          "id": "nid-col-jordan",
+          "kind": "column",
+          "title": "Jordanian national number",
+          "column": "jordan_national_id",
+          "values": [
+            "9861234567",
+            "9871234568",
+            "2001234569",
+            "9951234560",
+            "2011234561"
+          ],
+          "expect": {
+            "detected": false,
+            "evidence_entity": "NATIONAL_ID"
+          },
+          "note": "Evidence only: the 10-digit pattern matches, but it has no checksum, so the column is listed as a NATIONAL_ID candidate for review rather than confirmed."
+        },
+        {
+          "id": "nid-col-morocco",
+          "kind": "column",
+          "title": "Moroccan CIN",
+          "column": "cin_morocco",
+          "values": [
+            "AB123456",
+            "K987654",
+            "BE654321",
+            "JA112233",
+            "C445566"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "NATIONAL_ID"
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "PASSPORT",
+      "title": "Passport number",
+      "category": "Direct identifier",
+      "description": "Passport numbers in the Egyptian format: one letter followed by eight digits.",
+      "cases": [
+        {
+          "id": "passport-col",
+          "kind": "column",
+          "title": "Passport column",
+          "column": "passport_no",
+          "values": [
+            "A12345678",
+            "B23456789",
+            "C34567890",
+            "A45678901",
+            "P56789012"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "PASSPORT"
+          }
+        },
+        {
+          "id": "passport-text",
+          "kind": "text",
+          "title": "Passport in text",
+          "text": "Traveller passport A12345678 expires next year.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "PASSPORT",
+                "value": "A12345678"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "EG_TAX_ID",
+      "title": "Egyptian tax registration number",
+      "category": "Direct identifier",
+      "description": "Egyptian tax registration numbers (nine digits, with or without dashes). Nine digits are common, so the column name must say tax / TIN.",
+      "cases": [
+        {
+          "id": "tax-col",
+          "kind": "column",
+          "title": "Tax ID with dashes",
+          "column": "tax_id",
+          "values": [
+            "123-456-789",
+            "234-567-890",
+            "345-678-901",
+            "456-789-012",
+            "567-890-123"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "EG_TAX_ID"
+          }
+        },
+        {
+          "id": "tax-col-plain",
+          "kind": "column",
+          "title": "Tax ID without dashes (name decides)",
+          "column": "tax_registration_number",
+          "values": [
+            "123456789",
+            "234567890",
+            "345678901",
+            "456789012",
+            "567890123"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "EG_TAX_ID"
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "EG_VEHICLE_PLATE",
+      "title": "Egyptian vehicle plate",
+      "category": "Indirect identifier",
+      "description": "Egyptian vehicle plates in Arabic or Latin letters followed by up to four digits.",
+      "cases": [
+        {
+          "id": "plate-col-ar",
+          "kind": "column",
+          "title": "Arabic plates",
+          "column": "vehicle_plate",
+          "values": [
+            "أبج 1234",
+            "سطر 567",
+            "مصر 89",
+            "هـ 4321",
+            "لوح 12"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "EG_VEHICLE_PLATE"
+          }
+        },
+        {
+          "id": "plate-col-lat",
+          "kind": "column",
+          "title": "Latin plates",
+          "column": "car_plate",
+          "values": [
+            "ABC 1234",
+            "XYZ 567",
+            "MSR 89",
+            "HK 4321",
+            "LP 12"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "EG_VEHICLE_PLATE"
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "CREDIT_CARD",
+      "title": "Payment card number",
+      "category": "Financial",
+      "description": "Payment card numbers — Visa, Mastercard, Meeza, with or without spaces — accepted only when the Luhn checksum is valid; CVV codes when labelled.",
+      "cases": [
+        {
+          "id": "card-col-visa",
+          "kind": "column",
+          "title": "Visa numbers (Luhn-valid)",
+          "column": "card_number",
+          "values": [
+            "4176514127440253",
+            "4893082814396164",
+            "4109060249502721",
+            "4922130029810977",
+            "4170413798108339"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "CREDIT_CARD"
+          }
+        },
+        {
+          "id": "card-col-mc",
+          "kind": "column",
+          "title": "Mastercard numbers",
+          "column": "credit_card",
+          "values": [
+            "5177432592115761",
+            "5159717016765668",
+            "5189368217572158",
+            "5199046068867780",
+            "5154637370642847"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "CREDIT_CARD"
+          }
+        },
+        {
+          "id": "card-col-meeza",
+          "kind": "column",
+          "title": "Meeza cards",
+          "column": "meeza_card",
+          "values": [
+            "6270334079938299",
+            "6270336582285035",
+            "6270331200323953",
+            "6270338672814799",
+            "6270332839366017"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "CREDIT_CARD"
+          }
+        },
+        {
+          "id": "card-col-spaced",
+          "kind": "column",
+          "title": "Spaced card numbers",
+          "column": "card_no",
+          "values": [
+            "4176 5141 2744 0253",
+            "4893 0828 1439 6164",
+            "4109 0602 4950 2721",
+            "4922 1300 2981 0977",
+            "4170 4137 9810 8339"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "CREDIT_CARD"
+          }
+        },
+        {
+          "id": "card-text",
+          "kind": "text",
+          "title": "Card number in text",
+          "text": "Paid with card 4176 5141 2744 0253 yesterday.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "CREDIT_CARD",
+                "value": "4176"
+              }
+            ],
+            "absent": []
+          }
+        },
+        {
+          "id": "card-text-cvv",
+          "kind": "text",
+          "title": "CVV with label",
+          "text": "Card CVV: 123, expiry 09/28.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "CREDIT_CARD",
+                "value": "123"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "IBAN_CODE",
+      "title": "IBAN (bank account)",
+      "category": "Financial",
+      "description": "International bank account numbers, validated with the ISO 13616 mod-97 checksum and the country's length.",
+      "cases": [
+        {
+          "id": "iban-col-eg",
+          "kind": "column",
+          "title": "Egyptian IBANs (checksum-valid)",
+          "column": "iban",
+          "values": [
+            "EG380019000500000000263180002",
+            "EG670002000100000001234567890",
+            "EG550037003300000000987654321",
+            "EG870010000400000000111122223",
+            "EG460019000500000000555566667"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "IBAN_CODE"
+          }
+        },
+        {
+          "id": "iban-col-sa",
+          "kind": "column",
+          "title": "Saudi IBANs",
+          "column": "bank_iban",
+          "values": [
+            "SA0380000000608010167519",
+            "SA7710000000608010160001",
+            "SA7620000000608010160002",
+            "SA7530000000608010160003",
+            "SA7440000000608010160004"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "IBAN_CODE"
+          }
+        },
+        {
+          "id": "iban-text",
+          "kind": "text",
+          "title": "IBAN in text",
+          "text": "Transfer to IBAN EG380019000500000000263180002 today.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "IBAN_CODE",
+                "value": "EG380019000500000000263180002"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "SWIFT_BIC",
+      "title": "SWIFT / BIC code (Egypt)",
+      "category": "Financial",
+      "description": "SWIFT / BIC codes of Egyptian banks.",
+      "cases": [
+        {
+          "id": "swift-col",
+          "kind": "column",
+          "title": "Egyptian bank BICs",
+          "column": "swift_code",
+          "values": [
+            "CIBEEGCX",
+            "NBEGEGCX",
+            "MISREGCX",
+            "QNBAEGCX",
+            "BMISEGCX"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "SWIFT_BIC"
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "IP_ADDRESS",
+      "title": "IP address",
+      "category": "Online identifier",
+      "description": "IPv4 (public and private) and IPv6 addresses.",
+      "cases": [
+        {
+          "id": "ip-col-v4",
+          "kind": "column",
+          "title": "Public IPv4",
+          "column": "source_ip",
+          "values": [
+            "41.33.12.5",
+            "196.219.34.12",
+            "156.160.4.9",
+            "197.45.12.88",
+            "102.40.2.19"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "IP_ADDRESS"
+          }
+        },
+        {
+          "id": "ip-col-private",
+          "kind": "column",
+          "title": "Private IPv4",
+          "column": "internal_ip",
+          "values": [
+            "10.0.0.5",
+            "192.168.1.20",
+            "172.16.4.9",
+            "10.10.2.3",
+            "192.168.0.99"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "IP_ADDRESS"
+          }
+        },
+        {
+          "id": "ip-col-v6",
+          "kind": "column",
+          "title": "IPv6",
+          "column": "ipv6_address",
+          "values": [
+            "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+            "fe80:0000:0000:0000:0202:b3ff:fe1e:8329",
+            "2001:0db8:0000:0000:0000:ff00:0042:8329",
+            "2a00:1450:4001:0829:0000:0000:0000:200e",
+            "2001:0db8:1234:5678:9abc:def0:1234:5678"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "IP_ADDRESS"
+          }
+        },
+        {
+          "id": "ip-text",
+          "kind": "text",
+          "title": "IP in a log line",
+          "text": "Login failed from 196.219.34.12 at 10:42.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "IP_ADDRESS",
+                "value": "196.219.34.12"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "MAC_ADDRESS",
+      "title": "MAC address",
+      "category": "Online identifier",
+      "description": "Network hardware (MAC) addresses; broadcast and multicast addresses are rejected.",
+      "cases": [
+        {
+          "id": "mac-col",
+          "kind": "column",
+          "title": "MAC addresses",
+          "column": "device_mac",
+          "values": [
+            "00:1A:2B:3C:4D:5E",
+            "3C:5A:B4:12:9F:01",
+            "F0:18:98:AA:BB:CC",
+            "00:25:96:FF:FE:12",
+            "AC:DE:48:00:11:22"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "MAC_ADDRESS"
+          }
+        },
+        {
+          "id": "mac-text",
+          "kind": "text",
+          "title": "MAC in a log line",
+          "text": "Router saw device 3C:5A:B4:12:9F:01 join.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "MAC_ADDRESS",
+                "value": "3C:5A:B4:12:9F:01"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "IMEI",
+      "title": "Device IMEI",
+      "category": "Telecom identifier",
+      "description": "Device IMEI numbers (Luhn-validated), with or without dashes.",
+      "cases": [
+        {
+          "id": "imei-col",
+          "kind": "column",
+          "title": "IMEI (Luhn-valid)",
+          "column": "device_imei",
+          "values": [
+            "357963436166480",
+            "495259787994288",
+            "499994167965005",
+            "867814380913372",
+            "861876144540482"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "IMEI"
+          }
+        },
+        {
+          "id": "imei-col-dashes",
+          "kind": "column",
+          "title": "IMEI with dashes",
+          "column": "handset_imei",
+          "values": [
+            "35-796343-616648-0",
+            "49-525978-799428-8",
+            "49-999416-796500-5",
+            "86-781438-091337-2",
+            "86-187614-454048-2"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "IMEI"
+          }
+        },
+        {
+          "id": "imei-text",
+          "kind": "text",
+          "title": "IMEI in text",
+          "text": "Blocked handset IMEI 357963436166480 after theft report.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "IMEI",
+                "value": "357963436166480"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "IMSI",
+      "title": "Subscriber IMSI",
+      "category": "Telecom identifier",
+      "description": "Subscriber IMSI numbers of Egyptian networks (MCC 602).",
+      "cases": [
+        {
+          "id": "imsi-col",
+          "kind": "column",
+          "title": "Egyptian IMSIs (MCC 602)",
+          "column": "imsi",
+          "values": [
+            "602018433984069",
+            "602023282854302",
+            "602035851736030",
+            "602025244912710",
+            "602011057530536"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "IMSI"
+          }
+        },
+        {
+          "id": "imsi-text",
+          "kind": "text",
+          "title": "IMSI in a CDR note",
+          "text": "CDR subscriber 602023282854302 roamed.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "IMSI",
+                "value": "602023282854302"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "ICCID",
+      "title": "SIM card number (ICCID)",
+      "category": "Telecom identifier",
+      "description": "SIM card serial numbers (ICCID, Luhn-validated).",
+      "cases": [
+        {
+          "id": "iccid-col",
+          "kind": "column",
+          "title": "ICCIDs (Luhn-valid)",
+          "column": "sim_iccid",
+          "values": [
+            "8920024040670802866",
+            "8920023428720963880",
+            "8920022136295274499",
+            "8920025851797492541",
+            "8920023563392419033"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "ICCID"
+          }
+        },
+        {
+          "id": "iccid-text",
+          "kind": "text",
+          "title": "ICCID in text",
+          "text": "SIM 8920024040670802866 was swapped.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "ICCID",
+                "value": "8920024040670802866"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "DATE_TIME",
+      "title": "Date of birth",
+      "category": "Direct identifier (with other data)",
+      "description": "Dates of birth (YYYY-MM-DD or DD/MM/YYYY) when the column is named as a birth date.",
+      "cases": [
+        {
+          "id": "dob-col-ymd",
+          "kind": "column",
+          "title": "Birth dates, YYYY-MM-DD",
+          "column": "date_of_birth",
+          "values": [
+            "1990-01-15",
+            "1985-06-30",
+            "2001-03-09",
+            "1978-11-02",
+            "1999-12-31"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "DATE_TIME"
+          }
+        },
+        {
+          "id": "dob-col-dmy",
+          "kind": "column",
+          "title": "Birth dates, DD/MM/YYYY",
+          "column": "dob",
+          "values": [
+            "15/01/1990",
+            "30/06/1985",
+            "09/03/2001",
+            "02/11/1978",
+            "31/12/1999"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "DATE_TIME"
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "GENDER",
+      "title": "Gender",
+      "category": "Indirect identifier",
+      "description": "Gender codes (M / F / Male / Female / X / Other / Unknown) in a gender or sex column.",
+      "cases": [
+        {
+          "id": "gender-col",
+          "kind": "column",
+          "title": "Gender codes",
+          "column": "gender",
+          "values": [
+            "M",
+            "F",
+            "F",
+            "M",
+            "M"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "GENDER"
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "PERSON",
+      "title": "Person name",
+      "category": "Direct identifier",
+      "description": "Person names in name columns, in Latin or Arabic script. Names inside free text need an NER model.",
+      "cases": [
+        {
+          "id": "person-col-latin",
+          "kind": "column",
+          "title": "Full names (Latin)",
+          "column": "full_name",
+          "values": [
+            "Ahmed Hassan",
+            "Mona Adel",
+            "Sara Ali Mahmoud",
+            "Omar Khaled",
+            "Nour El Din"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "PERSON"
+          }
+        },
+        {
+          "id": "person-col-ar",
+          "kind": "column",
+          "title": "Full names (Arabic)",
+          "column": "الاسم_الكامل",
+          "values": [
+            "أحمد حسن",
+            "منى عادل",
+            "سارة علي محمود",
+            "عمر خالد",
+            "نور الدين"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "PERSON"
+          }
+        },
+        {
+          "id": "person-col-lower",
+          "kind": "column",
+          "title": "Full names in lower case",
+          "column": "full_name",
+          "values": [
+            "ahmed hassan",
+            "mona adel",
+            "sara ali",
+            "omar khaled",
+            "nour el din"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "PERSON"
+          }
+        },
+        {
+          "id": "person-text-ner",
+          "kind": "text",
+          "title": "Name inside free text",
+          "text": "Ahmed Hassan called about his bill.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "PERSON",
+                "value": "Ahmed Hassan"
+              }
+            ],
+            "absent": []
+          },
+          "requires": [
+            "ner"
+          ]
+        }
+      ]
+    },
+    {
+      "entity_type": "LOCATION",
+      "title": "Location (GPS, postcode, address)",
+      "category": "Indirect identifier",
+      "description": "GPS coordinates (pairs, latitude with its longitude, WKT points, degrees-minutes-seconds), street addresses with address keywords in text, and — as review candidates — Egyptian postcodes.",
+      "cases": [
+        {
+          "id": "loc-col-pair",
+          "kind": "column",
+          "title": "GPS pairs",
+          "column": "gps_location",
+          "values": [
+            "30.0444,31.2357",
+            "31.2001,29.9187",
+            "29.9792,31.1342",
+            "30.5877,32.2654",
+            "27.1783,31.1859"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "LOCATION"
+          }
+        },
+        {
+          "id": "loc-col-lat",
+          "kind": "column",
+          "title": "Latitude next to its longitude column",
+          "column": "latitude",
+          "values": [
+            "30.0444",
+            "31.2001",
+            "29.9792",
+            "30.5877",
+            "27.1783"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "LOCATION"
+          },
+          "with": {
+            "longitude": [
+              "31.2357",
+              "29.9187",
+              "31.1342",
+              "32.2654",
+              "31.1859"
+            ]
+          }
+        },
+        {
+          "id": "loc-col-wkt",
+          "kind": "column",
+          "title": "WKT points",
+          "column": "geom",
+          "values": [
+            "POINT (31.2357 30.0444)",
+            "POINT (29.9187 31.2001)",
+            "POINT (31.1342 29.9792)",
+            "POINT (32.2654 30.5877)",
+            "POINT (31.1859 27.1783)"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "LOCATION"
+          }
+        },
+        {
+          "id": "loc-col-postcode",
+          "kind": "column",
+          "title": "Egyptian postcodes (name decides)",
+          "column": "postal_code",
+          "values": [
+            "11511",
+            "21500",
+            "12611",
+            "41511",
+            "82511"
+          ],
+          "expect": {
+            "detected": false,
+            "evidence_entity": "LOCATION"
+          },
+          "note": "Evidence only: five digits are too common to confirm on their own; the column is a LOCATION candidate for review."
+        },
+        {
+          "id": "loc-text-address",
+          "kind": "text",
+          "title": "Street address with keywords",
+          "text": "Deliver to Building 12, El Tahrir Street, floor 3, apartment 5.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "LOCATION",
+                "value": "Street"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "URL",
+      "title": "Web address",
+      "category": "Online identifier",
+      "description": "Web addresses (http, https, ftp).",
+      "cases": [
+        {
+          "id": "url-col",
+          "kind": "column",
+          "title": "URLs",
+          "column": "website",
+          "values": [
+            "https://example.com/u/ahmed",
+            "http://shop.example.eg/profile/12",
+            "https://example.org/a?id=5",
+            "https://site.io/users/mona",
+            "ftp://files.example.com/cv.pdf"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "URL"
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "API_KEY",
+      "title": "API keys / credentials",
+      "category": "Security secret",
+      "description": "Cloud and developer credentials with a known prefix: AWS access keys, Google API keys, GitHub tokens, Anthropic keys.",
+      "cases": [
+        {
+          "id": "apikey-col-aws",
+          "kind": "column",
+          "title": "AWS access keys",
+          "column": "aws_access",
+          "values": [
+            "AKIAIOSFODNN7EXAMPLE",
+            "AKIAI44QH8DHBEXAMPLE",
+            "AKIAJ3XHXLQX4EXAMPLE",
+            "AKIAQWERTYUIOPASDFGH",
+            "AKIAZXCVBNMLKJHGFDSA"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "API_KEY"
+          }
+        },
+        {
+          "id": "apikey-col-github",
+          "kind": "column",
+          "title": "GitHub tokens",
+          "column": "github_token",
+          "values": [
+            "ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ghp_B1B1B1B1B1B1B1B1B1B1B1B1B1B1B1B1B1B1",
+            "ghp_c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+            "ghp_D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4D4",
+            "ghp_e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "API_KEY"
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "JWT",
+      "title": "JSON Web Token",
+      "category": "Security secret",
+      "description": "JSON Web Tokens (the header must decode to JSON with an algorithm).",
+      "cases": [
+        {
+          "id": "jwt-col",
+          "kind": "column",
+          "title": "JWTs",
+          "column": "id_token",
+          "values": [
+            "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiMCIsICJuYW1lIjogInVzZXIifQ.c2lnbmF0dXJl",
+            "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiMSIsICJuYW1lIjogInVzZXIifQ.c2lnbmF0dXJl",
+            "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiMiIsICJuYW1lIjogInVzZXIifQ.c2lnbmF0dXJl",
+            "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiMyIsICJuYW1lIjogInVzZXIifQ.c2lnbmF0dXJl",
+            "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiNCIsICJuYW1lIjogInVzZXIifQ.c2lnbmF0dXJl"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "JWT"
+          }
+        },
+        {
+          "id": "jwt-text",
+          "kind": "text",
+          "title": "JWT in a log line",
+          "text": "Authorization failed for token eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiMCIsICJuYW1lIjogInVzZXIifQ.c2lnbmF0dXJl at gateway.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "JWT",
+                "value": "eyJhbGciOiAiSFMyNTYi"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "PASSWORD_HASH",
+      "title": "Password hash",
+      "category": "Security secret",
+      "description": "Password hashes in bcrypt and Argon2 formats.",
+      "cases": [
+        {
+          "id": "hash-col-bcrypt",
+          "kind": "column",
+          "title": "bcrypt hashes",
+          "column": "pwd_hash",
+          "values": [
+            "$2b$12$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "$2b$12$BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+            "$2a$10$ccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "$2y$12$DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+            "$2b$12$eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "PASSWORD_HASH"
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "CRYPTO_WALLET",
+      "title": "Crypto wallet address",
+      "category": "Financial",
+      "description": "Bitcoin (checksum-validated) and Ethereum wallet addresses.",
+      "cases": [
+        {
+          "id": "crypto-col-btc",
+          "kind": "column",
+          "title": "Bitcoin addresses",
+          "column": "btc_wallet",
+          "values": [
+            "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+            "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2",
+            "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy",
+            "1dice8EMZmqKvrGE4Qc9bUFf9PX3xaYDp",
+            "1BoatSLRHtKNngkdXEeobR76b53LETtpyT"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "CRYPTO_WALLET"
+          }
+        },
+        {
+          "id": "crypto-col-eth",
+          "kind": "column",
+          "title": "Ethereum addresses",
+          "column": "eth_wallet",
+          "values": [
+            "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+            "0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe",
+            "0x52908400098527886E0F7030069857D2E4169EE7",
+            "0x8617E340B3D01FA5F11F306F4090FD50E238070D",
+            "0x27b1fdb04752bbc536007a920d24acb045561c26"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "CRYPTO_WALLET"
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "GDPR_SPECIAL_CATEGORY",
+      "title": "Special-category data (health, religion, biometrics, minors)",
+      "category": "Sensitive (special category)",
+      "description": "Special-category data mentioned in text: health conditions, religion, biometric data, and data about minors.",
+      "cases": [
+        {
+          "id": "gdpr-text-health",
+          "kind": "text",
+          "title": "Health condition",
+          "text": "The subscriber mentioned he has diabetes and needs a callback.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "GDPR_SPECIAL_CATEGORY",
+                "value": "diabetes"
+              }
+            ],
+            "absent": []
+          }
+        },
+        {
+          "id": "gdpr-text-religion",
+          "kind": "text",
+          "title": "Religion",
+          "text": "Customer is a Coptic Christian and asked about holiday offers.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "GDPR_SPECIAL_CATEGORY",
+                "value": "Coptic"
+              }
+            ],
+            "absent": []
+          }
+        },
+        {
+          "id": "gdpr-text-bio",
+          "kind": "text",
+          "title": "Biometric data",
+          "text": "Account unlocked by fingerprint on the new device.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "GDPR_SPECIAL_CATEGORY",
+                "value": "fingerprint"
+              }
+            ],
+            "absent": []
+          }
+        },
+        {
+          "id": "gdpr-text-minor",
+          "kind": "text",
+          "title": "Minor / guardian",
+          "text": "Line registered by the guardian of a minor.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "GDPR_SPECIAL_CATEGORY",
+                "value": "minor"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "OTP",
+      "title": "One-time password",
+      "category": "Security secret",
+      "description": "One-time passwords when labelled (OTP, verification code).",
+      "cases": [
+        {
+          "id": "otp-text",
+          "kind": "text",
+          "title": "OTP in an SMS",
+          "text": "Your OTP is 482913. Do not share it.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "OTP",
+                "value": "482913"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "SIM_PUK",
+      "title": "SIM PUK code",
+      "category": "Security secret",
+      "description": "SIM PUK codes when labelled.",
+      "cases": [
+        {
+          "id": "puk-text",
+          "kind": "text",
+          "title": "PUK in a note",
+          "text": "Customer asked for the PUK code: 12345678",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "SIM_PUK",
+                "value": "12345678"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "SUPPORT_TICKET",
+      "title": "Support ticket reference",
+      "category": "Indirect identifier",
+      "description": "Support ticket references in the SR-<digits> format.",
+      "cases": [
+        {
+          "id": "ticket-text",
+          "kind": "text",
+          "title": "Ticket number",
+          "text": "Follow-up on ticket SR-100245 please.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "SUPPORT_TICKET",
+                "value": "SR-100245"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "TRANSACTION_ID",
+      "title": "Transaction reference",
+      "category": "Indirect identifier",
+      "description": "Transaction references in the TXN-<digits> format.",
+      "cases": [
+        {
+          "id": "txn-text",
+          "kind": "text",
+          "title": "Transaction ID",
+          "text": "Refund for TXN-20260927 approved.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "TRANSACTION_ID",
+                "value": "TXN-20260927"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    },
+    {
+      "entity_type": "UTILITY_ACCOUNT",
+      "title": "Utility account number",
+      "category": "Indirect identifier",
+      "description": "Electricity, water and gas account numbers when labelled.",
+      "cases": [
+        {
+          "id": "utility-text",
+          "kind": "text",
+          "title": "Electricity account",
+          "text": "Electricity account: 123456789012 is overdue.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "UTILITY_ACCOUNT",
+                "value": "123456789012"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    }
+  ],
+  "context": [
+    {
+      "title": "Column names and context",
+      "description": "The same values can be PII or not depending on the column. These cases show where the column name decides.",
+      "cases": [
+        {
+          "id": "ctx-9digits-order",
+          "kind": "column",
+          "title": "Same 9-digit values under a non-tax name",
+          "column": "order_number",
+          "values": [
+            "123456789",
+            "234567890",
+            "345678901",
+            "456789012",
+            "567890123"
+          ],
+          "expect": {
+            "detected": false
+          }
+        },
+        {
+          "id": "ctx-5digits-qty",
+          "kind": "column",
+          "title": "Same 5-digit values as postcodes, under a quantity name",
+          "column": "quantity",
+          "values": [
+            "11511",
+            "21500",
+            "12611",
+            "41511",
+            "82511"
+          ],
+          "expect": {
+            "detected": false
+          }
+        },
+        {
+          "id": "ctx-10digits-invoice",
+          "kind": "column",
+          "title": "Jordan-shaped 10 digits under an invoice name",
+          "column": "invoice_no",
+          "values": [
+            "9861234567",
+            "9871234568",
+            "2001234569",
+            "9951234560",
+            "2011234561"
+          ],
+          "expect": {
+            "detected": false
+          }
+        },
+        {
+          "id": "probe-city-title",
+          "kind": "column",
+          "title": "City names in Title Case",
+          "column": "city",
+          "values": [
+            "New Cairo",
+            "Nasr City",
+            "Sheikh Zayed",
+            "Port Said",
+            "Kafr El Sheikh"
+          ],
+          "expect": {
+            "detected": false
+          }
+        }
+      ]
+    }
+  ],
+  "text_gateway": [
+    {
+      "title": "Text Gateway: several identifiers in one text",
+      "description": "Free text is scanned span by span; every PII type that has a free-text pattern is found in the same pass. Per-type text examples are in the sections above.",
+      "cases": [
+        {
+          "id": "probe-multi",
+          "kind": "text",
+          "title": "Several identifiers in one sentence",
+          "text": "Ahmed (01012345678, ahmed@example.com) paid with IBAN EG670002000100000001234567890 from 196.219.34.12.",
+          "language": "en",
+          "expect": {
+            "spans": [
+              {
+                "entity_type": "PHONE_NUMBER",
+                "value": "01012345678"
+              },
+              {
+                "entity_type": "EMAIL_ADDRESS",
+                "value": "ahmed@example.com"
+              },
+              {
+                "entity_type": "IBAN_CODE",
+                "value": "EG670002000100000001234567890"
+              },
+              {
+                "entity_type": "IP_ADDRESS",
+                "value": "196.219.34.12"
+              }
+            ],
+            "absent": []
+          }
+        }
+      ]
+    }
+  ],
+  "edge_rules": [
+    {
+      "title": "Edge rules (telecom policy pack)",
+      "description": "Edge rules correct a verdict from column semantics — the column name, the detected type, checksum results — never from individual values. Each rule's id is recorded in the scan's decision path.",
+      "pack": "telecom",
+      "cases": [
+        {
+          "id": "edge-surrogate-id",
+          "kind": "column",
+          "title": "customer_id with 14 digits that fail the national-ID checksum",
+          "column": "customer_id",
+          "values": [
+            "10000000000001",
+            "10000000000002",
+            "10000000000003",
+            "10000000000004",
+            "10000000000005"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "PSEUDO_ID",
+            "rule": "surrogate_id_is_indirect"
+          }
+        },
+        {
+          "id": "edge-imei-name",
+          "kind": "column",
+          "title": "IMEI column whose sample values are not Luhn-valid",
+          "column": "imei",
+          "values": [
+            "123456789012345",
+            "111111111111111",
+            "222222222222222",
+            "333333333333333",
+            "444444444444444"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "IMEI",
+            "rule": "imei_named_column"
+          }
+        },
+        {
+          "id": "edge-network-id",
+          "kind": "column",
+          "title": "Phone-shaped values in a LAC column",
+          "column": "lac",
+          "values": [
+            "01012345678",
+            "01112345678",
+            "01212345678",
+            "01512345678",
+            "01012345679"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "NETWORK_ID",
+            "rule": "network_id_by_name"
+          }
+        },
+        {
+          "id": "edge-ref-phone",
+          "kind": "column",
+          "title": "Phone-shaped values in a 'ref' column, no context",
+          "column": "ref",
+          "values": [
+            "01012345678",
+            "01112345678",
+            "01212345678",
+            "01512345678",
+            "01012345679"
+          ],
+          "expect": {
+            "detected": false
+          }
+        },
+        {
+          "id": "edge-api-key",
+          "kind": "column",
+          "title": "Any values in an api_key column",
+          "column": "api_key",
+          "values": [
+            "abc123",
+            "def456",
+            "ghi789",
+            "jkl012",
+            "mno345"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "API_KEY",
+            "rule": "api_key_is_security"
+          }
+        },
+        {
+          "id": "edge-session-token",
+          "kind": "column",
+          "title": "Session tokens",
+          "column": "session_token",
+          "values": [
+            "x1f9",
+            "a8b7",
+            "c6d5",
+            "e4f3",
+            "g2h1"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "SESSION_TOKEN",
+            "rule": "session_token_is_security"
+          }
+        },
+        {
+          "id": "edge-secret",
+          "kind": "column",
+          "title": "Secrets",
+          "column": "client_secret",
+          "values": [
+            "s1",
+            "s2",
+            "s3",
+            "s4",
+            "s5"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "SECRET",
+            "rule": "secret_is_security"
+          }
+        },
+        {
+          "id": "edge-jwt-name",
+          "kind": "column",
+          "title": "Bearer tokens by name",
+          "column": "bearer",
+          "values": [
+            "t1",
+            "t2",
+            "t3",
+            "t4",
+            "t5"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "JWT",
+            "rule": "jwt_is_security"
+          }
+        },
+        {
+          "id": "edge-session-id",
+          "kind": "column",
+          "title": "Session IDs",
+          "column": "session_id",
+          "values": [
+            "9f1c",
+            "0a2b",
+            "7d3e",
+            "6c4f",
+            "5b5a"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "SESSION_ID",
+            "rule": "session_is_indirect_pii"
+          }
+        },
+        {
+          "id": "edge-csrf",
+          "kind": "column",
+          "title": "CSRF tokens",
+          "column": "csrf_token",
+          "values": [
+            "c1",
+            "c2",
+            "c3",
+            "c4",
+            "c5"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "CSRF_TOKEN",
+            "rule": "csrf_is_security"
+          }
+        },
+        {
+          "id": "edge-password",
+          "kind": "column",
+          "title": "Password column",
+          "column": "password",
+          "values": [
+            "p@ss1",
+            "Secr3t!",
+            "hunter2",
+            "qwerty12",
+            "letmein9"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "PASSWORD_HASH",
+            "rule": "pwdhash_is_security"
+          }
+        },
+        {
+          "id": "edge-social-url",
+          "kind": "column",
+          "title": "Social profile URLs",
+          "column": "profile_url",
+          "values": [
+            "https://facebook.com/ahmed.h",
+            "https://x.com/mona",
+            "https://linkedin.com/in/sara",
+            "https://instagram.com/omar",
+            "https://facebook.com/nour"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "SOCIAL_PROFILE_URL",
+            "rule": "social_url_is_direct"
+          }
+        },
+        {
+          "id": "edge-employer",
+          "kind": "column",
+          "title": "Employer names",
+          "column": "employer",
+          "values": [
+            "Vodafone",
+            "Orange",
+            "CIB",
+            "Fawry",
+            "Banque Misr"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "EMPLOYER",
+            "rule": "employer_is_indirect_pii"
+          }
+        },
+        {
+          "id": "edge-organization",
+          "kind": "column",
+          "title": "Handset manufacturer",
+          "column": "manufacturer",
+          "values": [
+            "Samsung",
+            "Apple",
+            "Xiaomi",
+            "Oppo",
+            "Huawei"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "ORGANIZATION",
+            "rule": "organization_reference_not_pii"
+          }
+        },
+        {
+          "id": "edge-latlon",
+          "kind": "column",
+          "title": "Numeric coordinates labelled ADDRESS by NER",
+          "column": "lon",
+          "values": [
+            "31.2357",
+            "29.9187",
+            "31.1342",
+            "32.2654",
+            "31.1859"
+          ],
+          "expect": {
+            "detected": true,
+            "entity_type": "LOCATION",
+            "rule": "latlon_is_location"
+          },
+          "requires": [
+            "ner"
+          ]
+        }
+      ]
+    }
+  ],
+  "not_supported": [
+    {
+      "title": "Not detected",
+      "description": "Listed so that nobody relies on them. Each can be requested through the change process.",
+      "cases": [
+        {
+          "id": "ns-name-in-text",
+          "kind": "text",
+          "title": "Person names inside free text without an NER model",
+          "text": "Ahmed Hassan called about his bill.",
+          "language": "en",
+          "expect": {
+            "spans": [],
+            "absent": [
+              {
+                "value": "Ahmed Hassan",
+                "entity_type": "PERSON"
+              }
+            ]
+          }
+        },
+        {
+          "id": "ns-ssn",
+          "kind": "text",
+          "title": "US social security numbers",
+          "text": "SSN 123-45-6789 on file.",
+          "language": "en",
+          "expect": {
+            "spans": [],
+            "absent": [
+              {
+                "value": "123-45-6789"
+              }
+            ]
+          }
+        },
+        {
+          "id": "ns-ssn-col",
+          "kind": "column",
+          "title": "US social security numbers in a column",
+          "column": "ssn",
+          "values": [
+            "123-45-6789",
+            "234-56-7890",
+            "345-67-8901",
+            "456-78-9012",
+            "567-89-0123"
+          ],
+          "expect": {
+            "detected": false
+          }
+        },
+        {
+          "id": "ns-address-no-keyword",
+          "kind": "text",
+          "title": "Addresses without street keywords",
+          "text": "Delivered to 12 El Nasr, Nasr City.",
+          "language": "en",
+          "expect": {
+            "spans": [],
+            "absent": [
+              {
+                "value": "El Nasr"
+              }
+            ]
+          }
+        },
+        {
+          "id": "ns-uk-national",
+          "kind": "text",
+          "title": "Foreign phone numbers in national format",
+          "text": "Call our London office on 020 7183 8750.",
+          "language": "en",
+          "expect": {
+            "spans": [],
+            "absent": [
+              {
+                "value": "020 7183 8750"
+              }
+            ]
+          }
+        },
+        {
+          "id": "ns-obfuscated-email",
+          "kind": "text",
+          "title": "Obfuscated e-mails",
+          "text": "Contact ahmed at example dot com.",
+          "language": "en",
+          "expect": {
+            "spans": [],
+            "absent": [
+              {
+                "value": "ahmed at example dot com"
+              }
+            ]
+          }
+        },
+        {
+          "id": "ns-lat-alone",
+          "kind": "column",
+          "title": "A latitude column without its longitude",
+          "column": "latitude",
+          "values": [
+            "30.0444",
+            "31.2001",
+            "29.9792",
+            "30.5877",
+            "27.1783"
+          ],
+          "expect": {
+            "detected": false
+          }
+        },
+        {
+          "id": "ns-comment-sentences",
+          "kind": "column",
+          "title": "A comment column where every row is a sentence with an e-mail",
+          "column": "comment",
+          "values": [
+            "mail me at a@x.com",
+            "reach b@y.org",
+            "write c@z.net",
+            "use d@w.io",
+            "try e@v.eg"
+          ],
+          "expect": {
+            "detected": false
+          },
+          "note": "Column scans classify whole values. PII inside sentences is found by the Text Gateway (scan the column's values as text)."
+        },
+        {
+          "id": "ns-sparse-notes",
+          "kind": "column",
+          "title": "A notes column where only some rows hold PII",
+          "column": "notes",
+          "values": [
+            "call me 01012345678",
+            "ok thanks",
+            "fine",
+            "mail a@x.com",
+            "no issue"
+          ],
+          "expect": {
+            "detected": false
+          }
+        },
+        {
+          "id": "ns-dob-generic-name",
+          "kind": "column",
+          "title": "Dates under a generic name",
+          "column": "created",
+          "values": [
+            "1990-01-15",
+            "1985-06-30",
+            "2001-03-09",
+            "1978-11-02",
+            "1999-12-31"
+          ],
+          "expect": {
+            "detected": false
+          }
+        },
+        {
+          "id": "ns-diagnosis-col",
+          "kind": "column",
+          "title": "Health terms as column values",
+          "column": "diagnosis",
+          "values": [
+            "diabetes",
+            "hypertension",
+            "asthma",
+            "diabetes",
+            "cancer"
+          ],
+          "expect": {
+            "detected": false
+          }
+        }
+      ]
+    }
+  ]
+}

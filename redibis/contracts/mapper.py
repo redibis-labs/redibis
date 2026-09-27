@@ -59,6 +59,9 @@ def ge_expectation_to_odcs(expectation: Any) -> dict:
     # Preserve GE meta notes as ODCS description
     if meta.get("notes", {}).get("content"):
         result["description"] = meta["notes"]["content"]
+    # A severity chosen while authoring (qa.expect_…(…, severity="P2")) travels with the rule.
+    if meta.get("severity") in ("P1", "P2", "P3"):
+        result["severity"] = meta["severity"]
 
     # Validate through Pydantic if available (preserve redibis extensions ODCS drops)
     if _ODCS_AVAILABLE and DataQuality is not None:
@@ -159,7 +162,10 @@ def _map_match_regex(kwargs: dict) -> dict:
     Used for E.164 MSISDN, 15-digit IMSI, and any other format constraint.
     Round-trips back to GE via redibis.contracts.rules._rule_to_ge (regex branch).
     """
-    rule: dict = {"rule": "regex", "pattern": kwargs.get("regex", "")}
+    # The pattern lives under ``arguments`` (like validValues): the ODCS
+    # DataQuality model has no ``pattern`` field, so a top-level key was
+    # silently dropped on export and the rule lost its regex.
+    rule: dict = {"rule": "regex", "arguments": {"pattern": kwargs.get("regex", "")}}
     mostly = kwargs.get("mostly")
     if mostly is not None and mostly < 1.0:
         # fraction of values allowed to fail the format, expressed as percent

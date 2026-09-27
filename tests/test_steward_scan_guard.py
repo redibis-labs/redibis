@@ -66,3 +66,14 @@ def test_v2_contract_and_synthesis_fetches_carry_workspace():
         through_api = "async function api(" in V2[max(0, idx - 800): idx]
         sets_header = "X-Redibis-Workspace" in window
         assert through_api or sets_header, window[-400:]
+
+
+def test_deep_enrich_tab_is_dimmed_and_not_clickable():
+    assert 'synthesize: "Deep Enrich is temporarily unavailable"' in V2
+    assert "tab-disabled" in V2
+
+
+def test_data_evaluation_subtab_is_dimmed():
+    app = (ROOT / "redibis" / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert 'DATA_SUB_DISABLED={eval:' in app
+    assert '"social_url"' in app

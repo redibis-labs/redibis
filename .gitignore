@@ -24,6 +24,7 @@ reports/
 agent_runs/
 .cache/
 *.ipynb
+!examples/**/*.ipynb
 .ipynb_checkpoints/
 *.swp
 .DS_Store

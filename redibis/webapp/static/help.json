@@ -1,0 +1,202 @@
+{
+  "_comment": "Content for the /help page. Edit freely: add sections, steps or videos. A video with an empty url shows as 'coming soon'. YouTube links (unlisted is fine) work best. repo_url adds a 'View on GitHub' button to the public site. After editing, run scripts/build_help_site.py.",
+  "repo_url": "https://github.com/redibis-labs/redibis",
+  "intro": "redibis is an open-source tool that looks at your tabular data, finds personal information (PII), checks data quality, and writes the result down as a data contract your team can review, trust and share. Everything runs on your own machine or servers.",
+  "sections": [
+    {
+      "id": "what",
+      "title": "What is redibis?",
+      "text": [
+        "Point redibis at a CSV or Parquet file. It profiles every column, detects personal data such as names, phone numbers, emails and national IDs, and checks quality rules.",
+        "The findings become one versioned data contract in the open ODCS v3 format. People review and correct it, and their decisions are remembered on the next scan.",
+        "When you need to share the data, redibis can mask, hash, encrypt or replace sensitive values with realistic fakes first."
+      ],
+      "videos": [
+        {
+          "title": "redibis in 3 minutes",
+          "url": "",
+          "minutes": 3
+        }
+      ]
+    },
+    {
+      "id": "start",
+      "title": "Quick start",
+      "steps": [
+        {
+          "text": "Clone the redibis repository from GitHub and open a terminal in it."
+        },
+        {
+          "text": "Install redibis in a virtual environment:",
+          "cmd": "python3 -m venv .venv && source .venv/bin/activate && pip install -e \".[dev,web]\" -c requirements/constraints.txt"
+        },
+        {
+          "text": "Start the dashboard, then open http://127.0.0.1:8000/",
+          "cmd": "./scripts/webapp.sh --start"
+        },
+        {
+          "text": "Log in. A fresh install creates admin / admin — change that password straight away under Users."
+        },
+        {
+          "text": "On the scan page, upload a CSV (or pick the sample tests/data/realistic_eshop_customer_account.csv) and press Scan."
+        },
+        {
+          "text": "Open Contracts to see the contract created for your table."
+        }
+      ],
+      "videos": [
+        {
+          "title": "Install and run your first scan",
+          "url": "",
+          "minutes": 5
+        }
+      ]
+    },
+    {
+      "id": "results",
+      "title": "Reading your results",
+      "text": [
+        "Each column shows whether it holds personal data, what kind (for example PHONE_NUMBER or EMAIL_ADDRESS), how sensitive it is, and which detection engines agreed.",
+        "The profile panel shows null rate, distinct values, type and format. Quality results show which rules passed or failed.",
+        "Nothing is final until a person approves it: detections are suggestions."
+      ],
+      "videos": [
+        {
+          "title": "Understanding scan results",
+          "url": "",
+          "minutes": 4
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "title": "Steward Review",
+      "text": [
+        "Contracts → Steward Review walks you through the contract column by column. Accept a finding, correct it, or mark it for review.",
+        "Verified decisions are locked in: the next scan will not overwrite what a person confirmed.",
+        "Reviewing never starts a new scan, so it is safe to explore."
+      ],
+      "videos": [
+        {
+          "title": "Reviewing a contract",
+          "url": "",
+          "minutes": 6
+        }
+      ]
+    },
+    {
+      "id": "mask",
+      "title": "Masking and safe export",
+      "text": [
+        "Data → Mask & Export suggests a rule per column: keep, redact, mask, hash, encrypt, format-preserving encryption (FF3-1) or realistic fakes (names, phones, emails, dates, social profile links and more).",
+        "The same input always gets the same fake, so joins across tables still work.",
+        "Mask preview shows raw and masked values side by side before you export. The export summary and audit report then rate the risk of each choice (high, medium, low). Keys are never exported."
+      ],
+      "videos": [
+        {
+          "title": "Masking a file for sharing",
+          "url": "",
+          "minutes": 5
+        }
+      ]
+    },
+    {
+      "id": "gateway",
+      "title": "Text Gateway: protect free text",
+      "text": [
+        "Support tickets, chat logs and emails hide personal data mid-sentence. Gateway → paste the text (or open files for a batch), pick English, Arabic or both, and press Scan.",
+        "Every finding is highlighted with its type and which engine found it. Accept or reject each one, then choose per type what happens: redact, mask, hash, format-preserving encryption or a realistic fake.",
+        "Copy the de-identified text, or download the report. Add your own detection categories under Detection rules, and save a reviewed setup as a use case to reuse it.",
+        "Apps can call the same de-identification over the HTTP API before sending text to an LLM; it refuses to run without a reviewed policy."
+      ],
+      "steps": [
+        {
+          "text": "Or from the command line:",
+          "cmd": "redibis pii deid \"Call me on 01012345678\" --default redact"
+        }
+      ],
+      "videos": [
+        {
+          "title": "Cleaning text before it reaches an LLM",
+          "url": "",
+          "minutes": 3
+        }
+      ]
+    },
+    {
+      "id": "quality",
+      "title": "Quality rules and monitoring",
+      "text": [
+        "redibis builds on Great Expectations. A quality scan profiles the data and proposes rules — not null, unique, value lengths, formats, row count, expected columns — and runs them.",
+        "The rules are saved in the data contract, versioned with it, in an engine-neutral form, so the contract is the single place that says what good data looks like.",
+        "Every Great Expectations rule can be used, and you can add your own business rules in SQL (for example: no negative amounts, every refund has a refund id). They run on the same data, next to the discovered rules.",
+        "Re-check new data against the contract at any time; schema drift (added, dropped or retyped columns) is reported too, and a failure returns a non-zero exit code for CI.",
+        "Export the same rules as a Great Expectations suite, SodaCL checks or dbt tests (SodaCL and dbt need the contracts extra), or generate Airflow DAGs to run the checks on a schedule.",
+        "Working in a notebook? Author rules from a pandas or Spark DataFrame (a full partition gives more accurate rules), curate them in code, then review, edit and merge them with redibis quality-run. The Quality page's full-code program runs in Jupyter too: validate on a full partition, edit RULES, then save_quality_run(df). See the quality authoring tutorial in docs/tutorials and the full reference in docs/QUALITY_RULES.md."
+      ],
+      "steps": [
+        {
+          "text": "Profile, discover rules and save them to the contract:",
+          "cmd": "redibis quality data.csv shop.customers --automerge quality --output-dir ./reports"
+        },
+        {
+          "text": "Check a new file against the contract:",
+          "cmd": "redibis quality-monitor run shop.customers --sample new_data.csv --output-dir ./reports"
+        },
+        {
+          "text": "Export the rules:",
+          "cmd": "redibis rules export shop.customers --target ge --output-dir ./reports"
+        },
+        {
+          "text": "Review rules authored in code, then merge:",
+          "cmd": "redibis quality-run show shop.customers --output-dir ./reports"
+        }
+      ],
+      "videos": [
+        {
+          "title": "Quality rules as part of the contract",
+          "url": "",
+          "minutes": 3
+        }
+      ]
+    },
+    {
+      "id": "enrich",
+      "title": "Business definitions with an LLM (optional)",
+      "text": [
+        "Contracts → Enrich can draft column definitions and glossary terms using an LLM provider you configure in Settings, including models you host yourself.",
+        "Drafts are suggestions for a person to accept. The model can see column details and a few sample values, so use a provider you trust with your data — or one you host yourself."
+      ],
+      "videos": []
+    },
+    {
+      "id": "cli",
+      "title": "Command line and API",
+      "text": [
+        "Everything in the dashboard is also available from the redibis command (run redibis --help) and the HTTP API (open API Docs after logging in)."
+      ],
+      "videos": [
+        {
+          "title": "redibis from the command line",
+          "url": "",
+          "minutes": 5
+        }
+      ],
+      "steps": [
+        {
+          "text": "Example: scan a file for personal data and save the contract.",
+          "cmd": "redibis scan data.csv shop.customers --mode pii --automerge pii --output-dir ./reports"
+        }
+      ]
+    },
+    {
+      "id": "community",
+      "title": "Get involved",
+      "text": [
+        "redibis is Apache-2.0 licensed. Bug reports, ideas and pull requests are welcome: see CONTRIBUTING.md in the repository.",
+        "Found a security issue? Please follow SECURITY.md instead of opening a public issue."
+      ],
+      "videos": []
+    }
+  ]
+}

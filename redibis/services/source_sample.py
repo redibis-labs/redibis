@@ -56,7 +56,9 @@ def _load_file_sample(path: str | Path, *, rows: int) -> pd.DataFrame:
         return pd.read_parquet(p).head(limit)
     if suffix in (".csv", ".tsv", ".txt"):
         sep = "\t" if suffix == ".tsv" else ","
-        return pd.read_csv(p, nrows=limit, sep=sep)
+        # Same as the scan: every column as text, so leading zeros (phones, IDs)
+        # survive and rules authored at scan time hold when re-checked here.
+        return pd.read_csv(p, nrows=limit, sep=sep, dtype=str, keep_default_na=False)
     raise ConfigError(f"unsupported sample file type: {suffix}")
 
 

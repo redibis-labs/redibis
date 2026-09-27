@@ -423,23 +423,18 @@ class DiscoveryService:
     def _run_sql_probe(
         self, probe: QualityProbe, df: pd.DataFrame, result: QualityProbeResult
     ) -> QualityProbeResult:
-        """Run a custom SQL rule via DuckDB."""
-        try:
-            import duckdb
-            con = duckdb.connect()
-            con.register("data", df)
-            violations = con.execute(probe.sql).fetchdf()
-            result.unexpected_count = len(violations)
-            result.unexpected_percent = (
-                (len(violations) / len(df) * 100) if len(df) > 0 else 0
-            )
-            result.success = result.unexpected_count == 0
-            result.partial_unexpected = (
-                violations.head(5).to_dict("records") if len(violations) > 0 else []
-            )
-        except ImportError:
-            result.success = False
-            result.observed_value = "duckdb not installed"
+        """Run a custom SQL rule (DuckDB) with the same semantics as the
+        generated program and quality monitoring (``quality.sql_rules``)."""
+        from redibis.quality.sql_rules import run_sql_rules
+
+        rule = {"rule": "sql", "column": probe.column, "sql": probe.sql,
+                "kwargs": dict(probe.kwargs or {})}
+        row = run_sql_rules(df, [rule])[0]
+        result.success = bool(row["success"])
+        result.unexpected_count = int(row.get("unexpected_count") or 0)
+        result.unexpected_percent = float(row.get("unexpected_pct") or 0.0)
+        result.partial_unexpected = list(row.get("partial_unexpected") or [])
+        result.observed_value = row.get("observed_value")
         return result
 
     # ── Accept / Reject ───────────────────────────────────────────────────

@@ -83,3 +83,47 @@ def test_approved_crud_and_merge(client, session_id, tmp_path):
     r = client.delete(f"/api/sessions/{session_id}/approved/{pid}")
     assert r.status_code == 200
     assert r.json()["summary"]["total"] == 1
+
+
+def test_approved_merge_is_kept_as_a_run_with_only_the_approved_items(client):
+    csv = b"email,age,city\na@b.com,30,Cairo\nc@d.com,41,Giza\n"
+    table = "telecom.approved_runs"
+    sid = client.post("/api/sessions", files={"file": ("t.csv", io.BytesIO(csv), "text/csv")},
+                      data={"table": table}).json()["session_id"]
+    client.post(f"/api/sessions/{sid}/approved/quality",
+                json={"column": "age", "rule": {"expectation_type": "expect_column_values_to_not_be_null"}})
+    client.post(f"/api/sessions/{sid}/approved/quality",
+                json={"column": "email", "rule": {"expectation_type": "expect_column_values_to_be_unique",
+                                                  "meta": {"severity": "P2"}}})
+    client.post(f"/api/sessions/{sid}/approved/pii",
+                json={"column": "email", "source": "scan",
+                      "detection": {"column": "email", "detected": True, "entity_type": "EMAIL_ADDRESS",
+                                    "confidence": 0.95}})
+    merged = client.post(f"/api/sessions/{sid}/approved/merge", json={"validate_contract": False}).json()
+    assert set(merged["runs"]) == {"pii", "quality"}
+
+    runs = client.get(f"/api/contracts/{table}/runs?kind=quality").json()["runs"]
+    approved = [r for r in runs if r["run_id"] == merged["runs"]["quality"]]
+    assert len(approved) == 1
+    run = approved[0]
+    assert run["status"] == "merged" and run["created_at"] and run["merged_at"]
+    assert run["rule_count"] == 2
+    assert run["summary_stats"]["source"] == "approved"
+    assert run["summary_stats"]["merged_version"] == merged["merged_version"]
+    pii = client.get(f"/api/contracts/{table}/runs?kind=pii").json()["runs"]
+    assert [r["column_count"] for r in pii if r["run_id"] == merged["runs"]["pii"]] == [1]
+    stored = client.get(f"/api/runs/quality/{table}/{run['run_id']}").json()["payload"]
+    rules = [q for obj in stored["schema"] for p in obj.get("properties", []) for q in p.get("quality", [])]
+    assert len(rules) == 2 and {"severity": "P2", "rule": "duplicateCount", "mustBe": 0} in rules
+
+    again = client.post(f"/api/sessions/{sid}/approved/merge", json={"validate_contract": False}).json()
+    assert again.get("noop") and "runs" not in again             # nothing new: no extra run
+
+
+def test_v2_runs_tab_shows_times_sources_and_counts():
+    from pathlib import Path
+
+    html = (Path(__file__).resolve().parents[1] / "redibis/webapp/templates/v2.html").read_text(encoding="utf-8")
+    for needle in ("<th>Created</th>", "<th>Merged</th>", "function fmtWhen", "function runSource",
+                   "scan · all discovered", "rule_count", "column_count", "Merge this whole run anyway?"):
+        assert needle in html, needle

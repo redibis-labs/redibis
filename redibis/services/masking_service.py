@@ -32,7 +32,8 @@ def _utc_now_iso() -> str:
 def _load_df(path: str) -> pd.DataFrame:
     if path.endswith((".parquet", ".pq")):
         return pd.read_parquet(path)
-    return pd.read_csv(path)
+    # Text columns, as the scan reads them: "01012345678" must not become 1012345678.
+    return pd.read_csv(path, dtype=str, keep_default_na=False)
 
 
 class MaskingService:

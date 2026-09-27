@@ -188,10 +188,20 @@ def _merge_profile_stats(dst: dict, src: Any) -> None:
                 break
 
 
+# ``profile_status`` on the column payload: why the Profile panel is (or is not)
+# populated. ``samples_withheld`` is about samples only.
+PROFILE_OK = "ok"                      # profiler ran, stats present
+PROFILE_NOT_RUN = "not_run"            # profiling was not part of this scan type
+PROFILE_NO_RUN = "no_run"              # no profile record exists for this table at all
+PROFILE_WRITE_FAILED = "write_failed"  # the guarded write raised
+
+
 def _has_profile_stats(stats: dict) -> bool:
+    # logical_type is schema metadata (always backfilled from the contract), not a
+    # profile statistic. ``is not None`` so a null_rate of 0.0 still counts.
     return any(
         stats.get(k) is not None
-        for k in ("null_rate", "ndv", "ndv_ratio", "nunique", "cardinality_ratio", "logical_type")
+        for k in ("null_rate", "ndv", "ndv_ratio", "nunique", "cardinality_ratio")
     )
 
 
@@ -469,16 +479,26 @@ class StewardReviewService:
         allow_samples = role_can(role or "explorer", "view_samples")
         run_id = self.profiles.latest_run_id(table)
         profile = {"stats": {}, "quality": [], "format_signature": "",
-                   "samples": None, "samples_withheld": "no profile for this run"}
+                   "samples": None, "samples_withheld": "", "profile_status": PROFILE_NO_RUN,
+                   "profile_run_id": "", "profile_engines": []}
         if run_id:
+            manifest = self.profiles.manifest(table, run_id) or {}
             profile = self.profiles.read(
                 table, run_id, column,
                 actor=actor, include_samples=include_samples, allow_samples=allow_samples,
             )
-            if not profile.get("stats") and not profile.get("samples_withheld"):
-                profile["samples_withheld"] = ""
-            if not self.profiles.manifest(table, run_id):
-                profile["samples_withheld"] = profile.get("samples_withheld") or "no profile for this run"
+            engines = list(manifest.get("engines") or [])
+            profile["profile_run_id"] = run_id
+            profile["profile_engines"] = engines
+            # Legacy records (written before the scan skipped empty writes) carry
+            # ``engines: []`` and so classify as not_run with no migration.
+            if manifest.get("write_error"):
+                profile["profile_status"] = PROFILE_WRITE_FAILED
+                profile["profile_error"] = str(manifest["write_error"])
+            elif "profile" not in engines:
+                profile["profile_status"] = PROFILE_NOT_RUN
+            else:
+                profile["profile_status"] = PROFILE_OK
 
         self._hydrate_engines_from_telemetry(table, column, found)
         self._hydrate_definition_from_contract(table, column, found)
@@ -806,12 +826,13 @@ class StewardReviewService:
         profile["stats"] = stats
         profile["quality"] = quality
         profile["format_signature"] = stats.get("format_signature") or profile.get("format_signature") or ""
-        if _has_profile_stats(stats) and profile.get("samples_withheld") == "no profile for this run":
-            profile["samples_withheld"] = ""
-        if not _has_profile_stats(stats) and not quality:
-            profile["samples_withheld"] = profile.get("samples_withheld") or "no profile for this run"
-        elif not profile.get("samples_withheld") and profile.get("samples") is None:
-            profile["samples_withheld"] = profile.get("samples_withheld") or ""
+        profile["samples_withheld"] = profile.get("samples_withheld") or ""
+        status = profile.get("profile_status") or PROFILE_NO_RUN
+        if _has_profile_stats(stats) and status in (PROFILE_NOT_RUN, PROFILE_NO_RUN):
+            status = PROFILE_OK  # ledger/telemetry/contract fallback supplied stats
+        profile["profile_status"] = status
+        profile.setdefault("profile_run_id", "")
+        profile.setdefault("profile_engines", [])
         return profile
 
     def _route_write(self, table: str, column: str, fv: FieldVerdict, who: str) -> None:

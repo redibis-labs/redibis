@@ -408,6 +408,16 @@ class ScanService:
         """Best-effort write of the guarded profile store + profile generations."""
         if self.store is None:
             return
+        profile = getattr(run_result, "profile", None)
+        quality = getattr(run_result, "quality_results", None)
+        if profile is None and not quality:
+            # Profiling was not part of this scan type. Writing an empty record here
+            # makes latest_run_id() report a profile that does not exist.
+            log.info(
+                "profiling did not run for %s (scan_types=%s) — no profile record written",
+                config.table, getattr(config, "scan_types", None),
+            )
+            return
         try:
             samples: dict[str, list] = {}
             if df is not None and hasattr(df, "columns"):
@@ -417,14 +427,15 @@ class ScanService:
                     except Exception:
                         continue
             engines = []
-            profile = getattr(run_result, "profile", None)
             if profile is not None:
                 engines.append("profile")
+            if quality:
+                engines.append("quality")
             self.store.profiles.write(
                 config.table,
                 run_id,
                 profile_result=profile,
-                quality_result=getattr(run_result, "quality_results", None),
+                quality_result=quality,
                 samples=samples,
                 consent=self.store.sampling_consent,
                 engines=engines,
@@ -440,8 +451,14 @@ class ScanService:
                 gens = generations_from_profile(column, stats, run_id=run_id)
                 if gens:
                     self.store.generation_ledger.append(config.table, column, gens)
-        except Exception:
+        except Exception as exc:
+            # Non-fatal for the scan, but stamped on the manifest so the steward
+            # page reports ``write_failed`` instead of an unexplained empty panel.
             log.warning("guarded profile write failed", exc_info=True)
+            try:
+                self.store.profiles.mark_write_error(config.table, run_id, str(exc))
+            except Exception:
+                pass
 
     def _write_deterministic_lifecycle(
         self,

@@ -221,6 +221,229 @@ def _run_runs(args, store: ContractStore, backend):
     return 1
 
 
+def _read_input(path: str, engine: str):
+    """A data file as a pandas (CSV read as text) or Spark DataFrame."""
+    if engine == "spark":
+        from pyspark.sql import SparkSession
+
+        reader = SparkSession.builder.getOrCreate().read
+        return reader.parquet(path) if path.endswith(".parquet") else reader.option("header", True).csv(path)
+    import pandas as pd
+
+    return (pd.read_parquet(path) if path.endswith(".parquet")
+            else pd.read_csv(path, dtype=str, keep_default_na=False))
+
+
+def _run_quality_results(args, store: ContractStore) -> int:
+    """`redibis quality-results validate|status|latest|rules|check`."""
+    import json as _json
+    from datetime import date as _date
+
+    from redibis.quality.results import (
+        ConsumerPolicy, get_result_store, rules_catalog, validate_partition,
+    )
+
+    try:
+        results = get_result_store(args.store)
+        action = args.quality_results_action
+        if action == "validate":
+            contract = yaml.safe_load(Path(args.rules).read_text(encoding="utf-8")) if args.rules else store
+            run = validate_partition(
+                _read_input(args.input, args.engine), args.table, partition=args.partition,
+                contract=contract, store=results, fingerprint=args.fingerprint or "",
+                policies=args.policies, force=args.force, count_rows=True,
+                spark_mode=args.spark_mode)
+            print(run)
+            return 0 if run.status == "passed" else 1
+        if action == "status":
+            since = _date.today().toordinal() - args.days
+            runs = results.runs(args.table, date_from=_date.fromordinal(since), latest_only=not args.all)
+            if runs.empty:
+                print(f"no validated partitions of {args.table} in the last {args.days} days")
+                return 0
+            cols = ["partition", "partition_ts", "status", "rules_passed", "rules_total", "p1_failed",
+                    "validated_at", "run_id", "rule_set_digest"]
+            print(runs[cols].to_string(index=False))
+            return 0
+        if action == "latest":
+            run, rows = results.latest(args.table)
+            if run is None:
+                print(f"no validated partitions of {args.table}")
+                return 1
+            if args.json:
+                payload = {"run": run.row(), "results": rows.to_dict("records")}
+                print(_json.dumps(payload, indent=2, default=str))
+            else:
+                print(run)
+                cols = ["expectation", "column_name", "severity", "passed", "unexpected_count", "observed"]
+                shown = rows if args.all else rows[~rows["passed"].astype(bool)]
+                if not shown.empty:
+                    print(shown[cols].fillna("").to_string(index=False))
+            return 0 if run.status == "passed" else 1
+        if action == "rules":
+            contract = None
+            if args.from_contract:
+                from redibis.quality.results.producer import resolve_contract
+
+                contract = resolve_contract(store, args.table)
+            catalog = rules_catalog(results, args.table, contract=contract)
+            if catalog.empty:
+                print(f"no rule set stored for {args.table} (validate a partition first, or use --from-contract)")
+                return 1
+            print(catalog.fillna("").to_string(index=False))
+            return 0
+        if action == "check":
+            policy = ConsumerPolicy.from_yaml(args.policy)
+            as_of = _date.fromisoformat(args.as_of) if args.as_of else None
+            decision = policy.evaluate(results, as_of=as_of)
+            print(_json.dumps(decision.to_dict(), indent=2, default=str) if args.json else decision)
+            return 0 if decision.accepted else 1
+    except Exception as exc:  # noqa: BLE001
+        print(f"quality-results error: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
+    return 2
+
+
+def _run_quality_run(args, store: ContractStore, backend) -> int:
+    """`redibis quality-run list|show|diff|edit|export|import|merge|discard`."""
+    sub_store = _build_subcontract_store(args, backend)
+    merger = RunMerger(store, sub_store)
+    return _run_quality_authoring(args, store, sub_store, merger)
+
+
+def _run_quality_authoring(args, store: ContractStore, sub_store, merger) -> int:
+    from datetime import datetime, timezone
+
+    from redibis.quality.authoring import (
+        QualityDraft, TABLE_LEVEL, diff_rules, drop_rules, format_diff,
+        latest_run, list_rules, relax_rules, rule_label, save_draft,
+    )
+    action, table = args.quality_run_action, args.table
+
+    if action == "list":
+        runs = sub_store.list_run_summaries("quality", table)
+        if not runs:
+            print(f"No quality runs for {table}")
+            return 0
+        for r in runs:
+            stats = r.get("summary_stats") or {}
+            passed = (f"{stats.get('quality_passed')}/{stats.get('quality_total')}"
+                      if stats.get("quality_total") else "-")
+            print(f"  {r['run_id']:36s}  {r['status']:9s}  {str(r.get('created_at',''))[:19]}  "
+                  f"rules {stats.get('rules', '-'):>4}  pass {passed:>7}  "
+                  f"{stats.get('engine', '')}  {stats.get('note', '')}")
+        return 0
+
+    if action == "import":
+        try:
+            draft = QualityDraft.from_yaml(args.file)
+        except (OSError, ValueError, yaml.YAMLError) as exc:
+            print(f"Cannot import {args.file}: {exc}", file=sys.stderr)
+            return 1
+        if draft.table and draft.table != table:
+            print(f"{args.file} holds rules for {draft.table!r}, not {table!r}", file=sys.stderr)
+            return 1
+        draft.table = table
+        run_id = args.run or "import_" + datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        sub = save_draft(sub_store, draft, run_id=run_id, note=args.note, created_by="import")
+        print(f"Imported {len(draft.rules)} quality rules for {table} as run {sub.run_id}")
+        print(f"  next: redibis quality-run diff {table} --run {sub.run_id}   "
+              f"then: redibis quality-run merge {table} --run {sub.run_id}")
+        return 0
+
+    if action == "discard":
+        sub = merger.discard_run("quality", table, args.run)
+        if sub is None:
+            print(f"No quality run {args.run!r} for {table}", file=sys.stderr)
+            return 1
+        print(f"Discarded quality run {args.run} for {table}")
+        return 0
+
+    try:
+        sub = latest_run(sub_store, table, args.run)
+    except KeyError as exc:
+        print(str(exc).strip("'\""), file=sys.stderr)
+        return 1
+
+    if action == "merge":
+        result = merger.merge_run("quality", table, sub.run_id,
+                                  validate=not args.no_validate, strip_pii_quality=True)
+        u = result.upsert
+        print(f"Merged quality run {sub.run_id} into {table}: "
+              f"v{u.version_before or '∅'} → v{u.version_after} "
+              f"({'new' if u.is_new else 'updated'})")
+        return 0
+
+    if action == "show":
+        rules = list_rules(sub.payload)
+        stats = sub.summary_stats or {}
+        print(f"{table} · run {sub.run_id} · {sub.status} · {len(rules)} rules"
+              + (f" · validation {stats.get('quality_passed')}/{stats.get('quality_total')}"
+                 if stats.get("quality_total") else "")
+              + (f" · {stats['engine']}" if stats.get("engine") else ""))
+        for r in rules:
+            print(f"  [{r['index']:>3}] {r['column'] or TABLE_LEVEL:<24} {rule_label(r)}")
+        return 0
+
+    if action == "diff":
+        print(format_diff(diff_rules(store.get_active(table), sub.payload)))
+        return 0
+
+    if action == "export":
+        draft = QualityDraft(table=table, payload=sub.payload,
+                             passed=int((sub.summary_stats or {}).get("quality_passed") or 0),
+                             total=int((sub.summary_stats or {}).get("quality_total") or 0),
+                             engine=str((sub.summary_stats or {}).get("engine") or "pandas"),
+                             created_at=sub.created_at)
+        out = Path(args.out)
+        if out.suffix.lower() == ".py":
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(draft.to_program(args.engine), encoding="utf-8")
+            print(f"Wrote a complete {args.engine} program with {len(draft.rules)} rules "
+                  f"from run {sub.run_id} to {out}")
+            print("  run it: open in Jupyter and call validate(df), or "
+                  f"`python {out.name} --help`")
+            return 0
+        path = draft.to_yaml(out)
+        print(f"Wrote {len(draft.rules)} rules from run {sub.run_id} to {path}")
+        return 0
+
+    # edit
+    if args.file:
+        try:
+            payload = QualityDraft.from_yaml(args.file, table=table).payload
+        except (OSError, ValueError, yaml.YAMLError) as exc:
+            print(f"Cannot read {args.file}: {exc}", file=sys.stderr)
+            return 1
+        removed: list = []
+        note = args.note or f"rules replaced from {Path(args.file).name}"
+    else:
+        dropping = bool(args.drop_column or args.drop_rule or args.drop_index)
+        if not dropping and not args.relax:
+            print("Nothing to do: pass --drop-column, --drop-rule, --drop-index, --relax "
+                  "or --file", file=sys.stderr)
+            return 1
+        payload, removed = drop_rules(sub.payload, columns=args.drop_column,
+                                      rule_types=args.drop_rule, indices=args.drop_index)
+        relaxed = 0
+        if args.relax:
+            payload, relaxed = relax_rules(payload, args.relax)
+        if not removed and not relaxed:
+            print("No rules matched; run left unchanged", file=sys.stderr)
+            return 1
+        parts = []
+        if removed:
+            parts.append(f"removed {len(removed)} rule(s)")
+        if relaxed:
+            parts.append(f"relaxed {relaxed} range(s) by ±{args.relax:.0%}")
+        note = args.note or "; ".join(parts)
+    merger.edit_run("quality", table, sub.run_id, payload, note=note, edited_by="cli")
+    for r in removed:
+        print(f"  - [{r['index']:>3}] {r['column'] or TABLE_LEVEL:<24} {rule_label(r)}")
+    print(f"Updated run {sub.run_id}: {len(list_rules(payload))} rules left ({note})")
+    return 0
+
+
 def _run_rules(args, store: ContractStore):
     """`redibis rules export <table> --target ge|sodacl|dbt`."""
     from redibis.contracts.rules import regenerate, extract_rules
@@ -383,7 +606,10 @@ def _table_from_file(path: str, table: Optional[str]) -> str:
 
 def _load_mask_df(path: str):
     import pandas as pd
-    return pd.read_parquet(path) if path.endswith((".parquet", ".pq")) else pd.read_csv(path)
+    if path.endswith((".parquet", ".pq")):
+        return pd.read_parquet(path)
+    # Text columns, as the scan reads them — "01012345678" must stay 11 characters.
+    return pd.read_csv(path, dtype=str, keep_default_na=False)
 
 
 def _detect_for_mask(df) -> list[dict]:
@@ -574,6 +800,82 @@ def _run_mask_capabilities(args) -> int:
     return 0
 
 
+def _run_pii_capabilities(args) -> int:
+    """``redibis pii capabilities verify|report|export|guide`` — the PII capability contract."""
+    import logging
+
+    from redibis.pii import capability as cap
+
+    quiet = [logging.getLogger(n) for n in ("", "redibis", "pii", "presidio-analyzer")]
+    levels = [lg.level for lg in quiet]
+    for lg in quiet:                                   # per-column decision lines are noise here
+        lg.setLevel(logging.WARNING)
+    try:
+        return _pii_capabilities_action(args, cap)
+    finally:
+        for lg, level in zip(quiet, levels):
+            lg.setLevel(level)
+
+
+def _pii_capabilities_action(args, cap) -> int:
+    import json
+    from pathlib import Path
+
+    action = args.capabilities_action
+    contract = cap.load_contract(getattr(args, "contract", None))
+
+    def write(data, default_name: str) -> None:
+        out = getattr(args, "out", None)
+        if not out:
+            if isinstance(data, bytes):
+                out = default_name
+            else:
+                print(data)
+                return
+        Path(out).write_bytes(data) if isinstance(data, bytes) else Path(out).write_text(data, encoding="utf-8")
+        print(f"wrote {out}")
+
+    if action == "export":
+        write(json.dumps(contract, indent=2, ensure_ascii=False), "")
+        return 0
+    if action == "guide":
+        write(cap.render_guide_html() if args.format == "html" else cap.guide_markdown(), "")
+        return 0
+    if action == "verify":
+        only = [x for x in (args.only or "").split(",") if x]
+        result = cap.verify(contract, only=only or None)
+        if args.json or getattr(args, "out", None):
+            write(json.dumps(result, indent=2, ensure_ascii=False, default=str), "")
+        s = result["summary"]
+        print(f"{s['passed']}/{s['total']} verified, {s['failed']} failed, "
+              f"{s['not_verified']} not verified (optional model) in {result['seconds']} s", file=sys.stderr)
+        for r in result["results"]:
+            if r["status"] != "passed":
+                print(f"  {r['status']:12} {r['id']}: {'; '.join(r['problems'])}", file=sys.stderr)
+        return 1 if s["failed"] else 0
+    if action == "report":
+        verification = None
+        if getattr(args, "verification", None):
+            verification = json.loads(Path(args.verification).read_text(encoding="utf-8"))
+        elif not args.no_verify:
+            verification = cap.verify(contract)
+        html_text = cap.render_html(contract, verification)
+        if args.format == "pdf":
+            try:
+                write(cap.render_pdf(html_text), "pii-capability-contract.pdf")
+            except RuntimeError as exc:
+                print(f"pii capabilities: {exc}", file=sys.stderr)
+                return 2
+        else:
+            write(html_text, "")
+        if verification and verification["summary"]["failed"]:
+            print(f"warning: {verification['summary']['failed']} case(s) do not hold — see the document",
+                  file=sys.stderr)
+            return 1
+        return 0
+    return 2
+
+
 def _run_pii(args) -> int:
     """``redibis pii regex export|list`` and ``redibis pii ner list|export``."""
     import json
@@ -593,6 +895,9 @@ def _run_pii(args) -> int:
         cfg = RedibisConfig.from_yaml(args.config)
         if cfg.pii.regex_overrides:
             overrides = RegexOverrides.from_dict(cfg.pii.regex_overrides)
+
+    if args.pii_action == "capabilities":
+        return _run_pii_capabilities(args)
 
     if args.pii_action == "regex":
         if args.regex_action == "export":
@@ -706,7 +1011,7 @@ def _run_pii_calibrate_imei(args) -> int:
     from redibis.pii.device_id import validate_imei, normalize_imei
 
     path = Path(args.input)
-    df = pd.read_csv(path)
+    df = pd.read_csv(path, dtype=str, keep_default_na=False)  # IDs keep leading zeros
     col = args.column
     values = df[col].tolist()
     stages = {"normalize": 0, "format": 0, "luhn": 0, "rbi": 0}
@@ -742,7 +1047,7 @@ def _run_pii_calibrate_imsi(args) -> int:
     from redibis.pii.subscriber_id import validate_imsi, normalize_imsi
 
     path = Path(args.input)
-    df = pd.read_csv(path)
+    df = pd.read_csv(path, dtype=str, keep_default_na=False)  # IDs keep leading zeros
     col = args.column
     values = df[col].tolist()
     stages = {"normalize": 0, "format": 0, "mcc_known": 0, "home": 0, "roaming": 0}
@@ -782,7 +1087,7 @@ def _run_pii_calibrate_geo(args) -> int:
     )
 
     path = Path(args.input)
-    df = pd.read_csv(path)
+    df = pd.read_csv(path, dtype=str, keep_default_na=False)  # IDs keep leading zeros
     col = args.column
     partner = getattr(args, "partner_column", None)
     partner_values = df[partner].tolist() if partner and partner in df.columns else None
@@ -2957,6 +3262,109 @@ def main(argv: Optional[list[str]] = None):
     p_runs_discard = runs_sub.add_parser("discard", help="discard a run subcontract")
     _runs_kind(p_runs_discard, run_required=True)
 
+    # `redibis quality-run …` — the quality-rule authoring lifecycle: rules made
+    # in code or on the Quality page become a run you review, edit and merge.
+    p_qrun = sub.add_parser(
+        "quality-run", aliases=["quality_run"],
+        help="review / edit / merge quality rules authored in code or the Quality page")
+    qrun_sub = p_qrun.add_subparsers(dest="quality_run_action", required=True)
+
+    def _quality_run(p, *, run_required: bool = False, run_help: str = ""):
+        p.add_argument("table")
+        _common(p)
+        p.add_argument("--run", required=run_required,
+                       help=run_help or "run_id (default: newest run that is not discarded)")
+
+    _quality_run(qrun_sub.add_parser("list", help="quality runs for a table and their status"))
+    _quality_run(qrun_sub.add_parser("show", help="a run's rules, numbered"))
+    _quality_run(qrun_sub.add_parser(
+        "diff", help="what merging the run would add/remove in the active contract"))
+    p_qrun_edit = qrun_sub.add_parser(
+        "edit", help="remove, relax or replace a run's rules before merging")
+    _quality_run(p_qrun_edit, run_required=True)
+    p_qrun_edit.add_argument("--drop-column", action="append", default=[], metavar="COLUMN",
+                             help="remove every rule on COLUMN (repeatable)")
+    p_qrun_edit.add_argument("--drop-rule", action="append", default=[], metavar="TYPE",
+                             help="remove rules of TYPE, e.g. in_set or "
+                                  "expect_column_values_to_be_in_set (repeatable)")
+    p_qrun_edit.add_argument("--drop-index", action="append", type=int, default=[], metavar="N",
+                             help="remove rule number N as printed by `quality-run show` (repeatable)")
+    p_qrun_edit.add_argument("--relax", type=float, metavar="FRACTION",
+                             help="widen numeric ranges, e.g. 0.1 = ±10%% (snapshot rules "
+                                  "such as mean/median/row count rarely hold on the next "
+                                  "partition otherwise)")
+    p_qrun_edit.add_argument("--file", help="replace the run's rules with this edited YAML "
+                                            "or generated .py program")
+    p_qrun_edit.add_argument("--note", default="", help="why (stored in the run's edit history)")
+    p_qrun_export = qrun_sub.add_parser(
+        "export", help="write a run's rules to an editable YAML file or a full program")
+    _quality_run(p_qrun_export)
+    p_qrun_export.add_argument("-o", "--out", required=True,
+                               help="output path: .yaml, or .py for the complete Jupyter-ready program")
+    p_qrun_export.add_argument("--engine", choices=["spark", "pandas"], default="spark",
+                               help="program flavour when --out ends in .py (default spark)")
+    p_qrun_import = qrun_sub.add_parser(
+        "import", help="create a run from a rules file: draft YAML, ODCS partial, or a "
+                       "generated/edited .py program (parsed, never executed)")
+    p_qrun_import.add_argument("table")
+    p_qrun_import.add_argument("file")
+    _common(p_qrun_import)
+    p_qrun_import.add_argument("--run", help="run_id to create (default: import_<timestamp>)")
+    p_qrun_import.add_argument("--note", default="", help="note stored with the run")
+    p_qrun_merge = qrun_sub.add_parser("merge", help="merge a run into the active contract")
+    _quality_run(p_qrun_merge)
+    p_qrun_merge.add_argument("--no-validate", action="store_true",
+                              help="skip ODCS validation on merge")
+    _quality_run(qrun_sub.add_parser("discard", help="discard a run"),
+                 run_required=True, run_help="run_id to discard")
+
+    # `redibis quality-results …` — validate each partition once, store the results
+    # (Iceberg / S3-MinIO Parquet / Postgres); consumers check stored results.
+    p_qres = sub.add_parser(
+        "quality-results",
+        help="validate a partition once and store the results; consumers check them (no rescans)")
+    qres_sub = p_qres.add_subparsers(dest="quality_results_action", required=True)
+
+    def _qres(p):
+        _common(p)
+        p.add_argument("--store", default=None,
+                       help="result store URI: iceberg://CATALOG?namespace=dq (default), "
+                            "s3://bucket/prefix?endpoint=URL, file:///path, postgresql://…; "
+                            "or env REDIBIS_QUALITY_RESULTS_STORE")
+
+    p_qv = qres_sub.add_parser("validate", help="validate one partition (skipped if already done)")
+    p_qv.add_argument("table")
+    p_qv.add_argument("--partition", required=True, help="e.g. 2026-09-26 or dt=2026-09-26")
+    p_qv.add_argument("--input", required=True, help="Parquet or CSV file of the partition")
+    p_qv.add_argument("--rules", help="published rules / contract YAML (default: the active contract)")
+    p_qv.add_argument("--fingerprint", help="data version, e.g. the Iceberg snapshot id")
+    p_qv.add_argument("--policies", help="consumer policy file or directory (their custom SQL is computed too)")
+    p_qv.add_argument("--engine", choices=["pandas", "spark"], default="pandas")
+    p_qv.add_argument("--spark-mode", choices=["ge", "persist", "fused"], default="ge",
+                      help="Spark only: ge (Great Expectations, several jobs per rule), persist "
+                           "(the same on a cached frame), fused (aggregate rules in one job)")
+    p_qv.add_argument("--force", action="store_true", help="validate even if this data was validated")
+    _qres(p_qv)
+    p_qs = qres_sub.add_parser("status", help="validated partitions of a table")
+    p_qs.add_argument("table")
+    p_qs.add_argument("--days", type=int, default=7)
+    p_qs.add_argument("--all", action="store_true", help="every run, not just the latest per partition")
+    _qres(p_qs)
+    p_ql = qres_sub.add_parser("latest", help="results of the most recent partition (max partition_ts)")
+    p_ql.add_argument("table")
+    p_ql.add_argument("--all", action="store_true", help="every rule, not only the failed ones")
+    p_ql.add_argument("--json", action="store_true")
+    _qres(p_ql)
+    p_qr = qres_sub.add_parser("rules", help="rules a consumer can choose from (ids, columns, types)")
+    p_qr.add_argument("table")
+    p_qr.add_argument("--from-contract", action="store_true", help="read the active contract instead")
+    _qres(p_qr)
+    p_qc = qres_sub.add_parser("check", help="decide a consumer policy from stored results (exit 0/1)")
+    p_qc.add_argument("--policy", required=True, help="consumer policy YAML")
+    p_qc.add_argument("--as-of", help="evaluate as of this date (default: today)")
+    p_qc.add_argument("--json", action="store_true")
+    _qres(p_qc)
+
     p_appr = sub.add_parser("approved",
                             help="review / merge a session's approved contract properties")
     appr_sub = p_appr.add_subparsers(dest="approved_action", required=True)
@@ -3584,6 +3992,25 @@ def main(argv: Optional[list[str]] = None):
         "--provenance-out",
         help="write the full ScanProvenance record to this JSON file",
     )
+
+    p_pii_cap = pii_sub.add_parser(
+        "capabilities",
+        help="PII capability contract: every detectable type with verified examples (verify, report)",
+    )
+    cap_sub = p_pii_cap.add_subparsers(dest="capabilities_action", required=True)
+    p_cap_verify = cap_sub.add_parser("verify", help="run every example through the engines (exit 1 if one fails)")
+    p_cap_verify.add_argument("--only", help="comma-separated case ids")
+    p_cap_verify.add_argument("--json", action="store_true", help="print the full verification JSON")
+    p_cap_report = cap_sub.add_parser("report", help="the formal document (HTML or PDF)")
+    p_cap_report.add_argument("--format", choices=["html", "pdf"], default="html")
+    p_cap_report.add_argument("--verification", help="use this verification JSON instead of verifying now")
+    p_cap_report.add_argument("--no-verify", action="store_true", help="render without running the examples")
+    cap_sub.add_parser("export", help="the contract JSON")
+    p_cap_guide = cap_sub.add_parser("guide", help="how to add and tune PII detection")
+    p_cap_guide.add_argument("--format", choices=["md", "html"], default="md")
+    for p_ in (p_cap_verify, p_cap_report, cap_sub.choices["export"], p_cap_guide):
+        p_.add_argument("--contract", help="contract JSON (default: the shipped one)")
+        p_.add_argument("-o", "--out", help="write to this file")
 
     p_pii_cal = pii_sub.add_parser(
         "calibrate-nid",
@@ -4251,6 +4678,10 @@ def main(argv: Optional[list[str]] = None):
         return run_get(args, store, backend)
     if args.cmd == "runs":
         return _run_runs(args, store, backend)
+    if args.cmd in ("quality-run", "quality_run"):
+        return _run_quality_run(args, store, backend)
+    if args.cmd == "quality-results":
+        return _run_quality_results(args, store)
     if args.cmd == "rules":
         return _run_rules(args, store)
     if args.cmd == "contract":

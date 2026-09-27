@@ -219,7 +219,10 @@ def suggest_rule(column: str, entity: Optional[str], *, detected: bool,
         elif e in ("PERSON", "NAME", "PER"):
             rule.strategy = "fake"
             rule.params = {"kind": "name", "locale": locale, "preserve": {"gender": True}}
-        elif e in ("ADDRESS", "LOCATION", "GPE", "LOC", "SOCIAL_PROFILE_URL"):
+        elif e in ("SOCIAL_PROFILE_URL", "SOCIAL_URL"):
+            rule.strategy = "fake"
+            rule.params = {"kind": "social_url", "preserve": {"host": True}}
+        elif e in ("ADDRESS", "LOCATION", "GPE", "LOC"):
             rule.strategy = "fake"
             rule.params = {"kind": "address", "locale": locale}
         elif e in ("DATE", "DATE_TIME", "DOB", "BIRTHDATE"):

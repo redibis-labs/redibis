@@ -548,3 +548,60 @@ def test_web_extra_includes_mask_deps():
     web = [r for r in reqs if 'extra == "web"' in r]
     for pkg in ("ff3", "cryptography", "faker", "pyarrow", "rstr"):
         assert any(r.lower().startswith(pkg) for r in web), f"{pkg} missing from web extra"
+
+
+# ── social profile URLs ─────────────────────────────────────────────────────
+
+_SOCIAL = "https://facebook.com/bzurcbcr.kyeydt"
+
+
+def test_social_profile_url_suggests_social_url_faker():
+    rule = suggest_rule("social_profile_url", "SOCIAL_PROFILE_URL", detected=True)
+    assert rule.strategy == "fake"
+    assert rule.params["kind"] == "social_url"
+
+
+def test_fake_social_url_keeps_host_and_shape_and_is_deterministic():
+    out = T.fake_social_url(T.KeyedRandom(b"k", "a"), _SOCIAL)
+    again = T.fake_social_url(T.KeyedRandom(b"k", "a"), _SOCIAL)
+    assert out == again
+    assert out.startswith("https://facebook.com/")
+    handle = out.rsplit("/", 1)[1]
+    assert handle != "bzurcbcr.kyeydt"
+    assert len(handle) == len("bzurcbcr.kyeydt") and handle[8] == "."
+
+
+def test_fake_social_url_drops_query_and_handles_bare_handle():
+    out = T.fake_social_url(T.KeyedRandom(b"k", "b"), "https://x.com/someone?id=12345#top")
+    assert out.startswith("https://x.com/") and "12345" not in out and "?" not in out
+    bare = T.fake_social_url(T.KeyedRandom(b"k", "c"), "@someone")
+    assert bare.startswith("@") and bare != "@someone"
+
+
+def test_social_url_column_is_masked_end_to_end():
+    df = pd.DataFrame({"social_profile_url": [_SOCIAL, "https://instagram.com/ali_99"]})
+    plan = MaskingPlan(schema_table="t", columns=[
+        suggest_rule("social_profile_url", "SOCIAL_PROFILE_URL", detected=True),
+    ])
+    out = MaskingEngine(plan, RunKeys.mint(seed="s1")).transform_dataframe(df)
+    vals = out["social_profile_url"].tolist()
+    assert vals[0].startswith("https://facebook.com/") and vals[0] != _SOCIAL
+    assert vals[1].startswith("https://instagram.com/") and "ali_99" not in vals[1]
+
+
+def test_risk_flags_fpe_that_would_export_values_unchanged():
+    df = pd.DataFrame({"u": [_SOCIAL, "https://fb.com/a1"]})
+    plan = MaskingPlan(schema_table="t", columns=[
+        ColumnMaskRule(column="u", strategy="fpe", params={"alphabet": "digits"}),
+    ])
+    found = [f for f in risk_report(df, plan) if f["issue"] == "FPE leaves values unchanged"]
+    assert found and found[0]["severity"] == "high"
+    assert "1 of 2" in found[0]["detail"]
+
+
+def test_risk_does_not_flag_fpe_on_digit_values():
+    df = pd.DataFrame({"n": ["29501011234567", "29501019999999"]})
+    plan = MaskingPlan(schema_table="t", columns=[
+        ColumnMaskRule(column="n", strategy="fpe", params={"alphabet": "digits"}),
+    ])
+    assert not [f for f in risk_report(df, plan) if f["issue"] == "FPE leaves values unchanged"]

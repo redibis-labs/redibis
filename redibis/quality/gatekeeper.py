@@ -656,6 +656,13 @@ class QualityGatekeeper:
           - GE 0.17: CheckpointResult.to_json_dict() with run_results
           - GE 1.x:  CheckpointResult.run_results → ValidationResult.to_json_dict()
         """
+        # Already normalized (a report from this method, maybe with SQL rows
+        # appended): pass it through instead of re-reading it as GE output.
+        if (isinstance(results, dict) and isinstance(results.get("results"), list)
+                and all(isinstance(r, dict) and "rule" in r and "expectation_config" not in r
+                        for r in results["results"])):
+            return results
+
         overall_success = False
         statistics      = {}
         ge_results      = []
@@ -732,7 +739,19 @@ class QualityGatekeeper:
             result_data = r.get("result", {})
             meta        = exp_config.get("meta", r.get("meta", {}))
 
+            exception = None
+            ex_info = r.get("exception_info") or {}
+            if isinstance(ex_info, dict):
+                if ex_info.get("raised_exception"):
+                    exception = ex_info.get("exception_message")
+                else:
+                    for info in ex_info.values():
+                        if isinstance(info, dict) and info.get("raised_exception"):
+                            exception = info.get("exception_message")
+                            break
+
             normalized.append({
+                "exception":        (str(exception)[:500] if exception else None),
                 "column":           column,
                 "rule":             exp_type,
                 "success":          r.get("success", False),

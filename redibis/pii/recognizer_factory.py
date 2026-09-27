@@ -101,7 +101,12 @@ def build_recognizers(
 
         if entry.collision_group and entry.collision_group in suppressions:
             winner = suppressions[entry.collision_group]
-            if winner != name:
+            winner_entry = effective_catalog.get(winner)
+            # The column name picks the winning *entity* of an ambiguous shape; other
+            # formats of that same entity (Visa / Mastercard / spaced cards, dashed /
+            # plain tax IDs) keep running.
+            if winner != name and (winner_entry is None
+                                   or winner_entry.entity_type != entry.entity_type):
                 continue
 
         pattern = Pattern(

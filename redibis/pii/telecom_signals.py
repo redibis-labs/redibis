@@ -639,12 +639,13 @@ def apply_sim_gates(
                     for raw in values:
                         if not _is_non_null_value(raw):
                             continue
-                        digits = re.sub(r"\D", "", str(raw))
-                        if not digits:
+                        candidate = (str(raw).strip() if vname in _TEXT_VALIDATORS
+                                     else re.sub(r"\D", "", str(raw)))
+                        if not candidate:
                             continue
                         checked += 1
                         try:
-                            res = fn(digits)
+                            res = fn(candidate)
                             ok = res.get("valid", False) if isinstance(res, dict) else bool(res)
                         except Exception:
                             ok = False
@@ -655,6 +656,13 @@ def apply_sim_gates(
 
         out.append(hit)
     return out
+
+
+# Validators that read letters or separators too — they get the whole value, not its digits.
+_TEXT_VALIDATORS = frozenset({
+    "validate_iban", "validate_swift_bic", "validate_mac_address",
+    "validate_eth_address", "validate_btc_address", "validate_jwt",
+})
 
 
 def _prefer_nid_over_imsi(hits: list[dict]) -> list[dict]:

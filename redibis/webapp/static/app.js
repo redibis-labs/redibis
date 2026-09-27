@@ -1845,22 +1845,19 @@ async function approveQualityBatch(rows,filterFn,runId){
     await ensureSession();
   }catch(e){alert(apiErr(e));return}
   var src=(S.view.indexOf("discover")>=0?"discovery":"scan");
-  var n=0;
+  var st=qStage(),n=0;
   for(var i=0;i<rows.length;i++){
     var d=rows[i];
     if(filterFn&&!filterFn(d)) continue;
     var sig=d.rule||d.expectation_type;
-    if(isQualityRuleApproved(d.column,sig)) continue;
-    try{
-      await POST("/api/sessions/"+S.sid+"/approved/quality",
-        {column:normalizeQualityApproveColumn(d.column),
-         rule:{expectation_type:sig,kwargs:d.kwargs||{},meta:d.meta||{}},
-         source_run_id:runId||null,source:src});
-      n++;
-    }catch(e){alert("Approve failed for "+sig+": "+apiErr(e));break}
+    if(isQualityRuleApproved(d.column,sig)||isQualityRuleStaged(d.column,sig)) continue;
+    st[qStageKey(d.column,sig)]={column:normalizeQualityApproveColumn(d.column),
+      rule:{expectation_type:sig,kwargs:d.kwargs||{},meta:d.meta||{}},
+      source_run_id:runId||null,source:src};
+    n++;
   }
-  await loadApproved();
-  toast(n?"Approved "+n+" rule(s)":"No new rules to approve");
+  saveQStage();
+  addLog(n?"Approved "+n+" rule(s) — send them to approval when ready":"No new rules to approve","step");
   render();
 }
 function approveQualityBatchCtx(kind){
@@ -1886,7 +1883,7 @@ function clickApproveQuality(ruleName,col,runId){
     return d.rule===ruleName&&(dc===cc||(!cc&&!dc));
   });
   var hit=hits[0]||{};
-  approveQuality(hit.column||col||null,{
+  toggleQualityRule(hit.column||col||null,{
     expectation_type:ruleName,
     kwargs:hit.kwargs||{},
     meta:hit.meta||{}
@@ -1982,24 +1979,122 @@ function apprBtn(column,kind,runId,label){
     var fn=S.view==="pii-discover"?"clickApproveDiscPii":"clickApprovePii";
     return "<button class='btn btn-ghost btn-sm' onclick=\""+fn+"('"+E(column)+"','"+E(runId||"")+"')\">"+(ok?"✓ in basket":"+ approve")+"</button>";
   }
-  return "<button class='btn btn-ghost btn-sm' onclick=\"clickApproveQuality('"+E(label)+"','"+E(column||"")+"','"+E(runId||"")+"')\">"+(ok?"✓ approved":"+ approve rule")+"</button>";
+  return qualityApproveButton("clickApproveQuality('"+E(label)+"','"+E(column||"")+"','"+E(runId||"")+"')",column,label);
+}
+// ── Quality rule approval: select here, send to the Approved page on confirm ──
+// Approving a rule only marks it (green) in this browser; nothing reaches the
+// Approved page until "send to approval" is confirmed. A marked rule can be
+// unmarked; a sent rule can be withdrawn from the Approved page's basket.
+function qStageStoreKey(){return "redibis_quality_stage_"+(S.sid||"")}
+function qStage(){
+  if(S._qStageSid!==S.sid){
+    S._qStageSid=S.sid;S.qStage={};
+    try{S.qStage=JSON.parse(sessionStorage.getItem(qStageStoreKey())||"{}")||{}}catch(_){S.qStage={}}
+  }
+  return S.qStage||(S.qStage={});
+}
+function saveQStage(){try{sessionStorage.setItem(qStageStoreKey(),JSON.stringify(S.qStage||{}))}catch(_){}}
+function qStageKey(column,sig){return normQualityColumn(column)+"|"+qualityRuleSig(sig)}
+function isQualityRuleStaged(column,sig){return !!qStage()[qStageKey(column,sig)]}
+function qualitySentItem(column,sig){
+  var c=normQualityColumn(column),want=qualityRuleSigVariants(sig);
+  return (S.approved.items||[]).find(function(p){
+    if(p.kind!=="quality"||p.merged||normQualityColumn(p.column)!==c) return false;
+    if(p.label&&want[p.label.toLowerCase()]) return true;
+    var got=qualityRuleSigVariants(p.payload);
+    for(var k in want){if(got[k]) return true}
+    return false;
+  });
+}
+function qualityApprovalRowClass(column,sig){
+  return (isQualityRuleStaged(column,sig)||isQualityRuleApproved(column,sig))?"qrow-approved":"qrow-pending";
+}
+function qualityApproveButton(onclick,column,sig){
+  if(isQualityRuleApproved(column,sig)){
+    var sent=qualitySentItem(column,sig);
+    return sent
+      ? "<button class='btn btn-ghost btn-sm qappr-sent' title='In the Approved basket — click to withdraw' onclick=\""+onclick+"\">✓ sent · withdraw</button>"
+      : "<span class='chip chip-green' title='Merged into the contract'>✓ in contract</span>";
+  }
+  if(isQualityRuleStaged(column,sig))
+    return "<button class='btn btn-sm qappr-on' title='Approved — click to unapprove' onclick=\""+onclick+"\">✓ approved</button>";
+  return "<button class='btn btn-ghost btn-sm' title='Approve this rule (sent to the Approved page when you confirm)' onclick=\""+onclick+"\">+ approve</button>";
+}
+async function toggleQualityRule(column,rule,runId){
+  var sig=rule.expectation_type;
+  if(isQualityRuleApproved(column,sig)){
+    var sent=qualitySentItem(column,sig);
+    if(!sent) return;
+    if(!confirm("Withdraw "+sig+" on "+(column||"table")+" from the Approved page?")) return;
+    try{await deleteApproved(sent.prop_id);addLog("Withdrawn: "+sig+" ("+(column||"table")+")","step")}
+    catch(e){alert("Withdraw failed: "+apiErr(e))}
+    return;
+  }
+  var st=qStage(),k=qStageKey(column,sig);
+  if(st[k]) delete st[k];
+  else st[k]={column:normalizeQualityApproveColumn(column),rule:rule,source_run_id:runId||null,
+              source:(S.view.indexOf("discover")>=0?"discovery":"scan")};
+  saveQStage();render();
+}
+function stagedQualityRules(){
+  var st=qStage();
+  return Object.keys(st).map(function(k){return st[k]});
+}
+function clearStagedQuality(){S.qStage={};saveQStage();render()}
+async function sendStagedQuality(){
+  var items=stagedQualityRules().filter(function(it){
+    return !isQualityRuleApproved(it.column,it.rule.expectation_type);
+  });
+  if(!items.length){alert("Approve some rules first.");return}
+  if(!confirm("Send "+items.length+" approved rule(s) to the Approved page?\n\n"+
+      "From there they are reviewed and merged into the data contract.")) return;
+  try{await ensureSession()}catch(e){alert(apiErr(e));return}
+  var n=0,st=qStage();
+  for(var i=0;i<items.length;i++){
+    var it=items[i];
+    try{
+      await POST("/api/sessions/"+S.sid+"/approved/quality",it);
+      delete st[qStageKey(it.column,it.rule.expectation_type)];n++;
+    }catch(e){alert("Send failed for "+it.rule.expectation_type+": "+apiErr(e));break}
+  }
+  saveQStage();
+  await loadApproved();
+  S.qSentNotice=n;
+  addLog("Sent "+n+" quality rule(s) to the Approved page — merge them into the contract from there.","step");
+  render();
 }
 function qualityBatchBar(rows,runId){
   if(!rows.length) return "";
   S._qBatchRows=rows;
   S._qBatchRunId=runId||"";
   var pending=rows.filter(function(d){
-    return !isQualityRuleApproved(d.column,d.rule||d.expectation_type);
+    var sig=d.rule||d.expectation_type;
+    return !isQualityRuleApproved(d.column,sig)&&!isQualityRuleStaged(d.column,sig);
   }).length;
-  if(!pending) return "<div style='font-size:.74rem;color:var(--muted);margin-bottom:10px'>All "+rows.length+" rule(s) already in the approved basket.</div>";
-  return "<div class='row' style='gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center'>"+
+  return qualitySendBar()+(!pending?"":"<div class='row' style='gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center'>"+
     "<span style='font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em'>batch approve</span>"+
     "<button class='btn btn-ghost btn-sm' onclick=\"approveQualityBatchCtx()\">all ("+pending+")</button>"+
     "<button class='btn btn-ghost btn-sm' onclick=\"approveQualityBatchCtx('pass')\">passing only</button>"+
     "<button class='btn btn-ghost btn-sm' onclick=\"approveQualityBatchCtx('not_null')\">not null</button>"+
     "<button class='btn btn-ghost btn-sm' onclick=\"approveQualityBatchCtx('unique')\">unique</button>"+
     "<button class='btn btn-ghost btn-sm' onclick=\"approveQualityBatchCtx('null')\">nullable</button>"+
-    "<span style='font-size:.72rem;color:var(--muted)'>or paste curated rules below · approve one-by-one</span>"+
+    "<span style='font-size:.72rem;color:var(--muted)'>or approve one-by-one · click again to unapprove</span>"+
+  "</div>");
+}
+// "Send to approval" bar: approved (green) rules stay here until confirmed.
+function qualitySendBar(){
+  var n=stagedQualityRules().filter(function(it){
+    return !isQualityRuleApproved(it.column,it.rule.expectation_type);
+  }).length;
+  var sentNote=S.qSentNotice?"<span style='font-size:.76rem;color:var(--green)'>✓ "+S.qSentNotice+" rule(s) sent · "+
+    "<a href='#' onclick=\"S.qSentNotice=0;set({view:'approved'});return false\">open the Approved page →</a></span>":"";
+  return "<div class='qsend-bar"+(n?" has-staged":"")+"'>"+
+    "<span><strong>"+n+"</strong> approved rule(s) waiting — "+
+      "<span style='color:var(--muted)'>gray rows are proposed, green rows are approved</span></span>"+
+    "<span class='row' style='gap:8px;align-items:center'>"+sentNote+
+      (n?"<button class='btn btn-ghost btn-sm' onclick='clearStagedQuality()'>unapprove all</button>":"")+
+      "<button class='btn btn-primary btn-sm' onclick='sendStagedQuality()'"+(n?"":" disabled")+">"+
+        "Send "+n+" to approval →</button></span>"+
   "</div>";
 }
 
@@ -2070,7 +2165,7 @@ async function downloadMonitoringPackage(opts){
 async function fetchFullQualityCode(opts){
   opts=opts||{};
   await ensureSession();
-  var body={engine:opts.engine||"spark"};
+  var body={engine:opts.engine||"spark",style:opts.style||"program"};
   // Explicit rules/code are already curated by the caller; applying the review
   // page's dropped indices again would drop the wrong entries.
   if(opts.rules) body.rules=opts.rules;
@@ -2084,7 +2179,19 @@ async function fetchFullQualityCode(opts){
   });
   if(!res.ok) throw new Error(await res.text());
   return {code:await res.text(),source:res.headers.get("X-Redibis-Rule-Source")||"",
-          count:res.headers.get("X-Redibis-Rule-Count")||"?"};
+          count:res.headers.get("X-Redibis-Rule-Count")||"?",opts:opts};
+}
+// Rules the user approved on this page (green) or already sent — "approved rules only" scope.
+function approvedQualityRulesForCode(){
+  var out=stagedQualityRules().map(function(it){
+    return {rule:it.rule.expectation_type,column:it.column,kwargs:it.rule.kwargs||{},meta:it.rule.meta||{}};
+  });
+  (S.approved.items||[]).forEach(function(p){
+    if(p.kind!=="quality"||p.merged||!p.payload) return;
+    // The basket stores the contract form; the server turns it back into expectations.
+    out.push(Object.assign({},p.payload,{column:normalizeQualityApproveColumn(p.column)}));
+  });
+  return out;
 }
 function copyTextToClipboard(text){
   if(navigator.clipboard&&navigator.clipboard.writeText){
@@ -2103,7 +2210,11 @@ function downloadTextFile(name,text,mime){
   a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
   URL.revokeObjectURL(url);
 }
+var CODE_STYLE_LABELS={notebook:"Complete notebook — read the uploaded file, build the DataFrame, validate",
+  rules:"Rules only — apply to any DataFrame you have",program:"Classic program (RULES list, CLI) — as in the monitor package"};
 function showFullCodeModal(info){
+  var old=document.getElementById("fullCodeModal");if(old)old.remove();
+  var o=info.opts||{};
   var fname=(S.table||"table").replace(/\./g,"_")+"_quality.py";
   var back=document.createElement("div");
   back.style.cssText="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;"+
@@ -2114,9 +2225,19 @@ function showFullCodeModal(info){
   var head=document.createElement("div");
   head.style.cssText="padding:14px 18px;border-bottom:1px solid var(--border);"+
     "display:flex;justify-content:space-between;align-items:center;gap:12px";
-  head.innerHTML="<div><div class='stitle' style='margin:0'>Jupyter-ready quality program</div>"+
-    "<div style='color:var(--muted);font-size:.72rem'>"+E(info.count)+" rules · source: "+
-    E(info.source)+" · Spark by default — edit RULES then call validate(df)</div></div>";
+  var nApproved=approvedQualityRulesForCode().length;
+  function sel(id,cur,opts){
+    return "<select id='"+id+"' class='input' style='width:auto;font-size:.74rem;padding:4px 8px'>"+
+      opts.map(function(x){return "<option value='"+x[0]+"'"+(x[0]===cur?" selected":"")+">"+E(x[1])+"</option>"}).join("")+"</select>";
+  }
+  head.innerHTML="<div><div class='stitle' style='margin:0'>Jupyter code</div>"+
+    "<div style='color:var(--muted);font-size:.72rem'>"+E(info.count)+" rules · source: "+E(info.source)+
+    " · paste into Jupyter and run</div></div>"+
+    "<div class='row' style='gap:6px;flex-wrap:wrap'>"+
+      sel("codeStyleSel",o.style||"notebook",[["notebook",CODE_STYLE_LABELS.notebook],["rules",CODE_STYLE_LABELS.rules],["program",CODE_STYLE_LABELS.program]])+
+      sel("codeEngineSel",o.engine||"spark",[["spark","Spark"],["pandas","pandas"]])+
+      sel("codeScopeSel",o.scope||"all",[["all","All rules"],["approved","Approved rules only ("+nApproved+")"]])+
+    "</div>";
   var pre=document.createElement("pre");
   pre.style.cssText="margin:0;padding:16px 18px;overflow:auto;flex:1;font-size:.72rem;"+
     "background:#0f172a;color:#e2e8f0;white-space:pre";
@@ -2134,11 +2255,29 @@ function showFullCodeModal(info){
   });
   btn("close","btn-ghost",function(){back.remove()});
   card.appendChild(head);card.appendChild(pre);card.appendChild(foot);
+  back.id="fullCodeModal";
   back.appendChild(card);
+  ["codeStyleSel","codeEngineSel","codeScopeSel"].forEach(function(id){
+    var el=head.querySelector("#"+id);
+    if(el) el.onchange=async function(){
+      var scopeSel=head.querySelector("#codeScopeSel");
+      var next={style:head.querySelector("#codeStyleSel").value,engine:head.querySelector("#codeEngineSel").value,
+                scope:scopeSel.value,base:o.base||{}};
+      if(next.scope==="approved"){
+        var rules=approvedQualityRulesForCode();
+        if(!rules.length){alert("No approved rules yet — approve some rules (green) first.");scopeSel.value="all";return}
+        next.rules=rules;
+      }else if(next.base.rules){next.rules=next.base.rules}
+      else if(next.base.code){next.code=next.base.code}
+      try{showFullCodeModal(await fetchFullQualityCode(next))}catch(e){alert("Code generation failed: "+e.message)}
+    };
+  });
   back.onclick=function(ev){if(ev.target===back)back.remove()};
   document.body.appendChild(back);
 }
 async function copyFullQualityCode(opts){
+  opts=Object.assign({style:"notebook",engine:"spark",scope:"all"},opts||{});
+  opts.base={rules:opts.rules,code:opts.code};    // what the page asked for, kept when the scope changes
   try{
     var info=await fetchFullQualityCode(opts);
     await copyTextToClipboard(info.code);
@@ -2149,7 +2288,7 @@ async function copyFullQualityCode(opts){
 // Called by the interactive-review iframe (same origin) so its curated kept
 // rules are rendered by the one authoritative backend renderer.
 window.redibisRenderJupyterCode=async function(rules,dropped){
-  var info=await fetchFullQualityCode({rules:rules});
+  var info=await fetchFullQualityCode({rules:rules,style:"notebook",engine:"spark",base:{rules:rules}});
   showFullCodeModal(info);
   return info.code;
 };
@@ -2221,27 +2360,17 @@ async function evaluatePastedRules(boxId){
 }
 function approveParsedRule(i){
   var rr=S.pasteRules[i];if(!rr)return;
-  approveQuality(rr.column||null,{expectation_type:rr.expectation_type,kwargs:rr.kwargs||{},meta:rr.meta||{}},null);
+  toggleQualityRule(rr.column||null,{expectation_type:rr.expectation_type,kwargs:rr.kwargs||{},meta:rr.meta||{}},null);
 }
 async function approveAllParsedRules(){
   if(!S.pasteRules.length)return;
   try{
     await ensureSession();
   }catch(e){alert(apiErr(e));return}
-  var n=0;
-  for(var i=0;i<S.pasteRules.length;i++){
-    var rr=S.pasteRules[i];
-    try{
-      await POST("/api/sessions/"+S.sid+"/approved/quality",
-        {column:normalizeQualityApproveColumn(rr.column),
-         rule:{expectation_type:rr.expectation_type,kwargs:rr.kwargs||{},meta:rr.meta||{}},
-         source:(S.view.indexOf("discover")>=0?"discovery":"scan")});
-      n++;
-    }catch(e){alert("Approve failed for "+rr.expectation_type+": "+apiErr(e));break}
-  }
-  await loadApproved();
-  toast("Approved "+n+" rule(s)");
-  render();
+  var rows=S.pasteRules.map(function(rr){
+    return {column:rr.column||null,rule:rr.expectation_type,kwargs:rr.kwargs||{},meta:rr.meta||{}};
+  });
+  await approveQualityBatch(rows,null,null);   // marks them approved; send to approval to submit
 }
 function clearParsedRules(){resetPasteState(false);render();syncPasteBox();}
 function setQResultFilter(f){S.qResultFilter=f;render();syncPasteBox();}
@@ -2348,7 +2477,7 @@ function qualityResultsTable(rows,runId){
     "<div class='card' style='padding:0;overflow:hidden'><table class='tbl qeval-tbl'><thead><tr>"+
     "<th style='width:110px'>Status</th><th>Rule</th><th>Detail</th><th></th></tr></thead><tbody>"+
     visible.map(function(d){
-      return "<tr class='"+qualityRowClass(d)+"'>"+
+      return "<tr class='"+qualityApprovalRowClass(d.column,d.rule||d.expectation_type)+"'>"+
         "<td>"+qualityStatusCell(d)+"</td>"+
         "<td class='mono cell-strong'>"+E(qualityResultLabel(d))+"</td>"+
         "<td>"+qualityWhyCell(d)+"</td>"+
@@ -2373,18 +2502,17 @@ function pasteRulesTable(){
   var rows=visible.map(function(x){
     var rr=x.rr,i=x.i,e=x._eval;
     var kw=rr.kwargs&&Object.keys(rr.kwargs).length?JSON.stringify(rr.kwargs):"";
-    var apr=isQualityRuleApproved(rr.column,rr.expectation_type);
-    return "<tr class='"+qualityRowClass(e)+"'>"+
+    return "<tr class='"+qualityApprovalRowClass(rr.column,rr.expectation_type)+"'>"+
       "<td>"+qualityStatusCell(e)+"</td>"+
       "<td class='mono cell-strong'>"+E(rr.expectation_type)+"</td>"+
       "<td class='mono'>"+E(rr.column||"table-level")+"</td>"+
       "<td class='mono' style='font-size:.72rem;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis' title='"+E(kw)+"'>"+E(kw||"—")+"</td>"+
       "<td>"+qualityWhyCell(e)+"</td>"+
-      "<td><button class='btn btn-ghost btn-sm' onclick='approveParsedRule("+i+")'>"+(apr?"✓ approved":"+ approve")+"</button></td>"+
+      "<td>"+qualityApproveButton("approveParsedRule("+i+")",rr.column,rr.expectation_type)+"</td>"+
       "<td style='width:36px'><button class='btn btn-ghost btn-sm' style='color:var(--red)' onclick='S.pasteRules.splice("+i+",1);render()'>✕</button></td></tr>";
   }).join("");
   var sum=S.pasteEval&&S.pasteEval.summary;
-  return (sum?qualityEvalSummaryBar(sum):"")+
+  return (sum?qualityEvalSummaryBar(sum):"")+qualitySendBar()+
     "<div class='card' style='padding:0;overflow:hidden;margin-top:12px'><table class='tbl qeval-tbl' style='font-size:.78rem'>"+
     "<thead><tr><th style='width:110px'>Status</th><th>Expectation</th><th>Column</th><th>Params</th><th>Detail</th><th></th><th></th></tr></thead><tbody>"+
     rows+"</tbody></table></div>"+
@@ -3228,7 +3356,7 @@ function sev(l,n,c){return "<div style=\"padding:22px 24px;border-right:1px soli
 // Data tab — Columns / Preview / Mask & Export (v1 de-identification)
 // ════════════════════════════════════════════════════════════════════════════
 var MASK_STRATEGIES=["passthrough","redact","mask","hash","encrypt","fpe","fake"];
-var FAKE_KINDS=["name","phone","email","address","company","national_id","credit_card","iban","date","uuid","free_text","regex"];
+var FAKE_KINDS=["name","phone","email","address","company","social_url","national_id","credit_card","iban","date","uuid","free_text","regex"];
 var MASK_REGEX_PATTERNS=null;
 var MASK_CAPS=null;
 function maskDefaultLocaleOptions(){
@@ -3251,6 +3379,7 @@ function fakeLocaleApplies(r){
 
 async function openDataTab(sub){
   try{ await ensureSession(); }catch(e){ alert(e.message); return; }
+  if(DATA_SUB_DISABLED[sub]) sub="columns";
   S.dataSub=sub||"columns"; set({view:"data"});
   if(S.dataSub==="columns") loadDataColumns();
   else if(S.dataSub==="preview") loadDataRecord(0);
@@ -3446,9 +3575,14 @@ function vMaskExportHistory(){
   return h+"</tbody></table></div>";
 }
 
+// Data sub-tabs shown dimmed and not clickable (id -> tooltip).
+var DATA_SUB_DISABLED={eval:"Evaluation is temporarily unavailable"};
 function dataSubBar(){
   var sub=S.dataSub||"columns";
-  function b(id,l){return "<button class=\"btn btn-sm"+(sub===id?" btn-red":" btn-ghost")+"\" onclick=\"setDataSub('"+id+"')\">"+l+"</button>";}
+  function b(id,l){
+    if(DATA_SUB_DISABLED[id]) return "<button class=\"btn btn-sm btn-ghost\" disabled aria-disabled=\"true\" title=\""+DATA_SUB_DISABLED[id]+"\" style=\"opacity:.4;cursor:not-allowed\">"+l+"</button>";
+    return "<button class=\"btn btn-sm"+(sub===id?" btn-red":" btn-ghost")+"\" onclick=\"setDataSub('"+id+"')\">"+l+"</button>";
+  }
   return "<div class=\"row\" style=\"gap:8px;margin-bottom:18px\">"+b("columns","Columns")+b("preview","Raw record")+b("eval","Evaluation")+b("mask","Mask & Export")+"</div>";
 }
 

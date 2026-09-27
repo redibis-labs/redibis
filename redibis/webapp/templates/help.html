@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Redibis — Help</title>
+  <link rel="stylesheet" href="/static/app.css?v={{ asset_v }}"/>
+  <link rel="icon" type="image/png" href="/static/logo.png"/>
+  {% include "_help_style.html" %}
+</head>
+<body>
+  <nav class="nav">
+    <a class="nav-left" href="/" aria-label="Open scan console">
+      <img src="/static/logo.png" alt="R" class="nav-logo-img" onerror="this.style.display='none'"/>
+      <div class="nav-brand">Redibis</div>
+      <div class="nav-tagline">help</div>
+    </a>
+    <div class="nav-tabs"></div>
+    <div class="nav-right">
+      <a class="nav-link" href="/">◈ Scan</a>
+      <a class="nav-link" href="/v2">◈ Contracts</a>
+      <a class="nav-link" href="/docs" target="_blank">◉ API Docs</a>
+      {% include "_user_menu.html" %}
+    </div>
+  </nav>
+  <main class="help-wrap">
+    <h1>Help</h1>
+    {% include "_help_body.html" %}
+  </main>
+  <div class="footer-strip">redibis · easily govern · Apache-2.0 license</div>
+</body>
+</html>

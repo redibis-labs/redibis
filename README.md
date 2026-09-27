@@ -4,12 +4,12 @@
 
 <h1 align="center">redibis</h1>
 
+_Last updated: 2026-09-26_
+
 ** modernize , govern and protect your data **  
 Auto generates data contract [support ODCS v3] , auto pii detection , unstructured data protection  gateway  , auto quality rules and code generation .
 
 put redibis at heart of your [CI/CD- monitoring ] pipelines to contiues protect your data 
-
-📖 **Help and guides:** <https://redibis-labs.github.io/redibis/>
 
 ---
 
@@ -20,7 +20,11 @@ context, and de-identified before it is shared or sent to an LLM.
 The name combines **"redact" + "ibis"** — the Egyptian ibis was Thoth's sacred
 bird, the symbol of writing, records, and the categorization of knowledge.
 
-This repository is the **Apache-2.0 open core**.
+redibis is open source under the **Apache-2.0** license.
+
+**Help and guides:** <https://redibis-labs.github.io/redibis/> — the same
+getting-started guide is built into the dashboard at `/help`.
+
 ---
 
 ## Why use it
@@ -75,7 +79,6 @@ tutorials are verified; today the hands-on path is the
 - Catalog push status and backends
 - Optional column-memory learning loop (when configured)
 
-
 ### Free-text / gateway
 - Text PII scan policies, gateway sessions, and evaluation helpers for unstructured content
 
@@ -95,6 +98,7 @@ optional S3/MinIO).
 | Settings (`/settings`) | Models, LLM providers, governance, runtime |
 | Gateway | Free-text / evaluation operator UI (when enabled) |
 | Login / users | Auth on by default; bootstrap `admin` / `admin` if empty users store |
+| Help (`/help`) | Getting-started guide and videos |
 | Swagger (`/docs`) | Interactive HTTP API after login |
 
 **Start / stop (local filesystem):**
@@ -127,7 +131,8 @@ redibis <command> --help
 | `quality` | Profile + Great Expectations quality scan |
 | `deep-scan` | Multi-producer evidence scan (+ optional synthesis bundle) |
 | `show` / `list` / `history` / `merge` | Inspect or dump active contracts |
-| `runs` | List / merge / discard PII or quality run subcontracts |
+| `runs` | List / merge / discard run subcontracts (`--kind pii` or `--kind quality`) |
+| `quality-run` (`quality_run`) | Review quality rules authored in code or the Quality page: list, show, diff, edit, export, import, merge, discard — see [docs/QUALITY_RULES.md](docs/QUALITY_RULES.md) |
 | `contract` | Lifecycle views: PII/quality/definitions, strip/add PII, purge, export package |
 | `steward` | Steward review overview, column verdicts, export-verdicts, finalize |
 | `verdict` | Portable verdict package export / preview / import |
@@ -189,6 +194,11 @@ NER weights are not bundled — download once with
 Hands-on walkthrough with the shipped e-shop customer CSV:
 
 → **[docs/tutorials/INTRO.md](docs/tutorials/INTRO.md)**  
+→ **[docs/tutorials/QUALITY_AUTHORING.md](docs/tutorials/QUALITY_AUTHORING.md)** — author
+quality rules from a Spark or pandas DataFrame, review them with `redibis quality-run`, merge
+them into the contract  
+→ **[docs/QUALITY_RULES.md](docs/QUALITY_RULES.md)** — quality rules reference: rule vocabulary,
+lifecycle, merge semantics, Python / CLI / HTTP entry points  
 → Fixture: [`tests/data/realistic_eshop_customer_account.csv`](tests/data/realistic_eshop_customer_account.csv)
 
 Further tutorials and deep CLI sheets remain in the monorepo until each is

@@ -279,6 +279,8 @@ class MaskingEngine:
                     local_part = None
             return T.fake_email(rng, s, preserve_domain=preserve.get("domain", True),
                                 local_part=local_part)
+        if kind == "social_url":
+            return T.fake_social_url(rng, s, preserve_host=preserve.get("host", True))
         if kind == "national_id":
             return T.fake_national_id(rng, s)
         if kind in ("credit_card", "iban"):
@@ -479,6 +481,18 @@ def risk_report(df: pd.DataFrame, plan: MaskingPlan) -> list[dict]:
                     "detail": "DOB/ZIP/gender-like field left as-is can re-identify "
                               "individuals in combination. Consider masking or generalizing."})
         p = rule.params or {}
+        if rule.strategy == "fpe":
+            # FPE only touches characters in its alphabet; anything else is kept.
+            # A URL under the default "digits" alphabet therefore comes out unchanged.
+            alpha = set(T._alpha_string(p.get("alphabet", "digits")))
+            values = [str(v) for v in df[col].dropna().tolist() if str(v) != ""]
+            untouched = sum(1 for v in values if not any(ch in alpha for ch in v))
+            if untouched:
+                findings.append({"column": col, "severity": "high",
+                    "issue": "FPE leaves values unchanged",
+                    "detail": f"{untouched} of {len(values)} values have no characters in the "
+                              f"{p.get('alphabet', 'digits')!r} alphabet, so FPE exports them as-is. "
+                              "Use alphabet 'alnum', or fake (social_url for profile links)."})
         if rule.strategy in ("encrypt", "fpe"):
             if rule.strategy == "fpe":
                 mode = p.get("mode") or ("ff3" if T._HAS_FF3 else "keystream")

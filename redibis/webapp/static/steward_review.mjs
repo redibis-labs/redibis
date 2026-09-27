@@ -105,6 +105,58 @@ function apiFn(api) {
   });
 }
 
+const PROFILE_STATUS_MESSAGE = {
+  not_run: "Profiling was not part of the scan that produced this run. "
+         + "Re-scan with profiling enabled to populate this panel.",
+  no_run: "No profile has been captured for this table yet.",
+  write_failed: "The profile for this run could not be stored. See the run log.",
+};
+
+export function profilePanel(c) {
+  const profile = c.profile || {};
+  const stats = profile.stats || {};
+  const samples = profile.samples;
+  const withheld = profile.samples_withheld;
+  const quality = profile.quality || [];
+  const cells = [
+    ["null rate", fmtRate(stats.null_rate)],
+    ["ndv", esc(stats.ndv ?? stats.nunique ?? fmtRate(stats.ndv_ratio || stats.cardinality_ratio))],
+    ["type", esc(stats.logical_type || c.logical_type || "—")],
+    ["format", esc(profile.format_signature || stats.format_signature || "—")],
+    ["avg length", esc(stats.avg_value_length ?? "—")],
+    ["quality rules", String(quality.length)],
+  ].map(([l,v]) => `<div class="stat-cell"><b>${v}</b><span>${l}</span></div>`).join("");
+  const nullBar = stats.null_rate != null
+    ? `<label>null rate<meter min="0" max="1" value="${Number(stats.null_rate)||0}"></meter></label>`
+    : "";
+  const qlist = quality.length
+    ? `<ul>${quality.slice(0, 12).map((q)=>`<li>${esc(q.type||q.rule||q.expectation||JSON.stringify(q).slice(0,80))}</li>`).join("")}</ul>`
+    : `<p class="hint">No quality rules on this column.</p>`;
+  const sampleBlock = samples
+    ? `<div class="steward-samples iso">${samples.map(esc).join("<br>")}</div>`
+    : `<p class="hint">${withheld ? esc(withheld) : "Samples hidden"}
+       <button class="btn-sm" id="srShowSamples">Show samples · consented</button></p>`;
+  // The server says why the panel is empty; do not infer it from rendered cells.
+  const status = profile.profile_status || "ok";
+  const empty = PROFILE_STATUS_MESSAGE[status]
+    ? `<p class="hint" data-profile-status="${esc(status)}">${esc(PROFILE_STATUS_MESSAGE[status])}</p>`
+    : "";
+  const provenance = profile.profile_run_id
+    ? `<p class="hint">run ${esc(profile.profile_run_id)}`
+      + (profile.profile_engines?.length
+          ? ` · engines: ${profile.profile_engines.map(esc).join(", ")}`
+          : " · no engines recorded")
+      + `</p>`
+    : "";
+  return `<h4>Profile</h4>
+    <div class="stat-grid">${cells}</div>
+    ${empty}
+    ${provenance}
+    ${nullBar}
+    ${qlist}
+    ${sampleBlock}`;
+}
+
 function emptyReasons() {
   const out = {};
   EDIT_FIELDS.forEach((f) => { out[f] = { code: "domain_knowledge", text: "" }; });
@@ -563,41 +615,6 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
       </label>
       <textarea data-reason-text="${esc(field)}" placeholder="free text reason for this ${esc(field)} edit">${esc(r.text)}</textarea>
     </div>`;
-  }
-
-  function profilePanel(c) {
-    const profile = c.profile || {};
-    const stats = profile.stats || {};
-    const samples = profile.samples;
-    const withheld = profile.samples_withheld;
-    const quality = profile.quality || [];
-    const cells = [
-      ["null rate", fmtRate(stats.null_rate)],
-      ["ndv", esc(stats.ndv ?? stats.nunique ?? fmtRate(stats.ndv_ratio || stats.cardinality_ratio))],
-      ["type", esc(stats.logical_type || c.logical_type || "—")],
-      ["format", esc(profile.format_signature || stats.format_signature || "—")],
-      ["avg length", esc(stats.avg_value_length ?? "—")],
-      ["quality rules", String(quality.length)],
-    ].map(([l,v]) => `<div class="stat-cell"><b>${v}</b><span>${l}</span></div>`).join("");
-    const nullBar = stats.null_rate != null
-      ? `<label>null rate<meter min="0" max="1" value="${Number(stats.null_rate)||0}"></meter></label>`
-      : "";
-    const qlist = quality.length
-      ? `<ul>${quality.slice(0, 12).map((q)=>`<li>${esc(q.type||q.rule||q.expectation||JSON.stringify(q).slice(0,80))}</li>`).join("")}</ul>`
-      : `<p class="hint">No quality rules on this column.</p>`;
-    const sampleBlock = samples
-      ? `<div class="steward-samples iso">${samples.map(esc).join("<br>")}</div>`
-      : `<p class="hint">${withheld ? esc(withheld) : "Samples hidden"}
-         <button class="btn-sm" id="srShowSamples">Show samples · consented</button></p>`;
-    const empty = cells.includes("—") && !stats.null_rate && stats.ndv == null && stats.nunique == null
-      ? `<p class="hint">No profile stats for this column yet. Stats come from the last scan profile, ledger, or contract type.</p>`
-      : "";
-    return `<h4>Profile</h4>
-      <div class="stat-grid">${cells}</div>
-      ${empty}
-      ${nullBar}
-      ${qlist}
-      ${sampleBlock}`;
   }
 
   function fieldPickBar(field) {

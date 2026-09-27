@@ -90,6 +90,7 @@ tr.diff-row td{vertical-align:top}
 .ws-batch-panel{font-size:12px}
 .ws-batch-item.error{color:#991b1b}
 .ws-uuid{cursor:copy}
+.tab.tab-disabled{opacity:.4;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -100,6 +101,7 @@ tr.diff-row td{vertical-align:top}
   <a href="/gateway">Gateway</a>
   <a href="/gateway/evaluations">Evaluations</a>
   <a href="/settings">Settings</a>
+  <a href="/help">Help</a>
   {% include "_user_menu.html" %}
 </header>
 <div class="wrap">
@@ -212,16 +214,20 @@ async function loadTables(){
 async function selectTable(t){ STATE.table = t; await loadTables(); render(); }
 
 // ── Main render ────────────────────────────────────────────────────────────
+// Tabs shown dimmed and not clickable (key -> tooltip).
+const TAB_DISABLED = { synthesize: "Deep Enrich is temporarily unavailable" };
 function render(){
   if(!STATE.table){ $("main").innerHTML = `<div class="empty">Select a table.</div>`; return; }
   const tabs = [["contract","Contract"],["review","Steward Review"],["runs","Runs"],["enrich","Enrich"],["synthesize","Deep Enrich"],["share","Share"]];
+  if(TAB_DISABLED[STATE.tab]) STATE.tab = "contract";
   $("main").innerHTML =
-    `<div class="tabs">${tabs.map(([k,l])=>
-        `<div class="tab ${STATE.tab===k?'active':''}" onclick="setTab(${jsArg(k)})">${l}</div>`).join("")}</div>
+    `<div class="tabs">${tabs.map(([k,l])=> TAB_DISABLED[k]
+        ? `<div class="tab tab-disabled" aria-disabled="true" title="${TAB_DISABLED[k]}">${l}</div>`
+        : `<div class="tab ${STATE.tab===k?'active':''}" onclick="setTab(${jsArg(k)})">${l}</div>`).join("")}</div>
      <div id="tabBody"></div>`;
   ({contract:renderContract, review:renderStewardReview, runs:renderRuns, enrich:renderEnrich, synthesize:renderDeepEnrich, share:renderShare}[STATE.tab])();
 }
-function setTab(k){ STATE.tab=k; render(); }
+function setTab(k){ STATE.tab = TAB_DISABLED[k] ? "contract" : k; render(); }
 
 async function renderStewardReview(){
   const body = $("tabBody"); body.innerHTML = "Loading steward review…";
@@ -447,14 +453,30 @@ async function revokeSampling(col){
 }
 
 // ── Runs (select-and-merge) ────────────────────────────────────────────────
+// Newest first, with times: "approved" runs hold only what was approved and merged
+// from the Approved page; "scan" runs hold everything the scan discovered.
+function fmtWhen(iso){
+  if(!iso) return "—";
+  const d = new Date(iso); if(isNaN(d)) return esc(iso);
+  return `<span title="${esc(iso)}">${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</span>`;
+}
+function runSource(r){
+  const approved = String(r.run_id||"").startsWith("approved_") || (r.summary_stats||{}).source==="approved";
+  return approved ? `<span class="chip chip-green">approved</span>` : `<span class="chip chip-muted">scan · all discovered</span>`;
+}
 async function renderRuns(){
   const body = $("tabBody"); body.innerHTML = "Loading…";
   let html = "";
   for(const kind of ["pii","quality"]){
     let runs = {runs:[]};
     try{ runs = await api("GET","/api/contracts/"+STATE.table+"/runs?kind="+kind); }catch(e){}
-    const rows = (runs.runs||[]).map(r=>{
+    const list = (runs.runs||[]).slice().sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")));
+    STATE.runCounts = STATE.runCounts || {};
+    const rows = list.map(r=>{
       const st = {merged:"chip-green",discarded:"chip-muted",reviewed:"chip-amber",draft:"chip-blue"}[r.status]||"chip-muted";
+      const count = kind==="quality" ? r.rule_count : r.column_count;
+      STATE.runCounts[kind+"/"+r.run_id] = {count, approved: String(r.run_id||"").startsWith("approved_")};
+      const ver = (r.summary_stats||{}).merged_version ? ` → v${esc((r.summary_stats||{}).merged_version)}` : "";
       const stats = JSON.stringify(r.summary_stats||{});
       const evidenceLink = kind==="pii"
         ? `<a class="btn-sm" target="_blank" href="/review?table=${encodeURIComponent(STATE.table)}&run_id=${encodeURIComponent(r.run_id)}">evidence</a>`
@@ -464,16 +486,24 @@ async function renderRuns(){
          <button class="btn-sm" onclick="reviewRun(${jsArg(kind)},${jsArg(r.run_id)})">review</button>
          <button class="btn-sm btn-primary" onclick="mergeRun(${jsArg(kind)},${jsArg(r.run_id)})">merge</button>
          <button class="btn-sm" onclick="discardRun(${jsArg(kind)},${jsArg(r.run_id)})">discard</button>`;
-      return `<tr><td class="mono">${esc(r.run_id)}</td><td><span class="chip ${st}">${esc(r.status)}</span></td>
-        <td class="mono" style="font-size:11px">${esc(stats)}</td><td>${actions}</td></tr>`;
+      return `<tr><td style="white-space:nowrap">${fmtWhen(r.created_at)}</td>
+        <td class="mono">${esc(r.run_id)}</td><td>${runSource(r)}</td>
+        <td style="text-align:right">${count==null?"—":esc(count)}</td>
+        <td><span class="chip ${st}">${esc(r.status)}</span>${ver}</td>
+        <td style="white-space:nowrap">${r.merged_at?fmtWhen(r.merged_at):"—"}</td>
+        <td class="mono" style="font-size:11px"><details><summary>stats</summary>${esc(stats)}</details></td><td>${actions}</td></tr>`;
     }).join("");
+    const what = kind==="quality" ? "Rules" : "PII columns";
     html += `<div class="card"><h3>${kind}-contracts bucket</h3>
-      ${rows?`<table><thead><tr><th>Run</th><th>Status</th><th>Stats</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`
-            :`<div class="empty">No ${kind} runs.</div>`}</div>`;
+      ${rows?`<table><thead><tr><th>Created</th><th>Run</th><th>Source</th><th style="text-align:right">${what}</th><th>Status</th><th>Merged</th><th>Stats</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`
+            :`<div class="empty">No ${kind} runs.</div>`}
+      <small class="hint">Scan runs hold everything the scan discovered. What you approve on the Quality / PII pages is merged from the Approved page and kept here as an <b>approved</b> run.</small></div>`;
   }
   body.innerHTML = html;
 }
 async function mergeRun(kind, run){
+  const info = (STATE.runCounts||{})[kind+"/"+run] || {};
+  if(!info.approved && !confirm(`${run} is a scan run: it holds ${info.count==null?"every":"all "+info.count} discovered ${kind==="quality"?"rule(s)":"PII column(s)"}, not only the ones you approved.\n\nTo merge only approved items, use the Approved page. Merge this whole run anyway?`)) return;
   try{ const r = await api("POST",`/api/runs/${kind}/${STATE.table}/${run}/merge`,{validate_contract:false});
        toast(`Merged → v${r.version_after}`); await loadTables(); renderRuns(); }
   catch(e){ toast(e.message,false); }

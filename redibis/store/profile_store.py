@@ -103,6 +103,12 @@ class ProfileStore:
         written_samples: list[str] = []
         column_digests: dict[str, str] = {}
 
+        if not column_stats and not quality_by_col:
+            raise ValueError(
+                "ProfileStore.write called with neither profile stats nor quality results; "
+                "the caller should skip the write (see _write_guarded_profiles)"
+            )
+
         all_columns = sorted(set(column_stats) | set(quality_by_col) | set(samples))
         for column in all_columns:
             stats = dict(column_stats.get(column) or {})
@@ -151,6 +157,16 @@ class ProfileStore:
         }
         self.backend.put_json(self.bucket, self._manifest_key(table, run_id), manifest)
         return manifest
+
+    def mark_write_error(self, table: str, run_id: str, error: str) -> None:
+        """Stamp a failed write on the manifest so the read path can report it."""
+        man = self.manifest(table, run_id) or {
+            "table": table, "run_id": run_id, "engines": [],
+            "residency": RESIDENCY_PORTABLE, "columns_written": [],
+            "samples_written": [], "digests": {}, "written_at": _utc_now_iso(),
+        }
+        man["write_error"] = str(error)[:500]
+        self.backend.put_json(self.bucket, self._manifest_key(table, run_id), man)
 
     def latest_run_id(self, table: str) -> Optional[str]:
         prefix = f"{self.PREFIX}/{table}/"

@@ -54,6 +54,9 @@ web = [
     "ff3>=1.0",
 ]
 spark = ["pyspark>=3.5.1,<5.0"]
+# Quality result stores (redibis.quality.results): Iceberg (default) and Postgres.
+iceberg = ["pyiceberg>=0.9"]
+postgres = ["psycopg2-binary>=2.9"]
 enrich = ["litellm>=1.55,<1.75"]
 # Contract Synthesis: SQL lineage via sqlglot (Spark/DataStage parsers are stdlib).
 synthesis = ["sqlglot>=25.0", "jsonschema>=4.18"]
@@ -170,6 +173,8 @@ redibis = [
     "config/*.yaml",
     "pii/text_preprocess/lexicons/*.yaml",
     "pii/eval/profiles/*.yaml",
+    "pii/capability/*.json",
+    "pii/capability/*.md",
     "DEVELOPER_GUIDE.md",
     "py.typed",
 ]

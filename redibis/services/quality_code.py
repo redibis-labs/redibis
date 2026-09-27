@@ -26,7 +26,15 @@ __all__ = [
     "resolve_curated_rules",
     "rules_from_python_source",
     "render_quality_program",
+    "render_notebook_code",
+    "CODE_STYLES",
 ]
+
+# "program": the classic self-contained program (RULES list, CLI main) the monitor
+# package ships. "notebook": complete Jupyter code — read the data, build a Spark
+# (or pandas) DataFrame, write the rules with QualityDraft, validate. "rules": only
+# the rules and a validate() call, to apply to any DataFrame you already have.
+CODE_STYLES = ("program", "notebook", "rules")
 
 
 @dataclass
@@ -53,16 +61,53 @@ class CuratedRules:
 
 def _normalize_rule(rule: dict[str, Any]) -> dict[str, Any]:
     """Normalize any of the rule shapes flowing through the app into the
-    ``{"rule", "column", "kwargs", "meta"}`` shape the renderers consume."""
+    ``{"rule", "column", "kwargs", "meta"}`` shape the renderers consume.
+    SQL rules keep their query in ``kwargs["sql"]`` (see ``quality.sql_rules``)."""
+    from redibis.quality.sql_rules import is_sql_rule, normalize_sql_rule
+
+    rule = dict(rule)
+    if rule.get("column") in _TABLE_LEVEL:
+        rule["column"] = None
+    if is_sql_rule(rule):
+        return normalize_sql_rule(rule)
+    odcs = _from_contract_form(rule)
+    if odcs is not None:
+        return odcs
     etype = rule.get("rule") or rule.get("expectation_type") or rule.get("expectation_name")
-    out: dict[str, Any] = {
-        "rule": etype,
-        "column": rule.get("column"),
-        "kwargs": dict(rule.get("kwargs") or {}),
-    }
+    kwargs = dict(rule.get("kwargs") or {})
+    if kwargs.get("column") in _TABLE_LEVEL:
+        kwargs.pop("column")
+    out: dict[str, Any] = {"rule": etype, "column": rule.get("column"), "kwargs": kwargs}
     meta = rule.get("meta")
     if isinstance(meta, dict) and meta:
         out["meta"] = dict(meta)
+    return out
+
+
+_TABLE_LEVEL = ("Table-Level", "__table__", "")
+
+
+def _from_contract_form(rule: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """A rule as the contract / Approved basket stores it (``{"rule": "duplicateCount",
+    "mustBe": 0}`` or ``{"engine": "greatExpectations", "implementation": {…}}``) → GE shape."""
+    from redibis.contracts.rules import _odcs_quality_to_rule, _rule_to_ge
+
+    name = str(rule.get("rule") or "")
+    if "implementation" not in rule and (not name or name.startswith("expect_")):
+        return None
+    column = rule.get("column")
+    entry = {k: v for k, v in rule.items() if k != "column"}
+    ge = _rule_to_ge(_odcs_quality_to_rule("", entry, column))
+    if not ge or not ge.get("expectation_type"):
+        return None
+    kwargs = dict(ge.get("kwargs") or {})
+    kwargs.pop("column", None)
+    out: dict[str, Any] = {"rule": ge["expectation_type"], "column": column, "kwargs": kwargs}
+    meta = dict(rule.get("meta") or {})
+    if rule.get("severity") in ("P1", "P2", "P3"):
+        meta["severity"] = rule["severity"]
+    if meta:
+        out["meta"] = meta
     return out
 
 
@@ -208,3 +253,100 @@ def render_quality_program(
         ge_version=ge_version,
         engine=engine,
     )
+
+
+def _draft_for(table: str, curated: CuratedRules):
+    """The curated rules as a ``QualityDraft`` (severity from each rule's meta kept)."""
+    from redibis.quality.authoring import QualityDraft
+
+    draft = QualityDraft.new(table)
+    for rule in curated.effective_rules:
+        rule = dict(rule)
+        severity = (rule.pop("meta", None) or {}).get("severity")
+        added = draft.add_rules([rule])
+        if severity in ("P1", "P2", "P3") and added:
+            draft.set_severity(severity, indices=[r["index"] for r in added])
+    return draft
+
+
+def _reader_lines(data_path: str, engine: str) -> list[str]:
+    path = data_path or "path/to/your_file.csv"
+    parquet = path.lower().endswith((".parquet", ".pq"))
+    read = "pd.read_parquet(DATA)" if parquet else "pd.read_csv(DATA)"
+    lines = [f"DATA = {path!r}" + ("" if data_path else "   # ← your file"),
+             f"pdf = {read}                        # read as the scan read it (same column types)"]
+    if engine == "spark":
+        lines += [
+            "",
+            "spark = SparkSession.builder.appName(\"redibis-quality\").getOrCreate()",
+            "df = spark.createDataFrame(pdf.astype(object).where(pdf.notna(), None))   # NaN → null",
+            "# A real partition instead: df = spark.table(\"lake.db.table\").where(\"dt = '2026-09-26'\")",
+        ]
+    else:
+        lines.append("df = pdf")
+    return lines
+
+
+def render_notebook_code(
+    *,
+    table: str,
+    curated: CuratedRules,
+    style: str = "notebook",
+    engine: str = "spark",
+    data_path: str = "",
+) -> str:
+    """Jupyter code in the ``QualityDraft`` style (see ``CODE_STYLES``).
+
+    ``notebook``: imports, the data read into a DataFrame (``data_path``, e.g. the
+    file uploaded in the web app; Spark by default), one ``qa.expect_…(…)`` /
+    ``qa.add_sql(…)`` line per rule, and the validation (``spark_mode="fused"``).
+    ``rules``: the rule lines and ``qa.validate(df)`` only. Both paste back into
+    the Quality page (the parser reads these calls; nothing is executed).
+    """
+    engine = (engine or "spark").strip().lower()
+    if engine not in ("spark", "pandas"):
+        raise ValueError(f"unsupported codegen engine {engine!r} (use 'spark' or 'pandas')")
+    if style not in ("notebook", "rules"):
+        raise ValueError(f"unsupported code style {style!r} (use one of {', '.join(CODE_STYLES)})")
+    draft = _draft_for(table, curated)
+    rules = draft.rule_lines("qa")
+    count = len(rules)
+    head = [f"# Data quality rules for {table} — {count} rule(s) from {curated.rule_source}, generated by redibis.",
+            "# Edit freely: add qa.expect_…(…) lines, delete lines, change severity=\"P1\" | \"P2\" | \"P3\"."]
+    rule_block = [f"qa = QualityDraft.new({table!r})", *rules]
+    if style == "rules":
+        return "\n".join([
+            *head,
+            "from redibis.quality import QualityDraft",
+            "",
+            *rule_block,
+            "",
+            "# Validate on any pandas or Spark DataFrame you already have (Spark: spark_mode=\"fused\").",
+            "result = qa.validate(df)",
+            "print(result)",
+            "result.to_frame(only_failed=True)          # every rule: result.to_frame()",
+        ]) + "\n"
+    imports = ["import pandas as pd"]
+    if engine == "spark":
+        imports.append("from pyspark.sql import SparkSession")
+    imports.append("from redibis.quality import QualityDraft")
+    validate = ('result = qa.validate(df, spark_mode="fused")   # aggregate rules in one Spark job'
+                if engine == "spark" else "result = qa.validate(df)")
+    return "\n".join([
+        *head,
+        *imports,
+        "",
+        "# 1. Data",
+        *_reader_lines(data_path, engine),
+        "",
+        "# 2. Rules",
+        *rule_block,
+        "",
+        "# 3. Validate — nothing is written anywhere",
+        validate,
+        "print(result)",
+        "result.to_frame(only_failed=True)          # every rule: result.to_frame()",
+        "",
+        "# Next: save as a quality run for review  →  from redibis.quality.authoring import QualityAuthor",
+        f"#       QualityAuthor({table!r}).save(qa, note=\"from Jupyter\")",
+    ]) + "\n"

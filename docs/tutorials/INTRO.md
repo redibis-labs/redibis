@@ -1,5 +1,7 @@
 # Intro tutorial — e-shop customer account CSV
 
+_Last updated: 2026-09-20_
+
 This is the **open-core** hands-on path. It uses one shipped fixture so you can
 see scan → active contract → dashboard without extra config.
 

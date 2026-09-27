@@ -60,7 +60,7 @@
     
     <p class="help-intro">redibis is an open-source tool that looks at your tabular data, finds personal information (PII), checks data quality, and writes the result down as a data contract your team can review, trust and share. Everything runs on your own machine or servers.</p>
     <div class="help-toc">
-      <a href="#what">What is redibis?</a><a href="#start">Quick start</a><a href="#results">Reading your results</a><a href="#review">Steward Review</a><a href="#mask">Masking and safe export</a><a href="#enrich">Business definitions with an LLM (optional)</a><a href="#cli">Command line and API</a><a href="#community">Get involved</a>
+      <a href="#what">What is redibis?</a><a href="#start">Quick start</a><a href="#results">Reading your results</a><a href="#review">Steward Review</a><a href="#mask">Masking and safe export</a><a href="#gateway">Text Gateway: protect free text</a><a href="#quality">Quality rules and monitoring</a><a href="#enrich">Business definitions with an LLM (optional)</a><a href="#cli">Command line and API</a><a href="#community">Get involved</a>
     </div>
     
     <section class="help-sec" id="what">
@@ -137,7 +137,7 @@
     
     <section class="help-sec" id="mask">
       <h2>Masking and safe export</h2>
-      <p>Data → Mask &amp; Export suggests a rule per column: keep, redact, mask, hash, encrypt, format-preserving encryption (FF3-1) or realistic fakes (names, phones, emails, dates, social profile links and more).</p><p>The same input always gets the same fake, so joins across tables still work.</p><p>The risk panel warns about weak choices before you export. Keys never leave the run.</p>
+      <p>Data → Mask &amp; Export suggests a rule per column: keep, redact, mask, hash, encrypt, format-preserving encryption (FF3-1) or realistic fakes (names, phones, emails, dates, social profile links and more).</p><p>The same input always gets the same fake, so joins across tables still work.</p><p>Mask preview shows raw and masked values side by side before you export. The export summary and audit report then rate the risk of each choice (high, medium, low). Keys are never exported.</p>
       
       
       <div class="help-videos">
@@ -146,6 +146,42 @@
           <div class="help-video soon" aria-disabled="true">
             <span class="play">▶</span>
             <span>Masking a file for sharing<small>video coming soon</small></span>
+          </div>
+          
+        
+      </div>
+      
+    </section>
+    
+    <section class="help-sec" id="gateway">
+      <h2>Text Gateway: protect free text</h2>
+      <p>Support tickets, chat logs and emails hide personal data mid-sentence. Gateway → paste the text (or open files for a batch), pick English, Arabic or both, and press Scan.</p><p>Every finding is highlighted with its type and which engine found it. Accept or reject each one, then choose per type what happens: redact, mask, hash, format-preserving encryption or a realistic fake.</p><p>Copy the de-identified text, or download the report. Add your own detection categories under Detection rules, and save a reviewed setup as a use case to reuse it.</p><p>Apps can call the same de-identification over the HTTP API before sending text to an LLM; it refuses to run without a reviewed policy.</p>
+      <ol><li>Or from the command line:<br><code>redibis pii deid &#34;Call me on 01012345678&#34; --default redact</code></li></ol>
+      
+      <div class="help-videos">
+        
+          
+          <div class="help-video soon" aria-disabled="true">
+            <span class="play">▶</span>
+            <span>Cleaning text before it reaches an LLM<small>video coming soon</small></span>
+          </div>
+          
+        
+      </div>
+      
+    </section>
+    
+    <section class="help-sec" id="quality">
+      <h2>Quality rules and monitoring</h2>
+      <p>redibis builds on Great Expectations. A quality scan profiles the data and proposes rules — not null, unique, value lengths, formats, row count, expected columns — and runs them.</p><p>The rules are saved in the data contract, versioned with it, in an engine-neutral form, so the contract is the single place that says what good data looks like.</p><p>Every Great Expectations rule can be used, and you can add your own business rules in SQL (for example: no negative amounts, every refund has a refund id). They run on the same data, next to the discovered rules.</p><p>Re-check new data against the contract at any time; schema drift (added, dropped or retyped columns) is reported too, and a failure returns a non-zero exit code for CI.</p><p>Export the same rules as a Great Expectations suite, SodaCL checks or dbt tests (SodaCL and dbt need the contracts extra), or generate Airflow DAGs to run the checks on a schedule.</p><p>Working in a notebook? Author rules from a pandas or Spark DataFrame (a full partition gives more accurate rules), curate them in code, then review, edit and merge them with redibis quality-run. The Quality page&#39;s full-code program runs in Jupyter too: validate on a full partition, edit RULES, then save_quality_run(df). See the quality authoring tutorial in docs/tutorials and the full reference in docs/QUALITY_RULES.md.</p>
+      <ol><li>Profile, discover rules and save them to the contract:<br><code>redibis quality data.csv shop.customers --automerge quality --output-dir ./reports</code></li><li>Check a new file against the contract:<br><code>redibis quality-monitor run shop.customers --sample new_data.csv --output-dir ./reports</code></li><li>Export the rules:<br><code>redibis rules export shop.customers --target ge --output-dir ./reports</code></li><li>Review rules authored in code, then merge:<br><code>redibis quality-run show shop.customers --output-dir ./reports</code></li></ol>
+      
+      <div class="help-videos">
+        
+          
+          <div class="help-video soon" aria-disabled="true">
+            <span class="play">▶</span>
+            <span>Quality rules as part of the contract<small>video coming soon</small></span>
           </div>
           
         

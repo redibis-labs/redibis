@@ -73,7 +73,7 @@ def _odcs_quality_to_rule(rule_id: str, q: dict, column: Optional[str]) -> Quali
 
     if q.get("type") == "sql" or "query" in q:
         return QualityRule(rule_id=rule_id, type="sql", column=column,
-                           params={k: q[k] for k in ("query", "mustBeLessThan") if k in q},
+                           params={k: q[k] for k in _SQL_RULE_KEYS if k in q},
                            severity=severity, source="manual", description=description)
 
     rule = q.get("rule")
@@ -92,6 +92,11 @@ def _odcs_quality_to_rule(rule_id: str, q: dict, column: Optional[str]) -> Quali
     rtype = type_map.get(rule, rule or "custom")
     return QualityRule(rule_id=rule_id, type=rtype, column=column, params=params,
                        severity=severity, source="profiler", description=description)
+
+
+# ODCS keys a ``type: sql`` rule carries: the query plus its threshold.
+_SQL_RULE_KEYS = ("query", "mustBe", "mustNotBe", "mustBeGreaterThan", "mustBeGreaterOrEqualTo",
+                  "mustBeLessThan", "mustBeLessOrEqualTo", "mustBeBetween", "mustNotBeBetween")
 
 
 def extract_rules(contract: dict) -> list[QualityRule]:
@@ -121,6 +126,9 @@ def _rule_to_ge(rule: QualityRule) -> Optional[dict]:
 
     if rule.type == "not_null":
         kwargs: dict[str, Any] = {"column": rule.column}
+        if p.get("unit") == "percent" and p.get("mustBe") == 100:
+            # missingCount 100 % is "every value is null" (mapper._map_null).
+            return {"expectation_type": "expect_column_values_to_be_null", "kwargs": kwargs}
         if "mustBeLessThan" in p and p.get("unit") == "percent":
             kwargs["mostly"] = round(1.0 - p["mustBeLessThan"] / 100.0, 4)
         return {"expectation_type": "expect_column_values_to_not_be_null", "kwargs": kwargs}
@@ -156,7 +164,9 @@ def _rule_to_ge(rule: QualityRule) -> Optional[dict]:
 
     if rule.type == "regex":
         return {"expectation_type": "expect_column_values_to_match_regex",
-                "kwargs": {"column": rule.column, "regex": p.get("pattern", p.get("regex", ""))}}
+                "kwargs": {"column": rule.column,
+                           "regex": ((p.get("arguments") or {}).get("pattern")
+                                     or p.get("pattern") or p.get("regex") or "")}}
 
     return None
 

@@ -1405,13 +1405,50 @@ async def preview_basket(session_id: str) -> dict:
 @app.post("/api/sessions/{session_id}/approved/merge")
 async def merge_approved_route(session_id: str, body: ApprovedMergeBody) -> dict:
     session = _require_session(session_id)
-    from redibis.services.session_service import merge_approved
+    from redibis.services.session_service import build_approved_partials, merge_approved
+    partials = build_approved_partials(session) if session.approved.items else {}
     try:
         result = merge_approved(session, _cs(), validate=body.validate_contract)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Merge failed: {e}")
+    if not result.get("noop"):
+        result["runs"] = _record_approved_runs(session, partials, result)
     session.persist_to_disk()
     return {"status": "merged", **result}
+
+
+def _record_approved_runs(session, partials: dict, result: dict) -> dict:
+    """Keep what the Approved page merged as a run in the pii / quality bucket.
+
+    The run holds only the approved items (the scan's own runs hold everything it
+    discovered), is already merged, and carries its time — so the contract page's
+    Runs tab shows which approved set became which contract version.
+    """
+    from datetime import datetime, timezone
+
+    from redibis.store.subcontract_store import STATUS_MERGED
+
+    stamp = datetime.now(timezone.utc)
+    recorded = {}
+    for kind in ("pii", "quality"):
+        partial = partials.get(kind)
+        merged = (result.get("results") or {}).get(kind)
+        if partial is None or merged is None:
+            continue
+        try:
+            payload = {k: v for k, v in partial.items() if not str(k).startswith("_")}
+            sub = get_subcontract_store().create_from_payload(
+                kind=kind, schema_table=session.table_name,
+                run_id=f"approved_{kind}_{stamp:%Y%m%d_%H%M%S}", payload=payload,
+                created_by="approved-basket",
+                summary_stats={"source": "approved", "session_id": session.session_id,
+                               "merged_version": merged.get("version_after")})
+            sub = get_subcontract_store().set_status(kind, session.table_name, sub.run_id,
+                                                     STATUS_MERGED) or sub
+            recorded[kind] = sub.run_id
+        except Exception as exc:  # noqa: BLE001 — the contract merge already succeeded
+            logger.warning("could not record the approved %s run: %s", kind, exc)
+    return recorded
 
 
 @app.delete("/api/sessions/{session_id}/approved")
@@ -1768,6 +1805,10 @@ class FullCodeBody(BaseModel):
     rules: Optional[list[dict]] = None       # structured curated rules
     code: Optional[str] = None                # or full/fragment Python (parsed only)
     engine: str = "spark"                     # "spark" (default) | "pandas"
+    # "program" (default): the classic program the monitor package ships;
+    # "notebook": complete Jupyter code (read the uploaded file → DataFrame →
+    # QualityDraft rules → validate); "rules": the rules + validate(df) only.
+    style: str = "program"
 
 
 def _resolve_quality_rules(session, table: str, body):
@@ -1800,11 +1841,19 @@ async def generate_full_quality_code(session_id: str, body: FullCodeBody):
     if not table:
         raise HTTPException(status_code=400, detail="Session has no table configured")
 
-    from redibis.services.quality_code import render_quality_program
+    from redibis.services.quality_code import CODE_STYLES, render_notebook_code, render_quality_program
 
+    if body.style not in CODE_STYLES:
+        raise HTTPException(status_code=400, detail=f"style must be one of {', '.join(CODE_STYLES)}")
     curated = _resolve_quality_rules(session, table, body)
     try:
-        code = render_quality_program(table=table, curated=curated, engine=body.engine)
+        if body.style == "program":
+            code = render_quality_program(table=table, curated=curated, engine=body.engine)
+        else:
+            code = render_notebook_code(table=table, curated=curated, style=body.style,
+                                        engine=body.engine,
+                                        data_path=os.path.abspath(str(session.data_path))
+                                        if getattr(session, "data_path", None) else "")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -6628,6 +6677,23 @@ def settings_page(request: Request) -> HTMLResponse:
     )
 
 
+from redibis.webapp.help_content import load_help_content  # noqa: E402
+
+
+@app.get("/help", response_class=HTMLResponse)
+def help_page(request: Request) -> HTMLResponse:
+    """Getting-started help: what redibis is, quick start, how-to sections, videos."""
+    return _TEMPLATES.TemplateResponse(
+        request=request,
+        name="help.html",
+        context=_page_context(
+            request,
+            asset_v=_static_asset_v("app.js"),
+            help=load_help_content(),
+        ),
+    )
+
+
 @app.get("/v2", response_class=HTMLResponse)
 def v2_console(request: Request) -> HTMLResponse:
     """The v2 contract console: runs review/merge, contract view, enrich, share."""
@@ -6748,6 +6814,18 @@ except Exception:
 
     _logging.getLogger("redibis.webapp").exception(
         "prompt routes failed to register — /api/prompts/* unavailable"
+    )
+
+# PII capability contract (verified examples → formal document)
+try:
+    from redibis.webapp.pii_capability_routes import register_pii_capability_routes
+
+    register_pii_capability_routes(app)
+except Exception:
+    import logging as _logging
+
+    _logging.getLogger("redibis.webapp").exception(
+        "pii capability routes failed to register — /api/pii/capabilities/* unavailable"
     )
 
 # Free-text PII scan + de-identification playground API

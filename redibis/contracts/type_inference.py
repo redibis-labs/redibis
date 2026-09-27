@@ -41,7 +41,12 @@ def infer_types_from_dtype(dtype: Any) -> tuple[str, str]:
     if pd.api.types.is_string_dtype(dtype) or pd.api.types.is_object_dtype(dtype):
         return "string", "string"
 
-    # Fallback substring heuristics (Spark / odd dtype strings)
+    # Fallback substring heuristics (Spark / odd dtype strings).
+    # Complex Spark types first: "map<string,int>" must not match "int".
+    if lower.startswith("array<"):
+        return name, "array"
+    if lower.startswith(("map<", "struct<")):
+        return name, "object"
     if any(x in lower for x in ("decimal", "numeric", "float", "double")):
         return name, "decimal" if "decimal" in lower else "number"
     if any(x in lower for x in ("int", "long", "short", "bigint")):
@@ -68,10 +73,21 @@ def apply_inferred_types(prop: dict, dtype: Any) -> dict:
     return prop
 
 
+def is_spark_dataframe(df) -> bool:
+    """True for a ``pyspark.sql.DataFrame`` (checked without importing pyspark)."""
+    return hasattr(df, "sparkSession") and hasattr(df, "schema")
+
+
 def dtype_map_from_dataframe(df) -> dict[str, Any]:
-    """``{column_name: dtype}`` from a sampled DataFrame."""
+    """``{column_name: dtype}`` from a sampled DataFrame (pandas or Spark).
+
+    Spark columns map to their SQL type string (``bigint``, ``decimal(10,2)``…),
+    which ``infer_types_from_dtype`` understands via its substring fallback.
+    """
     if df is None:
         return {}
+    if is_spark_dataframe(df):
+        return {str(f.name): f.dataType.simpleString() for f in df.schema.fields}
     try:
         return {str(c): df[c].dtype for c in df.columns}
     except Exception:

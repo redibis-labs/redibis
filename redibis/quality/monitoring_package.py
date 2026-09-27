@@ -245,20 +245,26 @@ def _render_readme(
     extras = "ge,spark" if spark else "ge"
     runtime_dep = "pyspark" if spark else "pandas"
     run_cmd = (
+        f"# check one partition, print the results (exit 0 all passed · 1 a rule failed)\n"
         f"spark-submit {slug}_quality.py --table {table} \\\n"
-        f'  --partition-filter "txn_date = \'2026-08-30\'" --out results.json'
+        f'  --partition-filter "dt = \'2026-08-30\'" --out results.json\n\n'
+        f"# … and record them in the quality result store, one row per rule\n"
+        f"spark-submit {slug}_quality.py --table {table} \\\n"
+        f'  --partition-filter "dt = \'2026-08-30\'" --partition dt=2026-08-30 \\\n'
+        f'  --results-store "iceberg://prod?namespace=dq"      # or s3://…, postgresql://…, file://…'
         if spark
         else f"python {slug}_quality.py --sample data.csv --out results.json"
     )
     jupyter = (
-        f"""from {slug}_quality import build_rule_set, load_data, validate
+        f"""from {slug}_quality import load_data, record_partition, validate
 
-# You usually already have a Spark DataFrame in a notebook:
-report = validate(existing_spark_dataframe)
+# You choose the partition; the program validates the DataFrame it is given.
+df = spark.table("{table}").where("dt = '2026-08-30'")      # or load_data(partition_filter=...)
+report = validate(df)                    # aggregate rules in one Spark job (spark_mode="fused")
+report["statistics"], [r for r in report["results"] if not r["success"]]
 
-# Or let the program read one full partition itself:
-df = load_data(partition_filter="txn_date = '2026-08-30'")
-report = validate(df)"""
+# Store the verdicts per table × partition × rule (partition_runs / rule_results):
+run = record_partition(df, "dt=2026-08-30", store="iceberg://prod?namespace=dq")"""
         if spark
         else f"""from {slug}_quality import build_rule_set, load_sample, validate
 
@@ -279,6 +285,23 @@ report = validate(df)"""
         if spark
         else f"Both DAGs run `redibis quality-monitor run` against a bounded sample."
     )
+
+    options_block = f"""## Options of `{slug}_quality.py`
+
+| Option | Meaning |
+|---|---|
+| `--table` / `--path --format` | read a catalog table, or a Parquet/CSV/Delta path |
+| `--partition-filter` | Spark SQL predicate selecting the partition to read |
+| `--spark-mode fused\\|persist\\|ge` | `fused` (default): aggregate rules in one Spark job; `ge`: Great Expectations for every rule |
+| `--partition dt=2026-08-30` | record the run in the quality result store as this partition (`partition_column`, `partition_value`, `partition_ts`) |
+| `--results-store URI` | where to record (default `REDIBIS_QUALITY_RESULTS_STORE`, else Iceberg) |
+| `--fingerprint` | data version (e.g. Iceberg snapshot id): the same data and rules are validated once |
+| `--out results.json` | also write the results as JSON |
+
+Consumers then decide from the stored results (`redibis quality-results check`,
+`redibis quality-results latest {table}`) without reading the data again.
+
+""" if spark else ""
 
     return f"""# Redibis quality monitor — `{table}`   (engine: {engine})
 
@@ -325,7 +348,7 @@ Edit the `RULES = [...]` block at the top of `{slug}_quality.py` to add, remove,
 or retune expectations. Nothing is read from `quality/rules.yaml` at runtime —
 the program is self-contained.
 
-## Airflow deployment (optional)
+{options_block}## Airflow deployment (optional)
 
 1. Copy this whole package next to your DAGs and set `REDIBIS_PACKAGE_DIR`
 2. Copy `dags/` into `$AIRFLOW_HOME/dags/`

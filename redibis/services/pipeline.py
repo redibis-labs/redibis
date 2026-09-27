@@ -149,7 +149,11 @@ def apply_quality_rules(
     expectations. The ``column`` field of each rule is merged into kwargs.
     """
     if rule_set and rule_set.rules:
+        from redibis.quality.sql_rules import is_sql_rule
+
         for r in rule_set.rules:
+            if is_sql_rule(r):   # custom SQL runs outside GE: quality.sql_rules
+                continue
             kwargs = dict(r.get("kwargs", {}))
             col = r.get("column")
             if col and "column" not in kwargs:

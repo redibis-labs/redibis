@@ -280,6 +280,15 @@ class ContinuousQualityService:
             qr_path = rd / f"quality-report-{result.run_id}.html"
             try:
                 report_data = qa._extract_report_data(raw_ge) if raw_ge is not None else {"results": []}
+                report_data["results"] = list(report_data.get("results") or []) + [
+                    {"column": r.column or "Table-Level", "rule": "sql", "success": r.success,
+                     "kwargs": {}, "element_count": r.element_count,
+                     "unexpected_count": r.unexpected_count,
+                     "unexpected_pct": r.unexpected_percent,
+                     "partial_unexpected": r.partial_unexpected,
+                     "observed_value": r.observed_value, "meta": {}, "reason": r.message}
+                    for r in result.results if r.expectation_type == "sql"
+                ]   # custom SQL rules run outside Great Expectations
                 qa.export_quality_report(
                     report_data,
                     output_filename=str(qr_path),

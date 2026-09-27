@@ -129,3 +129,115 @@ def test_metadata_no_longer_embeds_profiling_payloads():
         tel = store.metadata.get_column_telemetry("db.t")["email"]
         assert "profiling" not in tel
         assert "samples" not in tel
+
+
+# ── Profile gap: PII-only scans must not write an empty profile record ─────────
+
+def _scan_service(tmp):
+    from redibis.services.scan_service import ScanService
+
+    backend = LocalBackend(tmp)
+    store = ContractStore(backend, "c")
+    return ScanService(backend=backend, store=store)
+
+
+def _df():
+    import pandas as pd
+
+    return pd.DataFrame({"msisdn": ["0100", "0101"], "charge": [1.0, 2.0]})
+
+
+def _cfg(table="cdr", scan_types=None):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(table=table, scan_types=scan_types or ["pii"])
+
+
+def test_no_profile_record_when_profiling_did_not_run():
+    from types import SimpleNamespace
+
+    with tempfile.TemporaryDirectory() as tmp:
+        svc = _scan_service(tmp)
+        run_result = SimpleNamespace(status="success", profile=None, quality_results=None)
+        svc._write_guarded_profiles(_cfg(), "run-42", run_result, _df())
+        assert svc.store.profiles.latest_run_id("cdr") is None
+        assert svc.store.profiles.manifest("cdr", "run-42") is None
+
+
+def test_profiling_scan_records_profile_engine():
+    from types import SimpleNamespace
+
+    with tempfile.TemporaryDirectory() as tmp:
+        svc = _scan_service(tmp)
+        run_result = SimpleNamespace(
+            status="success",
+            profile={"columns": {"msisdn": {"null_rate": 0.0, "ndv": 2}}},
+            quality_results=None,
+        )
+        svc._write_guarded_profiles(_cfg(scan_types=["profile"]), "run-1", run_result, _df())
+        man = svc.store.profiles.manifest("cdr", "run-1")
+        assert man["engines"] == ["profile"]
+        assert "write_error" not in man
+
+
+def test_guarded_profile_write_failure_is_recorded_on_the_manifest(monkeypatch):
+    from types import SimpleNamespace
+
+    with tempfile.TemporaryDirectory() as tmp:
+        svc = _scan_service(tmp)
+
+        def boom(*a, **k):
+            raise RuntimeError("disk full")
+
+        monkeypatch.setattr(svc.store.profiles, "write", boom)
+        run_result = SimpleNamespace(
+            status="success", profile={"columns": {"msisdn": {"null_rate": 0.0}}},
+            quality_results=None,
+        )
+        # Non-fatal: must not raise out of the scan.
+        svc._write_guarded_profiles(_cfg(scan_types=["profile"]), "run-7", run_result, _df())
+        man = svc.store.profiles.manifest("cdr", "run-7")
+        assert man is not None
+        assert "disk full" in man["write_error"]
+        assert svc.store.profiles.latest_run_id("cdr") == "run-7"
+
+
+def test_mark_write_error_preserves_an_existing_manifest():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = ProfileStore(LocalBackend(tmp), "c")
+        store.write("db.t", "r1", profile_result=_FakeProfile(), engines=["profile"])
+        store.mark_write_error("db.t", "r1", "x" * 900)
+        man = store.manifest("db.t", "r1")
+        assert man["engines"] == ["profile"]
+        assert man["columns_written"] == ["email"]
+        assert len(man["write_error"]) == 500
+
+
+def test_write_refuses_samples_only_records():
+    import pytest
+
+    with tempfile.TemporaryDirectory() as tmp:
+        store = ProfileStore(LocalBackend(tmp), "c")
+        with pytest.raises(ValueError):
+            store.write("cdr", "run-42", profile_result=None, quality_result=None,
+                        samples={"msisdn": ["0100"]}, engines=[])
+        assert store.latest_run_id("cdr") is None
+
+
+def test_write_failure_does_not_fail_the_scan(monkeypatch):
+    from types import SimpleNamespace
+
+    with tempfile.TemporaryDirectory() as tmp:
+        svc = _scan_service(tmp)
+
+        def boom(*a, **k):
+            raise RuntimeError("backend down")
+
+        # Both the write and the error stamp fail: still no exception out.
+        monkeypatch.setattr(svc.store.profiles, "write", boom)
+        monkeypatch.setattr(svc.store.profiles, "mark_write_error", boom)
+        run_result = SimpleNamespace(
+            status="success", profile={"columns": {"msisdn": {"null_rate": 0.0}}},
+            quality_results=None,
+        )
+        svc._write_guarded_profiles(_cfg(scan_types=["profile"]), "run-8", run_result, _df())

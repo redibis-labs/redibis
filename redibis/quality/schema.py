@@ -267,6 +267,11 @@ def rule_set_from_contract(contract: dict, *, table: str, version: str = "1") ->
         if ge and ge.get("expectation_type"):
             bindings.append(EngineBinding(engine="great_expectations", definition=ge, fidelity="lossless"))
             stable_id = quality_stable_rule_id(ge["expectation_type"], qr.column, ge.get("kwargs") or {})
+        elif qr.type == "sql":
+            sql_def = {"sql": qr.params.get("query", ""),
+                       **{k: v for k, v in qr.params.items() if k != "query"}}
+            bindings.append(EngineBinding(engine="sql", definition=sql_def, fidelity="lossless"))
+            stable_id = quality_stable_rule_id("sql", qr.column, sql_def)
         rules_v1.append(
             QualityRuleV1(
                 id=qr.rule_id,
@@ -332,7 +337,11 @@ def rule_set_from_ge_rules(
                 severity=str(meta.get("severity") or "P1"),
                 description=str(r.get("description") or ""),
                 stable_id=stable_id,
-                bindings=[EngineBinding(engine="great_expectations", definition={"expectation_type": etype, "kwargs": kwargs}, fidelity="lossless")],
+                bindings=[
+                    EngineBinding(engine="sql", definition=kwargs, fidelity="lossless")
+                    if etype == "sql" else
+                    EngineBinding(engine="great_expectations", definition={"expectation_type": etype, "kwargs": kwargs}, fidelity="lossless")
+                ],
                 extensions={"source": meta.get("source", source)},
             )
         )

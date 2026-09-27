@@ -21,7 +21,8 @@ def test_match_regex_maps_to_portable_regex_rule():
                {"column": "a_party_msisdn", "regex": r"^\+?[1-9]\d{1,14}$"})
     dq = ge_expectation_to_odcs(exp)
     assert dq["rule"] == "regex"
-    assert dq["pattern"] == r"^\+?[1-9]\d{1,14}$"
+    # under ``arguments`` — the ODCS DataQuality model drops a top-level ``pattern``
+    assert dq["arguments"]["pattern"] == r"^\+?[1-9]\d{1,14}$"
     # not the GE-only escape hatch
     assert dq.get("engine") != "greatExpectations"
 

@@ -301,7 +301,7 @@ def test_generated_spark_program_validates_a_spark_dataframe(merchant_df):
         report = module.validate(sdf)
         assert report["statistics"]["evaluated_expectations"] >= 1
 
-        filtered = sdf.filter("seller_id IS NOT NULL")
+        filtered = sdf.filter("merchant_id IS NOT NULL")
         assert filtered.count() <= sdf.count()
     finally:
         spark.stop()
