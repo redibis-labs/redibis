@@ -123,9 +123,9 @@ async function PUT(u,b,opts){
   if(!r.ok)throw new Error(await r.text());
   return r.json();
 }
-async function PATCH(u,b){var o={method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)};var r=await fetch(u,o);if(!r.ok)throw new Error(await r.text());return r.json()}
-async function DEL(u){var r=await fetch(u,{method:"DELETE"});if(!r.ok)throw new Error(await r.text());return r.json()}
-async function POST(u,b){var o={method:"POST"};if(b instanceof FormData)o.body=b;else{o.headers={"Content-Type":"application/json"};o.body=JSON.stringify(b)}var r=await fetch(u,o);if(!r.ok)throw new Error(await r.text());return r.json()}
+async function PATCH(u,b){var o={method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)};var r=await fetch(u,o);if(!r.ok)throw new Error(await r.text());announceContractWrite(u);return r.json()}
+async function DEL(u){var r=await fetch(u,{method:"DELETE"});if(!r.ok)throw new Error(await r.text());announceContractWrite(u);return r.json()}
+async function POST(u,b){var o={method:"POST"};if(b instanceof FormData)o.body=b;else{o.headers={"Content-Type":"application/json"};o.body=JSON.stringify(b)}var r=await fetch(u,o);if(!r.ok)throw new Error(await r.text());announceContractWrite(u);return r.json()}
 function apiErr(e){
   try{var j=JSON.parse(e.message);return typeof j.detail==="string"?j.detail:JSON.stringify(j.detail)||e.message}catch(_){return e.message||String(e)}
 }
@@ -2850,7 +2850,46 @@ async function importConfigsBundle(inp){
 }
 
 // ── Render ──
+// ── Live contract: views that show a contract refresh the moment it changes ──
+// (another tab, Contracts v2, Steward Review, a share link, another user, the CLI).
+var _live={table:null,stop:null};
+var CONTRACT_VIEWS=["contract-detail","contract-pii","contract-quality","contract-definitions"];
+var SESSION_CONTRACT_VIEWS=["approved","approved-edit","quality","pii","results","subcontracts"];
+function liveContractTable(){
+  if(CONTRACT_VIEWS.indexOf(S.view)>=0) return S.contractTable||null;
+  if(SESSION_CONTRACT_VIEWS.indexOf(S.view)>=0) return S.table||(S.result&&S.result.table_name)||null;
+  return null;
+}
+function ensureLiveContract(){
+  var L=window.redibisContractLive; if(!L) return;
+  var t=liveContractTable();
+  if(t===_live.table) return;
+  if(_live.stop) _live.stop();
+  _live.table=t; _live.stop=t?L.watch(t,onLiveContractChange):null;
+}
+async function onLiveContractChange(head){
+  var t=_live.table; if(!t) return;
+  if(window.redibisContractLive.isTyping()){
+    var el=document.activeElement;
+    if(el) el.addEventListener("blur",function(){setTimeout(function(){onLiveContractChange(head)},50)},{once:true});
+    return;
+  }
+  try{
+    if(S.view==="contract-detail") await loadCD(t);
+    else if(S.view==="contract-pii"){await loadContractPiiView(t);render()}
+    else if(S.view==="contract-quality"){await loadContractQualityView(t);render()}
+    else if(S.view==="contract-definitions"){await loadContractDefView(t);render()}
+    else if(SESSION_CONTRACT_VIEWS.indexOf(S.view)>=0){await loadApproved();render()}
+    if(!window.redibisContractLive.savedHereRecently(t)) addLog("Contract "+t+" updated to v"+head.version,"step");
+  }catch(e){console.warn("live contract refresh failed",e)}
+}
+function announceContractWrite(u){
+  var L=window.redibisContractLive; if(!L) return;
+  var t=L.tableOfPath(u)||(/\/approved\/(merge|pii|quality)|\/runs\/|\/merge/.test(u)?(S.table||""):"");
+  if(t) L.announce(t);
+}
 function render(){
+  try{ensureLiveContract()}catch(_){}
   try{renderInner()}catch(e){
     console.error("render failed:",e);
     var app=document.getElementById("app");

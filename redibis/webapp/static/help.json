@@ -132,7 +132,7 @@
         "Every Great Expectations rule can be used, and you can add your own business rules in SQL (for example: no negative amounts, every refund has a refund id). They run on the same data, next to the discovered rules.",
         "Re-check new data against the contract at any time; schema drift (added, dropped or retyped columns) is reported too, and a failure returns a non-zero exit code for CI.",
         "Export the same rules as a Great Expectations suite, SodaCL checks or dbt tests (SodaCL and dbt need the contracts extra), or generate Airflow DAGs to run the checks on a schedule.",
-        "Working in a notebook? Author rules from a pandas or Spark DataFrame (a full partition gives more accurate rules), curate them in code, then review, edit and merge them with redibis quality-run. The Quality page's full-code program runs in Jupyter too: validate on a full partition, edit RULES, then save_quality_run(df). See the quality authoring tutorial in docs/tutorials and the full reference in docs/QUALITY_RULES.md."
+        "Working in a notebook? Author rules from a pandas or Spark DataFrame (a full partition gives more accurate rules), curate them in code, then review, edit and merge them with redibis quality-run. The Quality page's full-code program runs in Jupyter too: validate on a full partition, edit RULES, then save_quality_run(df)."
       ],
       "steps": [
         {

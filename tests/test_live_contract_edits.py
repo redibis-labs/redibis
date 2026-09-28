@@ -204,3 +204,86 @@ def test_a_plain_classification_does_not_make_a_column_pii(store):
     apply_column_edits(store, table, {"id": {"classification": "internal"}}, decided_by="share:x")
     prop = _prop(store, table, "id")
     assert prop["classification"] == "internal" and not column_is_pii(prop)
+
+
+def test_pii_off_records_what_the_contract_keeps(store):
+    """The steward's saved tags / classification are the non-PII ones, not the form's old values."""
+    table = "db.customers"
+    _seed(store, table)
+    svc = StewardReviewService(store)
+    _steward_save(svc, table, "email", False, classification="pii_indirect",
+                  tags=["gdpr_personal_data", "pii_indirect", "contact"])
+    col = svc.column(table, "email", actor="steward")
+    assert col["current"]["tags"] == ["contact"] and not col["current"]["classification"]
+    human = {f: [c for c in cards if c.get("source") == "human"] for f, cards in col["engines"].items()}
+    assert human["tags"][0]["value"] == ["contact"] and human["classification"][0]["value"] == ""
+
+
+def test_a_share_form_sending_every_field_changes_only_what_was_edited(store):
+    """The share page sends every field of every column back; empty PII fields on a
+    normal column must not turn it into PII."""
+    from redibis.services.contract_edits import apply_column_edits
+
+    table = "db.customers"
+    _seed(store, table)
+    before = store.get_active(table)["version"]
+    email = _prop(store, table, "email")
+    form = {  # what share.html sends for scope "all" when nothing was edited
+        "id": {"business": {"definition": ""}, "classification": "", "pii": {"entity_type": ""}, "quality": []},
+        "email": {"business": {"definition": ""}, "classification": email["classification"],
+                  "pii": {"entity_type": email["entity_type"]}, "quality": []},
+    }
+    out = apply_column_edits(store, table, form, decided_by="share:x")
+    assert out["applied"] == [] and store.get_active(table)["version"] == before
+    assert not column_is_pii(_prop(store, table, "id"))
+
+    form["id"]["business"] = {"definition": "Customer key"}
+    out = apply_column_edits(store, table, form, decided_by="share:x")
+    assert out["applied"] == ["id.business"]
+    assert _prop(store, table, "id")["business"]["definition"] == "Customer key"
+    assert not column_is_pii(_prop(store, table, "id")) and column_is_pii(_prop(store, table, "email"))
+
+
+def test_contract_events_push_every_new_version():
+    """Every page listens to this stream: the head at once, then each new version."""
+    import json as _json
+    import threading
+    import time
+
+    from fastapi.testclient import TestClient
+
+    from redibis.webapp import backend
+
+    table = f"live.t{uuid.uuid4().hex[:8]}"
+    _seed(backend._cs(), table)
+    first = backend._cs().get_active(table)["version"]
+    results: list = []
+
+    def other_user():                       # someone switches PII off while the page listens
+        time.sleep(1.0)
+        results.append(backend._cs().set_pii_decision(
+            table, "email", "not_pii", decided_by="other-user").version_after)
+
+    threading.Thread(target=other_user).start()
+    # (the test client hands the stream over when it ends; a browser gets each event at once)
+    body = TestClient(backend.app).get(f"/api/contracts/{table}/events?max_seconds=3")
+    assert body.headers["content-type"].startswith("text/event-stream")
+    versions = [_json.loads(line[6:])["version"] for line in body.text.splitlines() if line.startswith("data: ")]
+    assert versions == [first, results[0]] and results[0] != first
+
+
+def test_share_events_and_pages_listen():
+    from fastapi.testclient import TestClient
+
+    from redibis.webapp import backend
+
+    client = TestClient(backend.app)
+    assert client.get("/api/share/no-such-token/events").status_code == 404
+    live = (REPO / "redibis/webapp/static/contract_live.js").read_text(encoding="utf-8")
+    assert "EventSource" in live and "BroadcastChannel" in live
+    for page in ("templates/v2.html", "templates/index.html", "templates/share.html"):
+        assert "/static/contract_live.js" in (REPO / "redibis/webapp" / page).read_text(encoding="utf-8"), page
+    app_js = (REPO / "redibis/webapp/static/app.js").read_text(encoding="utf-8")
+    assert "function ensureLiveContract" in app_js and "announceContractWrite(u)" in app_js
+    steward = (REPO / "redibis/webapp/static/steward_review.mjs").read_text(encoding="utf-8")
+    assert "window.refreshStewardReview" in steward and "secret · masked" in steward

@@ -738,6 +738,9 @@ class ContractStore:
             workflow       = workflow,
             timestamp      = timestamp,
         )
+        from redibis.store.change_feed import bump
+
+        bump(table)                          # live views notice the new version at once
         hook = getattr(self, "on_upsert", None)
         if callable(hook):
             try:
@@ -1277,7 +1280,9 @@ class ContractStore:
         self.quality_decisions.clear(table)
         self.definition_decisions.clear(table)
         deleted.extend(self.metadata.clear(table))
+        from redibis.store.change_feed import bump
 
+        bump(table)
         return {
             "table": table,
             "deleted_keys": deleted,

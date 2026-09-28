@@ -36,7 +36,9 @@ def split_column_edits(columns: dict[str, dict], *, active: dict,
     """Split ``{column: {field: value}}`` into definition patches, PII field edits and the rest.
 
     ``allowed(field)`` filters by the caller's permission (e.g. a share link's scope).
-    Tags are added to the column's current tags (as share links always did).
+    Values equal to what the contract already says are skipped — a form that sends every
+    field back (the share page does) changes only what was edited. Tags are added to the
+    column's current tags; a ``business`` block is merged into the current one.
     Returns ``(definitions, pii, rest, applied_labels)``.
     """
     current = {p.get("name"): p for s in active.get("schema", []) or []
@@ -48,11 +50,16 @@ def split_column_edits(columns: dict[str, dict], *, active: dict,
     for column, fields in (columns or {}).items():
         if column not in current or not isinstance(fields, dict):
             continue
+        prop = current[column]
         for field, value in fields.items():
             if not allowed(field):
                 continue
             if field == "tags":
-                value = sorted(set(current[column].get("tags") or []) | set(value or []))
+                value = sorted(set(prop.get("tags") or []) | set(value or []))
+            elif field == "business" and isinstance(value, dict):
+                value = {**(prop.get("business") or {}), **value}
+            if _unchanged(prop, field, value):
+                continue
             if field in DEFINITION_FIELDS:
                 definitions.setdefault(column, {})[field] = value
             elif field in PII_FIELDS:
@@ -61,6 +68,45 @@ def split_column_edits(columns: dict[str, dict], *, active: dict,
                 rest.setdefault(column, {})[field] = value
             applied.append(f"{column}.{field}")
     return definitions, pii, rest, applied
+
+
+def _unchanged(prop: dict, field: str, value: Any) -> bool:
+    """True when ``value`` says nothing new about the column."""
+    from redibis.contracts.privacy import col_entity_type
+
+    if field == "classification":
+        now = prop.get("classification") or (prop.get("privacy") or {}).get("classification") or ""
+        return str(value or "") == str(now)
+    if field == "pii":
+        block = value if isinstance(value, dict) else {}
+        if "detected" in block:
+            return False
+        entity = str(block.get("entity_type") or "")
+        return not entity or entity == (col_entity_type(prop) or "")
+    if field == "tags":
+        return sorted(value or []) == sorted(prop.get("tags") or [])
+    if field in ("description", "businessName"):
+        return str(value or "") == str(prop.get(field) or "")
+    return _blank(value) == _blank(prop.get(field))
+
+
+def _blank(value: Any) -> Any:
+    """Empty strings / lists / dicts read as "not set", so an empty form field is no edit."""
+    if isinstance(value, dict):
+        value = {k: _blank(v) for k, v in value.items()}
+        value = {k: v for k, v in value.items() if v is not None}
+    if value in ("", [], {}, None):
+        return None
+    return value
+
+
+def _turns_pii_on(fields: dict) -> bool:
+    """Does this edit say the column is PII (or a secret)? An empty or plain value does not."""
+    block = fields.get("pii") if isinstance(fields.get("pii"), dict) else {}
+    cls = str(fields.get("classification") or "").lower()
+    return bool(block.get("detected") is True or block.get("entity_type")
+                or isinstance(fields.get("privacy"), dict) or isinstance(fields.get("maskingPolicy"), dict)
+                or cls.startswith("pii") or cls == "security_sensitive")
 
 
 def apply_column_edits(store: Any, table: str, columns: dict[str, dict], *, decided_by: str,
@@ -72,11 +118,16 @@ def apply_column_edits(store: Any, table: str, columns: dict[str, dict], *, deci
         raise ValueError(f"No active contract for {table!r}")
     definitions, pii, rest, applied = split_column_edits(columns, active=active, allowed=allowed)
     for column in list(pii):
-        # A plain classification ("internal") of a column that is not PII stays a plain field.
+        # A column that is not PII becomes PII only when the edit says so; a plain
+        # classification ("internal") stays a plain field.
         fields = pii[column]
-        if set(fields) == {"classification"} and not _is_pii_now(store, table, active, column) \
-                and not str(fields["classification"] or "").lower().startswith("pii"):
-            rest.setdefault(column, {}).update(pii.pop(column))
+        block = fields.get("pii") if isinstance(fields.get("pii"), dict) else {}
+        if block.get("detected") is False:
+            continue                                # PII off: handled as it is
+        if not _is_pii_now(store, table, active, column) and not _turns_pii_on(fields):
+            plain = {k: v for k, v in pii.pop(column).items() if k == "classification"}
+            if plain:
+                rest.setdefault(column, {}).update(plain)
     if definitions:
         store.patch_definitions(table, column_patches=definitions, decided_by=decided_by,
                                 run_id=run_id or "definitions-patch")

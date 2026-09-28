@@ -34,8 +34,17 @@ function wrapIdent(s) {
   return esc(s).replace(/([._/-])/g, "$1&#8203;");
 }
 
-function piiIcon(isPii, extra = "") {
+function piiIcon(isPii, extra = "", classification = "") {
   const compact = String(extra).includes("compact");
+  if (!isPii && String(classification || "").toLowerCase() === "security_sensitive") {
+    // Credentials (password hashes, tokens, keys): not personal data, but masked (redact).
+    return `<span class="sr-pii-icon secret ${extra}" title="Secret — not personal data, masked (redact)" aria-label="Secret">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+        <path fill="currentColor" d="M7 14a2 2 0 110-4 2 2 0 010 4zm5.65-4A6 6 0 107 18a6 6 0 005.65-4H17v4h4v-4h2v-4H12.65z"/>
+      </svg>
+      ${compact ? "" : "<span>secret · masked</span>"}
+    </span>`;
+  }
   if (isPii) {
     return `<span class="sr-pii-icon on ${extra}" title="PII detected" aria-label="PII detected">
       <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
@@ -234,6 +243,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     .sr-pii-icon{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.04em}
     .sr-pii-icon.on{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
     .sr-pii-icon.off{background:#dcfce7;color:#166534;border:1px solid #86efac}
+    .sr-pii-icon.secret{background:#fef3c7;color:#92400e;border:1px solid #fcd34d}
     .steward-rail .sr-pii-icon{padding:1px 5px}
     .steward-rail .sr-pii-icon svg{width:14px;height:14px}
     .sr-choice{font-size:11px;color:#475569;margin:4px 0 8px}
@@ -398,7 +408,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
       <div class="item ${state.step==="overview"?"active":""}" data-step="overview">Overview</div>
       <h4>columns</h4>
       ${cols.map((c,i)=>`<div class="item ${state.step==="column"&&state.colIndex===i?"active":""}" data-col="${esc(c.column)}" data-i="${i}">
-        ${STATUS_MARK[c.status]||"·"} ${AGREEMENT_MARK[c.agreement]||""} ${piiIcon(c.pii, "compact")} ${wrapIdent(c.column)}
+        ${STATUS_MARK[c.status]||"·"} ${AGREEMENT_MARK[c.agreement]||""} ${piiIcon(c.pii, "compact", c.classification)} ${wrapIdent(c.column)}
       </div>`).join("")}
       <p class="hint" style="margin-top:12px"><a href="/review?table=${encodeURIComponent(table)}" target="_blank">Open run explorer</a></p>
     `;
@@ -630,7 +640,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     const on = state.edit.isPii;
     return `<div>
       <h4>Is this column PII? ${agreementChip((c.agreement||{}).pii)}</h4>
-      <p>Current: ${piiIcon(c.current&&c.current.pii)}
+      <p>Current: ${piiIcon(c.current&&c.current.pii, "", c.current&&c.current.classification)}
          · entity ${esc((c.current&&c.current.entity_type)||"—")} · ${esc((c.current&&c.current.classification)||"—")}</p>
       ${state.editOpen ? `<div class="pii-toggle">
         <button type="button" class="btn-sm ${on?"on-pii":""}" id="srPiiOn">PII on</button>
@@ -680,7 +690,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
     const current = c.current || {};
     main.innerHTML = `${errorBanner()}<div class="sr-card">
       <div class="sr-card-head">
-        ${piiIcon(current.pii)}
+        ${piiIcon(current.pii, "", current.classification)}
         <div>
           <h3>Column ${wrapIdent(c.column)}</h3>
           <p>${c.position} / ${c.of} · ${esc(c.review&&c.review.status||"pending")}</p>
@@ -691,7 +701,7 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
         <div>${profilePanel(c)}</div>
         <div>
           <h4>Current</h4>
-          <p>${piiIcon(current.pii)} · ${esc(current.entity_type)} · ${esc(current.classification)}</p>
+          <p>${piiIcon(current.pii, "", current.classification)} · ${esc(current.entity_type)} · ${esc(current.classification)}</p>
           <p class="iso">${esc(current.definition)}</p>
           <p>tags: ${esc((current.tags||[]).join(", "))}</p>
         </div>
@@ -1149,6 +1159,22 @@ export async function mountStewardReview(el, { table, api, ws } = {}) {
   await loadOverview();
   render();
   root.focus();
+
+  // The contract changed (here, on another page, or by another user): reload in place,
+  // staying on the same column. An open edit form is left as typed — only the rail and
+  // header refresh until it is saved or cancelled.
+  window.refreshStewardReview = async function refreshStewardReview() {
+    if (!root.isConnected) return;
+    try {
+      await loadOverview();
+      if (state.editOpen) { renderHeader(); renderRail(); return; }
+      if (state.step === "column" && state.column && state.column.column) await loadColumn(state.column.column);
+      render();
+    } catch (e) {
+      state.error = e && e.message ? e.message : String(e);
+      render();
+    }
+  };
 }
 
 if (typeof window !== "undefined") {

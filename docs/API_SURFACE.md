@@ -1,14 +1,10 @@
 # HTTP API surface (open-core dashboard)
 
-_Last updated: 2026-09-27_
+_Last updated: 2026-09-28_
 
 Generated from FastAPI route decorators in `redibis/webapp/`.
 Auth is on by default — most `/api/*` routes require a session cookie.
 Interactive docs: `/docs` (Swagger) after login.
-
-Quality rules — how they are authored, stored as quality runs, reviewed and merged,
-and the matching Python and CLI entry points — are documented in
-**[QUALITY_RULES.md](QUALITY_RULES.md)**.
 
 **355 routes** listed below.
 
@@ -131,6 +127,7 @@ and the matching Python and CLI entry points — are documented in
 | `POST` | `/api/contracts/{table}/enrich/merge` |
 | `GET` | `/api/contracts/{table}/enrich/preflight` |
 | `POST` | `/api/contracts/{table}/enrich/validate` |
+| `GET` | `/api/contracts/{table}/events` |
 | `GET` | `/api/contracts/{table}/example-docs` |
 | `POST` | `/api/contracts/{table}/example-docs` |
 | `DELETE` | `/api/contracts/{table}/example-docs/{filename}` |
@@ -392,8 +389,7 @@ and the matching Python and CLI entry points — are documented in
 `redibis quality-run import`) are served by the same routes: `GET` shows the rules,
 `PATCH` edits them, `merge` applies them to the active contract (each column in the
 run has its rules replaced), `discard` drops the run. List a table's quality runs with
-`GET /api/contracts/{table}/runs?kind=quality`. See
-[QUALITY_RULES.md](QUALITY_RULES.md#8-reference).
+`GET /api/contracts/{table}/runs?kind=quality`.
 
 | Method | Path |
 |--------|------|
@@ -512,6 +508,7 @@ run has its rules replaced), `discard` drops the run. List a table's quality run
 |--------|------|
 | `DELETE` | `/api/share/{token}` |
 | `GET` | `/api/share/{token}` |
+| `GET` | `/api/share/{token}/events` |
 | `PATCH` | `/api/share/{token}` |
 
 ## Users / auth admin

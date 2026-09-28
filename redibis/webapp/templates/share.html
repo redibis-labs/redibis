@@ -27,6 +27,7 @@ button{font:inherit;border:0;background:var(--accent);color:#fff;border-radius:8
 <div class="container" id="container">Loading…</div>
 <div class="toast" id="toast"></div>
 <script src="/static/auth.js"></script>
+<script src="/static/contract_live.js"></script>
 <script>
 const TOKEN = "{{ token }}";
 const $ = (id)=>document.getElementById(id);
@@ -87,10 +88,22 @@ async function save(){
     else { columns[col][field]=val; }
   });
   try{ const r = await api("PATCH","/api/share/"+TOKEN,{edits:{columns}});
-       toast(`Applied ${r.applied_fields.length} field(s) → v${r.version_after}`); load(); }
+       DIRTY=false; toast(`Applied ${r.applied_fields.length} field(s) → v${r.version_after}`); load(); }
   catch(e){ toast(e.message,false); }
 }
-load();
+// Live: reload when the contract changes elsewhere — unless you have unsaved edits here.
+let DIRTY=false;
+document.addEventListener("input", e=>{ if(e.target.closest && e.target.closest("[data-col]")) DIRTY=true; });
+async function reloadIfClean(){
+  if(DIRTY){ toast("The contract was changed by someone else — Apply saves your edits on top of it"); return; }
+  await load(); toast("Contract updated");
+}
+load().then(()=>{
+  if(window.redibisContractLive){
+    window.redibisContractLive.watch("share:"+TOKEN, reloadIfClean,
+      {eventsUrl:"/api/share/"+TOKEN+"/events", headUrl:"/api/share/"+TOKEN});
+  }
+});
 </script>
 </body>
 </html>

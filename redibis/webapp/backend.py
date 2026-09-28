@@ -3060,17 +3060,74 @@ async def switch_pii_column(request: Request, table: str, column: str, body: Pii
             "version_after": res.version_after}
 
 
-@app.get("/api/contracts/{table}/head")
-async def contract_head(table: str) -> dict:
-    """The live contract's version and last change — pages poll it to stay in sync."""
-    active = store_op(_cs().get_active, table)
+def _contract_head(store: Any, table: str) -> Optional[dict]:
+    """Version and last change of the active contract (None when there is none)."""
+    active = store_op(store.get_active, table)
     if active is None:
-        raise HTTPException(status_code=404, detail=f"No active contract for '{table}'")
-    last = (_cs().get_history(table, limit=1) or [None])[0]
+        return None
+    last = (store.get_history(table, limit=1) or [None])[0]
     return {"table": table, "version": active.get("version"),
             "changed_at": getattr(last, "timestamp", "") or "",
             "changed_by": getattr(last, "run_id", "") or "",
             "workflow": getattr(last, "workflow", "") or ""}
+
+
+@app.get("/api/contracts/{table}/head")
+async def contract_head(table: str) -> dict:
+    """The live contract's version and last change."""
+    head = _contract_head(_cs(), table)
+    if head is None:
+        raise HTTPException(status_code=404, detail=f"No active contract for '{table}'")
+    return head
+
+
+def _contract_event_stream(request: Request, store: Any, table: str, max_seconds: float):
+    """Server-sent events: the contract head now, then again each time the version changes.
+
+    Writes in this process are noticed within half a second (``change_feed``); writes
+    from elsewhere (CLI, another worker) within ``_REREAD_S``. The stream ends after
+    ``max_seconds`` and the browser's EventSource reconnects on its own.
+    """
+    import asyncio
+    import time
+
+    from fastapi.responses import StreamingResponse
+
+    from redibis.store.change_feed import stamp
+
+    reread_s, tick_s, ping_s = 5.0, 0.5, 15.0
+
+    async def events():
+        started = last_read = last_sent = time.monotonic()
+        seen_stamp = stamp(table)
+        head = await asyncio.to_thread(_contract_head, store, table)
+        version = (head or {}).get("version")
+        yield f"event: contract\ndata: {json.dumps(head or {'table': table, 'version': None})}\n\n"
+        while time.monotonic() - started < max_seconds:
+            if await request.is_disconnected():
+                return
+            await asyncio.sleep(tick_s)
+            now = time.monotonic()
+            if stamp(table) == seen_stamp and now - last_read < reread_s:
+                if now - last_sent >= ping_s:
+                    yield ": keep-alive\n\n"
+                    last_sent = now
+                continue
+            seen_stamp, last_read = stamp(table), now
+            head = await asyncio.to_thread(_contract_head, store, table)
+            if (head or {}).get("version") != version:
+                version = (head or {}).get("version")
+                yield f"event: contract\ndata: {json.dumps(head or {'table': table, 'version': None})}\n\n"
+                last_sent = now
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.get("/api/contracts/{table}/events")
+async def contract_events(request: Request, table: str, max_seconds: float = 300.0):
+    """Live contract changes (server-sent events) — every page showing the contract listens."""
+    return _contract_event_stream(request, _cs(), table, min(max(max_seconds, 1.0), 900.0))
 
 
 @app.get("/api/contracts/{table}/yaml")
@@ -4773,6 +4830,17 @@ async def edit_via_share(token: str, body: ShareEditBody) -> dict:
         return {"status": "noop", "applied_fields": [], "scope": share.scope}
     return {"status": "applied", "applied_fields": applied, "scope": share.scope,
             "version_after": (store_op(_cs().get_active, share.table) or {}).get("version")}
+
+
+@app.get("/api/share/{token}/events")
+async def share_events(request: Request, token: str, max_seconds: float = 300.0):
+    """Live changes of the shared contract (version only), for the share page."""
+    share = get_auth_store().get_share(token)
+    if share is None:
+        raise HTTPException(status_code=404, detail="Share not found")
+    if share.is_expired():
+        raise HTTPException(status_code=410, detail="Share link expired")
+    return _contract_event_stream(request, _cs(), share.table, min(max(max_seconds, 1.0), 900.0))
 
 
 @app.delete("/api/share/{token}")

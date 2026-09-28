@@ -120,6 +120,7 @@ tr.diff-row td{vertical-align:top}
 <div id="batchPanel"></div>
 <div class="toast" id="toast"></div>
 
+<script src="/static/contract_live.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 let STATE = { table: null, tab: "contract", memoryEnabled: false, ws: "default" };
@@ -148,6 +149,9 @@ async function api(method, path, body, isForm){
   }
   const ct = r.headers.get("content-type")||"";
   const data = ct.includes("json") ? await r.json() : await r.text();
+  if(r.ok && method !== "GET" && window.redibisContractLive){
+    window.redibisContractLive.announce(window.redibisContractLive.tableOfPath(path));
+  }
   if(!r.ok){
     const detail = (data && data.detail) || (typeof data === "string" && data) || r.statusText;
     if(detail && typeof detail === "object"){
@@ -257,6 +261,9 @@ function propIsPii(p){
     || (p.tags||[]).some(t=>PII_TAGS.has(String(t).toLowerCase()))
     || String(p.classification||pv.classification||"").toLowerCase().startsWith("pii"));
 }
+function propSecret(p){
+  return String(p.classification||(p.privacy||{}).classification||"").toLowerCase()==="security_sensitive";
+}
 function propEntity(p){
   return p.entity_type || ((p.privacy||{}).classification_engine||{}).entity_type || (p.pii||{}).entity_type || "";
 }
@@ -302,7 +309,8 @@ async function renderContract(){
       <td><input class="qe-def" data-col="${esc(p.name)}" value="${esc(p.description||"")}" placeholder="add a definition…"/></td>
       <td style="white-space:nowrap"><label class="qe-switch"><input type="checkbox" ${pii?"checked":""}
           onchange="switchPii(${jsArg(p.name)},this.checked,${jsArg(ent)})"/><span>${pii?"PII":"off"}</span></label>
-        ${pii&&ent?`<span class="chip chip-red">${esc(ent)}</span>`:""} ${decided}</td>
+        ${pii&&ent?`<span class="chip chip-red">${esc(ent)}</span>`:""}
+        ${!pii&&propSecret(p)?`<span class="chip chip-amber" title="Credential — not personal data, masked (redact)">secret · masked${ent?" · "+esc(ent):""}</span>`:""} ${decided}</td>
       <td>${qCell(p.name)}</td></tr>`;
   }).join("");
   const tableRules = byCol[""]||[];
@@ -375,23 +383,38 @@ async function refreshContractText(){
       : JSON.stringify(await api("GET", contractPath(STATE.table)),null,2);
   }catch(e){}
 }
-// Live sync: poll the contract head; when someone else changes it, refresh this view
-// (or say so, when you are typing, so nothing you type is lost).
-let _watch = null;
+// Live sync: the contract is pushed to this page the moment anyone changes it (see
+// /static/contract_live.js). Views refresh in place; while you type, you get a notice
+// instead, so nothing you are typing is lost.
+let _watchStop = null, _watchTable = null;
 function watchContract(){
-  if(_watch) return;
-  _watch = setInterval(async ()=>{
-    if(!STATE.table || document.hidden) return;
-    let head; try{ head = await api("GET", contractPath(STATE.table, "/head")); }catch(e){ return; }
-    if(STATE.version && head.version && head.version !== STATE.version){
-      const who = head.changed_by ? ` (${head.changed_by})` : "";
-      STATE.version = head.version;
-      const typing = document.activeElement && ["INPUT","TEXTAREA","SELECT"].includes(document.activeElement.tagName);
-      if(typing || !["contract","details"].includes(STATE.tab)){
-        toast(`Contract changed to v${head.version}${who} — reopen the tab to see it`);
-      } else { toast(`Contract updated to v${head.version}${who}`); render(); }
-    }
-  }, 8000);
+  if(!window.redibisContractLive || _watchTable === STATE.table) return;
+  if(_watchStop) _watchStop();
+  _watchTable = STATE.table;
+  if(!STATE.table){ _watchStop = null; return; }
+  _watchStop = window.redibisContractLive.watch(STATE.table, onContractChanged, {ws: STATE.ws});
+}
+function onContractChanged(head){
+  const who = head.changed_by ? ` (${head.changed_by})` : "";
+  const shown = STATE.version && head.version === STATE.version;   // this view already shows it
+  const mine = shown || window.redibisContractLive.savedHereRecently(STATE.table);
+  STATE.version = head.version;
+  if(shown) return;
+  if(window.redibisContractLive.isTyping()){
+    toast(`Contract changed to v${head.version}${who} — it refreshes when you leave the field`);
+    const el = document.activeElement;
+    if(el) el.addEventListener("blur", ()=>setTimeout(refreshOpenTab, 50), {once:true});
+    return;
+  }
+  if(!mine) toast(`Contract updated to v${head.version}${who}`);
+  refreshOpenTab();
+}
+function refreshOpenTab(){
+  if(STATE.tab === "review" && typeof window.refreshStewardReview === "function"){
+    window.refreshStewardReview();            // keeps the column you are on (and an open edit form)
+  } else if(["contract","details","runs"].includes(STATE.tab)){
+    render();
+  }
 }
 
 // ── Details view (PII evidence + rules + export + consent + purge) ──────────

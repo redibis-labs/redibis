@@ -132,7 +132,7 @@ redibis <command> --help
 | `deep-scan` | Multi-producer evidence scan (+ optional synthesis bundle) |
 | `show` / `list` / `history` / `merge` | Inspect or dump active contracts |
 | `runs` | List / merge / discard run subcontracts (`--kind pii` or `--kind quality`) |
-| `quality-run` (`quality_run`) | Review quality rules authored in code or the Quality page: list, show, diff, edit, export, import, merge, discard — see [docs/QUALITY_RULES.md](docs/QUALITY_RULES.md) |
+| `quality-run` (`quality_run`) | Review quality rules authored in code or the Quality page: list, show, diff, edit, export, import, merge, discard |
 | `contract` | Lifecycle views: PII/quality/definitions, strip/add PII, purge, export package |
 | `steward` | Steward review overview, column verdicts, export-verdicts, finalize |
 | `verdict` | Portable verdict package export / preview / import |
@@ -194,11 +194,6 @@ NER weights are not bundled — download once with
 Hands-on walkthrough with the shipped e-shop customer CSV:
 
 → **[docs/tutorials/INTRO.md](docs/tutorials/INTRO.md)**  
-→ **[docs/tutorials/QUALITY_AUTHORING.md](docs/tutorials/QUALITY_AUTHORING.md)** — author
-quality rules from a Spark or pandas DataFrame, review them with `redibis quality-run`, merge
-them into the contract  
-→ **[docs/QUALITY_RULES.md](docs/QUALITY_RULES.md)** — quality rules reference: rule vocabulary,
-lifecycle, merge semantics, Python / CLI / HTTP entry points  
 → Fixture: [`tests/data/realistic_eshop_customer_account.csv`](tests/data/realistic_eshop_customer_account.csv)
 
 Further tutorials and deep CLI sheets remain in the monorepo until each is

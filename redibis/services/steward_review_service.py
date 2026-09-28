@@ -633,6 +633,7 @@ class StewardReviewService:
         """Save several field verdicts in one request (PII + definition + tags, …)."""
         if not verdicts:
             raise ReviewInputError("at least one field verdict is required")
+        verdicts = _without_pii_labels_when_off(verdicts)
         last = None
         for item in verdicts:
             field = item.field if isinstance(item, FieldVerdict) else str(item.get("field") or "")
@@ -1055,6 +1056,38 @@ class StewardReviewService:
         )
         self.ledger.append(table, column, [gen])
         fv.evidence_refs = list(fv.evidence_refs) + [gen.id]
+
+
+def _without_pii_labels_when_off(verdicts: list) -> list:
+    """PII switched off in this save: drop the PII tags / classification the form still
+    carries, so the ledger records what the contract keeps (a normal column)."""
+    def get(v, key):
+        return getattr(v, key, None) if isinstance(v, FieldVerdict) else v.get(key)
+
+    pii = next((v for v in verdicts if get(v, "field") == "pii"), None)
+    if pii is None or get(pii, "decision") not in ("edit", "accept"):
+        return verdicts
+    value = get(pii, "value")
+    if value is None or _coerce_pii(value):
+        return verdicts
+    out = []
+    for v in verdicts:
+        field, val = get(v, "field"), get(v, "value")
+        clean = val
+        if field == "tags" and val is not None:
+            clean = [t for t in _as_list(val) if not _is_pii_tag(t)]
+        elif field == "classification" and str(val or "").lower().startswith("pii"):
+            clean = ""
+        if clean is not val:
+            if isinstance(v, FieldVerdict):
+                import copy
+
+                v = copy.copy(v)
+                v.value = clean
+            else:
+                v = {**v, "value": clean}
+        out.append(v)
+    return out
 
 
 def _as_list(value: Any) -> list:
